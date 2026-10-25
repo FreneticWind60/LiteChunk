@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#FFF4F6F9</color>
+    <color name="surface">#FFFFFFFF</color>
+    <color name="surface_high">#FFF2F5F9</color>
+    <color name="accent">#FF0F9E68</color>
+    <color name="accent_dim">#FF0C8657</color>
+    <color name="accent_container">#FFE1F5EC</color>
+    <color name="accent_alt">#FF2568CE</color>
+    <color name="accent_alt_container">#FFE6EFFC</color>
+    <color name="accent_12">#1F0F9E68</color>
+    <color name="accent_24">#3D0F9E68</color>
+    <color name="text">#FF0E1A24</color>
+    <color name="text_dim">#FF59697A</color>
+    <color name="text_faint">#FF8B9AA8</color>
+    <color name="danger">#FFD92D20</color>
+    <color name="danger_container">#FFFEECEA</color>
+    <color name="divider">#FFE1E7EE</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="icon_bg">#FF0E7A52</color>
+    <color name="row_bg">#FFF7F9FC</color>
+    <color name="row_bg_pressed">#FFEDF1F6</color>
+    <color name="header_start">#FFE9F7F0</color>
+    <color name="header_end">#FFEFF4FB</color>
+</resources>

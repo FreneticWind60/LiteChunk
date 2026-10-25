@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fluent UI Info 16 Regular geometry (MIT), used as the About entry point. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="?attr/colorControlNormal"
+    android:viewportHeight="16"
+    android:viewportWidth="16">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M8,1.5a6.5,6.5 0 1,1 0,13 6.5,6.5 0 0,1 0,-13zM8,2.6a5.4,5.4 0 1,0 0,10.8A5.4,5.4 0 0,0 8,2.6z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M8,4.3a1,1 0 1,1 0,2 1,1 0 0,1 0,-2zM8.5,7.4a0.6,0.6 0 0,0 -1,0v4.2a0.5,0.5 0 0,0 1,0z" />
+</vector>

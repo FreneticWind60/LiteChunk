@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fluent UI Share Android 16 Regular (MIT). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="?attr/colorControlNormal"
+    android:viewportHeight="16"
+    android:viewportWidth="16">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,3a1,1 0 1,0 0,2a1,1 0 0,0 0,-2m-2,1a2,2 0 1,1 0.491,1.313L5.956,7.581a2,2 0 0,1 0,0.838l4.535,2.268a2,2 0 1,1 -0.447,0.894L5.508,9.313a2,2 0 1,1 0,-2.627l4.536,-2.267A2,2 0 0,1 10,4M3,8a1,1 0 1,0 2,0a1,1 0 0,0 -2,0m8,4a1,1 0 1,0 2,0a1,1 0 0,0 -2,0" />
+</vector>

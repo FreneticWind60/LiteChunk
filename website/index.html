@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f4f6f9">
+  <title>LiteChunk — 轻量的 Minecraft 存档转换器（Android）</title>
+  <meta name="description"
+    content="LiteChunk 是 Minecraft 存档互转工具 Chunker 的轻量安卓移植版：Java 版 ⇄ 基岩版，2.5 MB，开源、免费、非官方。">
+
+  <!-- 分享信息（不加载任何外部资源，所以没有 og:image） -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="LiteChunk — 轻量的 Minecraft 存档转换器">
+  <meta property="og:description" content="Java 版 ⇄ 基岩版，2.5 MB 的安卓应用，基于开源项目 Chunker，非官方。">
+
+  <!-- 内联 SVG 图标，不请求任何外部文件 -->
+  <link rel="icon"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e7a52'/%3E%3Cg fill='none' stroke='%237be8b8' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M6.5 9.5h19v13h-19z'/%3E%3Cpath d='M6.5 14h19M13 14v8.5M19 9.5V14'/%3E%3C/g%3E%3C/svg%3E">
+
+  <!-- 主题判定必须早于样式表：深色模式用户不会先看到一瞬白屏 -->
+  <script>
+    (function () {
+      var root = document.documentElement;
+      root.classList.add('js');           // 有 JS 才启用滚动入场动画，脚本失效时内容照常显示
+      var theme;
+      try { theme = localStorage.getItem('litechunk-theme'); } catch (e) { }
+      if (theme !== 'light' && theme !== 'dark') {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      root.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <style>
+    /* ==========================================================================
+       1. 设计令牌
+       --------------------------------------------------------------------------
+       品牌绿沿用 APK 内的配色（#0F9E68 / 夜 #3DDC97），所以网站和应用看起来是一套东西。
+       组件只用「语义色」，随 data-theme 切换；品牌色固定不变。
+       ========================================================================== */
+    :root {
+      --g100: #c9efdd;
+      --g300: #7be8b8;
+      --g400: #3ddc97;
+      --g500: #17b87b;
+      --g600: #0f9e68;
+      --g700: #0e7a52;
+
+      --radius: 14px;
+      --radius-lg: 20px;
+      --head-h: 60px;
+      --wrap: 1080px;
+      --ease: cubic-bezier(.22, .61, .36, 1);
+
+      /* 系统无衬线字体，不加载 Web Font */
+      --font: system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      --mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+
+      /* ---- 浅色主题 ---- */
+      color-scheme: light;
+      --page: #f4f6f9;
+      --surface: #ffffff;
+      --surface-2: #f2f5f9;
+      --ink: #0e1a24;
+      --ink-2: #3f4e5e;
+      --muted: #59697a;
+      --line: #e3e9f0;
+      --line-2: #ccd6e0;
+      --accent: var(--g600);
+      --accent-strong: #0c8657;
+      --accent-soft: #e1f5ec;
+      --accent-ink: #0b5f43;
+      --on-accent: #ffffff;
+      --accent-edge: #0a6b48;
+      --accent-glow: rgba(15, 158, 104, .26);
+      --head: rgba(244, 246, 249, .82);
+      --sh-sm: 0 1px 2px rgba(14, 26, 36, .05), 0 2px 8px rgba(14, 26, 36, .05);
+      --sh-md: 0 10px 28px rgba(14, 26, 36, .08), 0 2px 6px rgba(14, 26, 36, .04);
+      --sh-lg: 0 26px 60px rgba(14, 26, 36, .12), 0 8px 20px rgba(14, 26, 36, .06);
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --page: #080c11;
+      --surface: #111922;
+      --surface-2: #18232e;
+      --ink: #e8eff6;
+      --ink-2: #bccad8;
+      --muted: #93a3b4;
+      --line: #1f2b37;
+      --line-2: #2d3c4b;
+      --accent: var(--g400);
+      --accent-strong: var(--g300);
+      --accent-soft: #17352a;
+      --accent-ink: #c9efdd;
+      --on-accent: #04241a;
+      --accent-edge: #1f9e6b;
+      --accent-glow: rgba(61, 220, 151, .18);
+      --head: rgba(8, 12, 17, .78);
+      --sh-sm: 0 1px 2px rgba(0, 0, 0, .5);
+      --sh-md: 0 10px 28px rgba(0, 0, 0, .45);
+      --sh-lg: 0 26px 60px rgba(0, 0, 0, .55), 0 8px 20px rgba(0, 0, 0, .35);
+    }
+
+    /* ==========================================================================
+       2. 基础重置
+       ========================================================================== */
+    *,
+    *::before,
+    *::after { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: calc(var(--head-h) + 16px);
+      -webkit-text-size-adjust: 100%;
+      background: var(--page);   /* 顶部/底部回弹时不会露出白边 */
+    }
+
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
+    ul, ol { padding: 0; list-style: none; }
+    img, svg { display: block; max-width: 100%; }
+    a { color: inherit; text-decoration: none; }
+    button { font: inherit; color: inherit; }
+
+    ::selection { background: var(--accent-soft); color: var(--accent-ink); }
+
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    /* 只给读屏软件看的文字 / 跳到主要内容 */
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      margin: -1px; padding: 0;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    .skip {
+      position: absolute;
+      left: 50%;
+      top: 8px;
+      z-index: 100;
+      padding: 10px 18px;
+      border-radius: 999px;
+      background: var(--accent);
+      color: var(--on-accent);
+      font-weight: 600;
+      transform: translate(-50%, -160%);
+      transition: transform .2s var(--ease);
+    }
+
+    .skip:focus-visible { transform: translate(-50%, 0); }
+
+    .sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+    /* ==========================================================================
+       3. 通用部件：容器、标题、按钮
+       ========================================================================== */
+    .wrap {
+      width: 100%;
+      max-width: var(--wrap);
+      margin-inline: auto;
+      padding-inline: 20px;
+    }
+
+    .section { padding: clamp(56px, 10vw, 100px) 0; }
+    .section--alt { background: var(--surface-2); border-block: 1px solid var(--line); }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--accent-ink);
+    }
+
+    .eyebrow::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 1px;
+      background: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-soft);
+    }
+
+    .h2 {
+      margin-top: 14px;
+      font-size: clamp(26px, 6vw, 38px);
+      line-height: 1.25;
+      letter-spacing: -.01em;
+      font-weight: 700;
+    }
+
+    .lead {
+      margin-top: 12px;
+      max-width: 62ch;
+      color: var(--muted);
+      font-size: clamp(15px, 3.8vw, 17px);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      min-height: 48px;
+      padding: 0 22px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 650;
+      letter-spacing: .01em;
+      cursor: pointer;
+      transition: transform .16s var(--ease), box-shadow .16s var(--ease),
+        background .2s var(--ease), border-color .2s var(--ease);
+    }
+
+    .btn svg { width: 18px; height: 18px; flex: none; }
+
+    /* 主按钮：厚底边 = 方块感，按下时压平 */
+    .btn--primary {
+      background: var(--accent);
+      color: var(--on-accent);
+      box-shadow: 0 4px 0 var(--accent-edge), 0 10px 24px var(--accent-glow);
+    }
+
+    .btn--primary:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--accent-edge), 0 14px 30px var(--accent-glow); }
+    .btn--primary:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--accent-edge); }
+
+    .btn--ghost {
+      background: var(--surface);
+      border-color: var(--line-2);
+      color: var(--ink);
+      box-shadow: var(--sh-sm);
+    }
+
+    .btn--ghost:hover { border-color: var(--accent); color: var(--accent-ink); background: var(--accent-soft); }
+
+    .btn--lg { min-height: 54px; padding: 0 26px; font-size: 16px; }
+
+    /* 滚动入场：默认不可见，由 IntersectionObserver 加 .is-in。
+       没有 JS 时 html 上没有 .js，动画规则整体不生效。 */
+    html.js .reveal {
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity .6s var(--ease), transform .6s var(--ease);
+      transition-delay: calc(var(--i, 0) * 70ms);
+    }
+
+    html.js .reveal.is-in { opacity: 1; transform: none; }
+
+    /* ==========================================================================
+       4. 顶栏：logo + 页内索引 + 主题开关（窄屏也保留索引，只有三项）
+       ========================================================================== */
+    .site-head {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: var(--head);
+      border-bottom: 1px solid transparent;
+      -webkit-backdrop-filter: blur(14px) saturate(1.4);
+      backdrop-filter: blur(14px) saturate(1.4);
+      transition: border-color .25s var(--ease), box-shadow .25s var(--ease);
+    }
+
+    .site-head.is-stuck {
+      border-bottom-color: var(--line);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, .05);
+    }
+
+    .head__inner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      height: var(--head-h);
+    }
+
+    .brand { display: inline-flex; align-items: center; gap: 10px; margin-right: auto; }
+
+    .brand__mark {
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: linear-gradient(160deg, #12855b, #0a4f37);
+      color: var(--g300);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12), 0 2px 6px rgba(4, 40, 28, .35);
+    }
+
+    .brand__mark svg { width: 21px; height: 21px; }
+
+    .brand__name {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: -.01em;
+    }
+
+    .brand__name b { color: var(--accent-ink); font-weight: 700; }
+
+    .head__nav { display: flex; gap: 4px; }
+
+    .head__nav a {
+      padding: 7px 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      transition: color .2s var(--ease), background .2s var(--ease);
+    }
+
+    .head__nav a:hover { color: var(--ink); background: var(--surface-2); }
+    .head__nav a.is-active { color: var(--accent-ink); background: var(--accent-soft); }
+
+    .theme-btn {
+      display: grid;
+      place-items: center;
+      width: 38px;
+      height: 38px;
+      flex: none;
+      border: 1px solid var(--line-2);
+      border-radius: 10px;
+      background: var(--surface);
+      cursor: pointer;
+      transition: background .2s var(--ease), border-color .2s var(--ease), transform .2s var(--ease);
+    }
+
+    .theme-btn:hover { border-color: var(--accent); transform: rotate(-8deg); }
+    .theme-btn svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* 太阳 / 月亮按主题显示其中一个 */
+    .theme-btn .i-moon { display: none; }
+    html[data-theme="dark"] .theme-btn .i-sun { display: none; }
+    html[data-theme="dark"] .theme-btn .i-moon { display: block; }
+
+    /* ==========================================================================
+       5. 首屏
+       ========================================================================== */
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: clamp(38px, 8vw, 76px) 0 clamp(46px, 9vw, 84px);
+    }
+
+    /* 淡淡的像素网格 + 右上角绿色光晕，不加图片 */
+    .hero__grid,
+    .hero__glow,
+    .hero__cube { position: absolute; pointer-events: none; }
+
+    .hero__grid {
+      inset: 0;
+      background-image:
+        linear-gradient(to right, var(--line) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+      background-size: 34px 34px;
+      opacity: .6;
+      -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 10%, transparent 78%);
+      mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 10%, transparent 78%);
+    }
+
+    .hero__glow {
+      top: -220px;
+      right: -160px;
+      width: 560px;
+      height: 560px;
+      background: radial-gradient(circle, var(--accent-glow), transparent 66%);
+    }
+
+    /* 等距方块：自绘 SVG 当装饰，不用任何官方素材 */
+    .hero__cube {
+      display: none;
+      right: -70px;
+      bottom: -70px;
+      width: 330px;
+      color: var(--accent);
+      opacity: .1;
+      transform: rotate(-6deg);
+    }
+
+    .hero__inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      gap: 40px;
+      align-items: center;
+    }
+
+    .hero h1 {
+      margin-top: 16px;
+      font-size: clamp(46px, 13vw, 82px);
+      line-height: .98;
+      letter-spacing: -.035em;
+      font-weight: 800;
+    }
+
+    .hero h1 span { color: var(--accent); }
+
+    .hero__lead {
+      margin-top: 18px;
+      max-width: 34ch;
+      font-size: clamp(16.5px, 4.4vw, 22px);   /* 压到 360px 也能让第二行不折行 */
+      line-height: 1.45;
+      font-weight: 600;
+      text-wrap: balance;
+    }
+
+    .hero__sub {
+      margin-top: 14px;
+      max-width: 46ch;
+      color: var(--muted);
+      font-size: clamp(14px, 3.7vw, 16px);
+    }
+
+    .hero__cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 28px;
+    }
+
+    /* 三项裸数据居中排列，作为首屏的收尾 */
+    .hero__facts {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px 26px;
+      margin-top: 32px;
+      padding-top: 22px;
+      border-top: 1px solid var(--line);
+    }
+
+    .hero__facts li { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .hero__facts b { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
+    .hero__facts span { font-size: 12px; color: var(--muted); letter-spacing: .02em; }
+
+    /* ==========================================================================
+       6. 首屏示意卡：用纯 CSS 拼一个「应用里正在转换」的界面
+       ========================================================================== */
+    .demo {
+      position: relative;
+      width: 100%;
+      max-width: 380px;
+      margin-inline: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      box-shadow: var(--sh-lg);
+      overflow: hidden;
+    }
+
+    /* 卡片右上角的切角，和启动图标的切口呼应 */
+    .demo::after {
+      content: "";
+      position: absolute;
+      top: 0; right: 0;
+      width: 22px; height: 22px;
+      background: var(--page);
+      clip-path: polygon(100% 0, 100% 100%, 0 0);
+      opacity: .9;
+    }
+
+    .demo__bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 11px 28px 11px 14px;   /* 右边留出切角的位置 */
+      border-bottom: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+
+    .demo__dots { display: flex; gap: 5px; }
+    .demo__dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-2); display: block; }
+    .demo__bar b { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+    .demo__ver {
+      margin-left: auto;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent-ink);
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: .02em;
+    }
+
+    .demo__body { padding: 18px 16px 16px; }
+
+    /* 左侧图标轨道 + 右侧文件卡，中间用竖线连起来 */
+    .demo__step { display: flex; align-items: center; gap: 12px; }
+
+    .demo__node {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      flex: none;
+      border-radius: 10px;
+      background: var(--accent-soft);
+      color: var(--accent-ink);
+    }
+
+    .demo__node--solid { background: var(--accent); color: var(--on-accent); }
+    .demo__node svg { width: 18px; height: 18px; }
+
+    .demo__card {
+      flex: 1;
+      min-width: 0;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--surface-2);
+    }
+
+    .demo__card b { display: block; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .demo__card small { display: block; font-size: 11px; color: var(--muted); }
+
+    .demo__stem {
+      width: 2px;
+      height: 16px;
+      margin: 2px 0 2px 16px;
+      background: repeating-linear-gradient(to bottom, var(--line-2) 0 3px, transparent 3px 6px);
+    }
+
+    .demo__progress {
+      margin-top: 16px;
+      height: 8px;
+      border-radius: 99px;
+      background: var(--surface-2);
+      box-shadow: inset 0 1px 2px rgba(0, 0, 0, .06);
+      overflow: hidden;
+    }
+
+    .demo__fill {
+      display: block;
+      width: 78%;
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--g600), var(--g400));
+      animation: fill 2.4s var(--ease) .3s both;
+    }
+
+    @keyframes fill { from { width: 6%; } to { width: 78%; } }
+
+    .demo__foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .demo__foot b { font-family: var(--mono); color: var(--accent-ink); font-size: 12px; }
+
+    /* 分隔带：两色像素块，Minecraft 味的细节点到为止 */
+    .pixel-bar {
+      height: 8px;
+      background: repeating-linear-gradient(90deg,
+          var(--accent) 0 8px,
+          transparent 8px 16px);
+      opacity: .45;
+    }
+
+    /* ==========================================================================
+       7. 功能亮点
+       ========================================================================== */
+    .feats {
+      display: grid;
+      gap: 14px;
+      margin-top: 36px;
+    }
+
+    .feat {
+      padding: 22px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      transition: transform .25s var(--ease), box-shadow .25s var(--ease), border-color .25s var(--ease);
+    }
+
+    .feat:hover { transform: translateY(-3px); border-color: var(--line-2); box-shadow: var(--sh-md); }
+
+    .feat__icon {
+      display: grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      margin-bottom: 16px;
+      border-radius: 11px;
+      background: var(--accent-soft);
+      color: var(--accent-ink);
+    }
+
+    .feat__icon svg { width: 21px; height: 21px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+    .feat__title { font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+
+    .feat__stat {
+      margin-top: 2px;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+      color: var(--accent);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .feat__stat small { font-size: 13px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-left: 6px; }
+
+    .feat__text { margin-top: 8px; font-size: 14px; color: var(--muted); }
+
+    /* ==========================================================================
+       8. 下载
+       ========================================================================== */
+    .dl {
+      display: grid;
+      gap: 32px;
+      padding: clamp(24px, 5vw, 44px);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background:
+        radial-gradient(120% 100% at 100% 0%, var(--accent-soft), transparent 58%),
+        var(--surface);
+      box-shadow: var(--sh-md);
+    }
+
+    .dl__cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+
+    .dl__note {
+      margin-top: 14px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .dl__note a { color: var(--accent-ink); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+    .dl__note a:hover { text-decoration-color: var(--accent); }
+
+    /* 规格表：两列，手机上也保持紧凑 */
+    .dl__specs {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      align-self: start;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--line);
+      overflow: hidden;
+    }
+
+    .dl__specs > div { padding: 14px 16px; background: var(--surface); }
+    .dl__specs dt { font-size: 11px; letter-spacing: .06em; color: var(--muted); }
+    .dl__specs dd { margin-top: 2px; font-size: 14px; font-weight: 650; }
+
+    /* ==========================================================================
+       9. 开源与许可
+       ========================================================================== */
+    .lic {
+      display: grid;
+      gap: 32px;
+      margin-top: 26px;
+    }
+
+    .lic__intro p { color: var(--muted); font-size: 15px; }
+    .lic__intro p + p { margin-top: 12px; }
+
+    .lic__intro a { color: var(--accent-ink); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
+    .lic__intro a:hover { text-decoration-color: var(--accent); }
+
+    .lic__more {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 18px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent-ink);
+    }
+
+    .lic__more svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s var(--ease); }
+    .lic__more:hover svg { transform: translateX(3px); }
+
+    .lic__list { display: grid; gap: 10px; align-content: start; }
+
+    .lic__item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 2px 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--surface);
+    }
+
+    .lic__name { font-size: 14px; font-weight: 650; }
+
+    .lic__tag {
+      padding: 1px 8px;
+      align-self: center;
+      border-radius: 6px;
+      background: var(--accent-soft);
+      color: var(--accent-ink);
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .lic__item p { grid-column: 1 / -1; font-size: 12.5px; color: var(--muted); }
+
+    /* 免责声明：左侧竖条 + 淡底色，不与正文抢注意力但要看得清 */
+    .notice {
+      display: flex;
+      gap: 14px;
+      margin-top: 40px;
+      padding: 18px 18px 18px 20px;
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px 12px 12px 4px;
+      background: var(--surface);
+    }
+
+    .notice > svg { width: 20px; height: 20px; flex: none; margin-top: 3px; stroke: var(--accent); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .notice h3 { font-size: 14px; font-weight: 700; }
+    .notice p { margin-top: 4px; font-size: 13px; color: var(--muted); }
+
+    /* ==========================================================================
+       10. 页脚
+       ========================================================================== */
+    .foot {
+      padding: 44px 0 28px;
+      border-top: 1px solid var(--line);
+      background: var(--surface-2);
+    }
+
+    .foot__top {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .foot__tagline { margin-top: -4px; font-size: 13px; color: var(--muted); }
+
+    .foot__links { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; }
+    .foot__links a { color: var(--muted); transition: color .2s var(--ease); }
+    .foot__links a:hover { color: var(--accent-ink); }
+
+    .foot__bottom {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 6px 16px;
+      padding-top: 20px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ==========================================================================
+       11. 断点：内容优先，只在需要时增加列（移动端优先）
+       ========================================================================== */
+    @media (min-width: 560px) {
+      .head__nav a { padding: 7px 12px; font-size: 13.5px; }
+      .hero__facts { gap: 12px 40px; }
+    }
+
+    @media (min-width: 720px) {
+      :root { --head-h: 66px; }
+      .wrap { padding-inline: 28px; }
+      /* 卡片改成「图标在左、文字在右」，比四列窄卡更好读 */
+      .feats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+      .feat {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        column-gap: 16px;
+        align-content: start;
+        padding: 24px;
+      }
+      .feat__icon { grid-row: 1 / span 3; margin-bottom: 0; }
+      .feat__title,
+      .feat__stat,
+      .feat__text { grid-column: 2; }
+      .lic { grid-template-columns: 1fr 1fr; gap: 40px; }
+      .foot__top { flex-direction: row; align-items: center; justify-content: space-between; }
+    }
+
+    @media (min-width: 900px) {
+      .hero__inner { grid-template-columns: 1.05fr .95fr; gap: 56px; }
+      .hero__cube { display: block; }
+      .demo { margin-inline: 0 auto; }
+      .dl { grid-template-columns: 1.25fr .75fr; align-items: center; }
+      .lic { grid-template-columns: 1.1fr .9fr; gap: 56px; }
+    }
+
+    @media (min-width: 1024px) {
+      .feats { gap: 18px; }
+      .feat { padding: 26px; }
+    }
+
+    /* 手机上两个下载按钮铺满一行，避免长短不齐 */
+    @media (max-width: 559px) {
+      .dl__cta { flex-direction: column; align-items: stretch; }
+      .dl__cta .btn { width: 100%; }
+    }
+
+    /* 360px 级别的窄屏：把顶栏压紧，保证 logo + 三项索引 + 主题按钮不换行 */
+    @media (max-width: 420px) {
+      .wrap { padding-inline: 16px; }
+      .head__inner { gap: 8px; }
+      .brand { gap: 8px; }
+      .brand__name { font-size: 16px; }
+      .head__nav { gap: 2px; }
+      .head__nav a { padding: 6px 7px; font-size: 12.5px; }
+      .theme-btn { width: 34px; height: 34px; }
+      .feat { padding: 18px; }
+    }
+
+    /* 尊重系统的「减少动态效果」 */
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *,
+      *::before,
+      *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+      html.js .reveal { opacity: 1; transform: none; }
+      .demo__fill { width: 78%; }
+    }
+  </style>
+</head>
+
+<body>
+  <a class="skip" href="#main">跳到主要内容</a>
+
+  <!-- ==========================================================
+       图标与 logo 全在这一个 sprite 里，页面里用 <use> 引
+       ========================================================== -->
+  <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <clipPath id="crate-top"><rect x="0" y="0" width="24" height="9.3" /></clipPath>
+    </defs>
+
+    <!-- 应用 logo：与 APK 内的启动图标同一形状（CC0） -->
+    <symbol id="i-crate" viewBox="0 0 24 24">
+      <path fill="currentColor"
+        d="M19.895 11.048a.116.116 0 0 0 .031.201c1.621.579 2.393.66 2.393 2.081v4.011c0 .716-.051.88-.531 1.254c-.877.683-6.185 4.747-6.392 4.913c-.774.62-1.169.556-2.054.339a515 515 0 0 1-9.945-2.577c-1.746-.47-1.701-2.064-1.701-3.203c0-3.945-.015-7.468-.015-11.202c0-1.186.049-1.222.95-1.881c.83-.607 4.296-3.135 6.153-4.499c.553-.406.828-.607 1.618-.406c1.616.41 6.664 1.649 9.382 2.339c2.083.529 2.535.893 2.535 2.326V8.38c0 .465-.007.638-.408.981c-.202.173-1.348 1.14-2.016 1.687m1.624-2.556a.113.113 0 0 0 .141-.112c.001-1.414.011-2.495.011-3.666c0-.622-.35-1.137-1.121-1.343C16.501 2.29 10.486.866 10.191.778c-.197-.059-.322.108-.322.199c-.001 4.294.029 7.832.029 11.854c0 .741.408 1.525 1.292 1.765c3.582.973 6.578 1.655 10.331 2.667a.115.115 0 0 0 .143-.112c.001-.848.014-1.405.014-1.95c0-2.27.279-2.679-1.57-3.194c-2.198-.612-5.306-1.378-5.554-1.441c-.485-.124-.548-.266-.548-.591c0-.122-.011-2.346-.003-2.869c.002-.157.006-.31.157-.397c.134-.077.264-.046.664.053c.448.111 4.598 1.186 6.695 1.73m-7.65 14.735a.114.114 0 0 0 .142-.111c.001-1.185.017-2.484.017-3.352c0-1.475.182-1.334-1.064-1.639c-1.474-.36-4.433-1.146-5.967-1.552c-.355-.094-.459-.424-.459-.998c0-1.726-.006-4.575-.006-6.577c0-1.834.193-1.599-.703-1.832c-.565-.146-2.468-.637-3.313-.828c-.144-.032-.225.085-.225.224c-.003 3.939.053 8.211.053 11.994c0 1.228.439 1.815 1.321 2.051c3.589.963 6.446 1.652 10.204 2.62" />
+      <g clip-path="url(#crate-top)">
+        <path fill="#ffffff" opacity=".38"
+          d="M19.895 11.048a.116.116 0 0 0 .031.201c1.621.579 2.393.66 2.393 2.081v4.011c0 .716-.051.88-.531 1.254c-.877.683-6.185 4.747-6.392 4.913c-.774.62-1.169.556-2.054.339a515 515 0 0 1-9.945-2.577c-1.746-.47-1.701-2.064-1.701-3.203c0-3.945-.015-7.468-.015-11.202c0-1.186.049-1.222.95-1.881c.83-.607 4.296-3.135 6.153-4.499c.553-.406.828-.607 1.618-.406c1.616.41 6.664 1.649 9.382 2.339c2.083.529 2.535.893 2.535 2.326V8.38c0 .465-.007.638-.408.981c-.202.173-1.348 1.14-2.016 1.687m1.624-2.556a.113.113 0 0 0 .141-.112c.001-1.414.011-2.495.011-3.666c0-.622-.35-1.137-1.121-1.343C16.501 2.29 10.486.866 10.191.778c-.197-.059-.322.108-.322.199c-.001 4.294.029 7.832.029 11.854c0 .741.408 1.525 1.292 1.765c3.582.973 6.578 1.655 10.331 2.667a.115.115 0 0 0 .143-.112c.001-.848.014-1.405.014-1.95c0-2.27.279-2.679-1.57-3.194c-2.198-.612-5.306-1.378-5.554-1.441c-.485-.124-.548-.266-.548-.591c0-.122-.011-2.346-.003-2.869c.002-.157.006-.31.157-.397c.134-.077.264-.046.664.053c.448.111 4.598 1.186 6.695 1.73m-7.65 14.735a.114.114 0 0 0 .142-.111c.001-1.185.017-2.484.017-3.352c0-1.475.182-1.334-1.064-1.639c-1.474-.36-4.433-1.146-5.967-1.552c-.355-.094-.459-.424-.459-.998c0-1.726-.006-4.575-.006-6.577c0-1.834.193-1.599-.703-1.832c-.565-.146-2.468-.637-3.313-.828c-.144-.032-.225.085-.225.224c-.003 3.939.053 8.211.053 11.994c0 1.228.439 1.815 1.321 2.051c3.589.963 6.446 1.652 10.204 2.62" />
+      </g>
+    </symbol>
+
+    <!-- Java 版存档：Fluent UI Drink Coffee（MIT） -->
+    <symbol id="i-java" viewBox="0 0 16 16">
+      <path fill="currentColor"
+        d="M2.5,0a0.5,0.5 0 0,1 0.5,0.5c0,0.47 0.274,0.706 0.8,1.1l0.04,0.03C4.314,1.985 5,2.498 5,3.5a0.5,0.5 0 0,1 -1,0c0,-0.47 -0.274,-0.706 -0.8,-1.1l-0.04,-0.03C2.686,2.015 2,1.502 2,0.5a0.5,0.5 0 0,1 0.5,-0.5m3,0a0.5,0.5 0 0,1 0.5,0.5c0,0.47 0.274,0.706 0.8,1.1l0.04,0.03C7.314,1.985 8,2.498 8,3.5a0.5,0.5 0 0,1 -1,0c0,-0.47 -0.274,-0.706 -0.8,-1.1l-0.04,-0.03C5.686,2.015 5,1.502 5,0.5a0.5,0.5 0 0,1 0.5,-0.5M9,0.5a0.5,0.5 0 0,0 -1,0c0,1.002 0.686,1.515 1.16,1.87l0.04,0.03c0.526,0.394 0.8,0.63 0.8,1.1a0.5,0.5 0 0,0 1,0c0,-1.002 -0.686,-1.515 -1.16,-1.87L9.8,1.6C9.274,1.206 9,0.97 9,0.5M13,6h0.5a2.5,2.5 0 0,1 0,5h-0.707A5.5,5.5 0 0,1 2,9.5V5.891C2,5.4 2.399,5 2.891,5h9.218c0.492,0 0.891,0.399 0.891,0.891zM3,6v3.5a4.5,4.5 0 1,0 9,0V6zm10,1v2.5q0,0.253 -0.022,0.5h0.522a1.5,1.5 0 0,0 0,-3z" />
+    </symbol>
+
+    <!-- 基岩版存档：Fluent UI Cube（MIT） -->
+    <symbol id="i-cube" viewBox="0 0 16 16">
+      <path fill="currentColor"
+        d="M4.697,5.04a0.5,0.5 0 0,0 -0.394,0.919L7.5,7.329v3.17a0.5,0.5 0 0,0 1,0V7.33l3.197,-1.37a0.5,0.5 0 1,0 -0.394,-0.92L8,6.456zm4.38,-3.662a3,3 0 0,0 -2.154,0L1.962,3.286A1.5,1.5 0 0,0 1,4.686v6.626a1.5,1.5 0 0,0 0.962,1.4l4.961,1.909a3,3 0 0,0 2.154,0l4.962,-1.909a1.5,1.5 0 0,0 0.961,-1.4V4.686a1.5,1.5 0 0,0 -0.961,-1.4zm-1.795,0.933a2,2 0 0,1 1.436,0l4.962,1.908a0.5,0.5 0 0,1 0.32,0.467v6.626a0.5,0.5 0 0,1 -0.32,0.467l-4.962,1.908a2,2 0 0,1 -1.436,0L2.321,11.78A0.5,0.5 0 0,1 2,11.312V4.686a0.5,0.5 0 0,1 0.32,-0.467z" />
+    </symbol>
+
+    <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v11" />
+      <path d="m7.5 10 4.5 4.5L16.5 10" />
+      <path d="M4 17v2.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V17" />
+    </symbol>
+
+    <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="m9 7-5 5 5 5" />
+      <path d="m15 7 5 5-5 5" />
+    </symbol>
+
+    <symbol id="i-sun" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2.7v2.2M12 19.1v2.2M2.7 12h2.2M19.1 12h2.2M5.4 5.4l1.6 1.6M17 17l1.6 1.6M18.6 5.4 17 7M7 17l-1.6 1.6" />
+    </symbol>
+
+    <symbol id="i-moon" viewBox="0 0 24 24">
+      <path d="M20.5 14.4A8.6 8.6 0 1 1 9.6 3.5a6.7 6.7 0 0 0 10.9 10.9Z" />
+    </symbol>
+
+    <!-- 功能图标：统一 1.7 描边 -->
+    <symbol id="i-feather" viewBox="0 0 24 24">
+      <path d="M20.2 3.8a5.4 5.4 0 0 0-7.7 0L4 12.3V20h7.7l8.5-8.5a5.4 5.4 0 0 0 0-7.7Z" />
+      <path d="M16.5 7.5 5 19" />
+      <path d="M13 11h4.5" />
+    </symbol>
+
+    <symbol id="i-bolt" viewBox="0 0 24 24">
+      <path d="M13.4 2.5 4.6 13.6a.6.6 0 0 0 .5 1h5.3l-1 7.4a.5.5 0 0 0 .9.4l8.8-11.1a.6.6 0 0 0-.5-1h-5.3l1-7.4a.5.5 0 0 0-.9-.4Z" />
+    </symbol>
+
+    <symbol id="i-branch" viewBox="0 0 24 24">
+      <circle cx="6" cy="5.5" r="2.5" />
+      <circle cx="6" cy="18.5" r="2.5" />
+      <circle cx="18" cy="8.5" r="2.5" />
+      <path d="M6 8v8" />
+      <path d="M18 11a6 6 0 0 1-6 6H6" />
+    </symbol>
+
+    <symbol id="i-target" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="3.6" />
+      <path d="M12 1.8v3M12 19.2v3M1.8 12h3M19.2 12h3" />
+    </symbol>
+
+    <symbol id="i-arrow-right" viewBox="0 0 24 24">
+      <path d="M4.5 12h15" />
+      <path d="m13.5 6 6 6-6 6" />
+    </symbol>
+
+    <symbol id="i-info" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 11v6" />
+      <path d="M12 7.6h.01" />
+    </symbol>
+  </svg>
+
+  <!-- ==========================================================
+       顶栏：logo + 页内索引 + 主题开关
+       ========================================================== -->
+  <header class="site-head" id="siteHead">
+    <div class="wrap head__inner">
+      <a class="brand" href="#top" aria-label="LiteChunk 首页">
+        <span class="brand__mark" aria-hidden="true">
+          <svg><use href="#i-crate"></use></svg>
+        </span>
+        <span class="brand__name">Lite<b>Chunk</b></span>
+      </a>
+
+      <nav class="head__nav" id="headNav" aria-label="页面索引">
+        <a href="#features">功能</a>
+        <a href="#download">下载</a>
+        <a href="#license">源码</a>
+      </nav>
+
+      <button class="theme-btn" id="themeBtn" type="button" aria-label="切换到深色主题" aria-pressed="false">
+        <svg class="i-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
+        <svg class="i-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ==========================================================
+         首屏：应用名 + 一句话定位 + 下载入口 + 界面示意
+         ========================================================== -->
+    <section class="hero" id="top">
+      <div class="hero__grid" aria-hidden="true"></div>
+      <div class="hero__glow" aria-hidden="true"></div>
+
+      <svg class="hero__cube" viewBox="0 0 240 240" aria-hidden="true">
+        <polygon points="120,24 212,70 120,116 28,70" fill="currentColor" />
+        <polygon points="28,70 120,116 120,208 28,162" fill="currentColor" opacity=".62" />
+        <polygon points="212,70 120,116 120,208 212,162" fill="currentColor" opacity=".82" />
+      </svg>
+
+      <div class="wrap hero__inner">
+        <div class="hero__copy">
+          <p class="eyebrow">对轻盈的极致追求</p>
+
+          <h1>Lite<span>Chunk</span></h1>
+
+          <p class="hero__lead">只需要 2.5 MB，<br>轻松实现 Minecraft 存档跨版本转化</p>
+
+          <p class="hero__sub">
+            基于开源项目 Chunker 的轻量安卓移植版。支持基岩、Java 双平台数百个版本，没有广告、没有账号、没有多余功能。
+          </p>
+
+          <div class="hero__cta">
+            <a class="btn btn--primary btn--lg" href="https://github.com/FreneticWind60/LiteChunk/releases/latest">
+              <svg aria-hidden="true"><use href="#i-download"></use></svg>
+              下载 APK
+            </a>
+            <a class="btn btn--ghost btn--lg" href="https://github.com/FreneticWind60/LiteChunk">
+              <svg aria-hidden="true"><use href="#i-code"></use></svg>
+              查看源码
+            </a>
+          </div>
+
+          <ul class="hero__facts">
+            <li><b>2.5 MB</b><span>安装包</span></li>
+            <li><b>Java ⇄ 基岩</b><span>双向转换</span></li>
+            <li><b>本机转换</b><span>存档不上传</span></li>
+          </ul>
+        </div>
+
+        <!-- 纯 CSS + SVG 拼出的界面示意，不是截图 -->
+        <div class="hero__demo" role="img" aria-label="LiteChunk 界面示意：Java 版存档转换为基岩版，进度 78%">
+          <div class="demo">
+            <div class="demo__bar">
+              <span class="demo__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+              <b>LiteChunk</b>
+              <span class="demo__ver">1.21.0</span>
+            </div>
+
+            <div class="demo__body">
+              <div class="demo__step">
+                <span class="demo__node" aria-hidden="true"><svg><use href="#i-java"></use></svg></span>
+                <span class="demo__card"><b>新的世界</b><small>Java 版 · 1.20.1</small></span>
+              </div>
+
+              <div class="demo__stem" aria-hidden="true"></div>
+
+              <div class="demo__step">
+                <span class="demo__node demo__node--solid" aria-hidden="true"><svg><use href="#i-cube"></use></svg></span>
+                <span class="demo__card"><b>基岩版 1.26.60</b><small>打包为 .mcworld</small></span>
+              </div>
+
+              <div class="demo__progress" aria-hidden="true"><span class="demo__fill"></span></div>
+              <div class="demo__foot"><span>整理数据库…</span><b>78%</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="pixel-bar" aria-hidden="true"></div>
+
+    <!-- ==========================================================
+         功能亮点：轻量 / 快 / 开源 / 不臃肿
+         ========================================================== -->
+    <section class="section" id="features">
+      <div class="wrap">
+        <header class="reveal">
+          <p class="eyebrow">Features</p>
+          <h2 class="h2">四个理由，都很朴素</h2>
+          <p class="lead">没有花哨的卖点。它更小、更快、源码公开，而且只干一件事。</p>
+        </header>
+
+        <div class="feats">
+          <article class="feat reveal" style="--i:0">
+            <span class="feat__icon" aria-hidden="true"><svg><use href="#i-feather"></use></svg></span>
+            <h3 class="feat__title">轻量</h3>
+            <p class="feat__stat">2.5 MB<small>安装包</small></p>
+            <p class="feat__text">整个 APK 2.5 MB。没有广告 SDK、没有账号体系、没有后台常驻服务，装完就能用。</p>
+          </article>
+
+          <article class="feat reveal" style="--i:1">
+            <span class="feat__icon" aria-hidden="true"><svg><use href="#i-bolt"></use></svg></span>
+            <h3 class="feat__title">快</h3>
+            <p class="feat__stat">≈19 s<small>25 MB 存档</small></p>
+            <p class="feat__text">转换跑在独立进程里，按设备可用内存自动定线程数。大存档不会把界面拖死，也不会把内存吃爆。</p>
+          </article>
+
+          <article class="feat reveal" style="--i:2">
+            <span class="feat__icon" aria-hidden="true"><svg><use href="#i-branch"></use></svg></span>
+            <h3 class="feat__title">开源</h3>
+            <p class="feat__stat">MIT<small>协议</small></p>
+            <p class="feat__text">引擎来自 Chunker，源码全部公开。相对上游改了什么、为什么改，README 里逐条写着。</p>
+          </article>
+
+          <article class="feat reveal" style="--i:3">
+            <span class="feat__icon" aria-hidden="true"><svg><use href="#i-target"></use></svg></span>
+            <h3 class="feat__title">不臃肿</h3>
+            <p class="feat__stat">0<small>广告与账号</small></p>
+            <p class="feat__text">只做四步：选存档、选版本、转换、保存。没有编辑器，没有皮肤商店，也没有启动器。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         下载
+         ========================================================== -->
+    <section class="section section--alt" id="download">
+      <div class="wrap">
+        <div class="dl reveal">
+          <div>
+            <p class="eyebrow">Download</p>
+            <h2 class="h2">下载 LiteChunk</h2>
+            <p class="lead">APK 从 GitHub Releases 直接下载，不上架任何应用商店，也不需要额外的转换工具。</p>
+
+            <div class="dl__cta">
+              <a class="btn btn--primary btn--lg"
+                href="https://github.com/FreneticWind60/LiteChunk/releases/latest">
+                <svg aria-hidden="true"><use href="#i-download"></use></svg>
+                下载最新版 APK
+              </a>
+            </div>
+
+            <p class="dl__note">
+              安装时需要允许「安装未知来源应用」。后续版本签名一致，可以直接覆盖升级，不会丢数据。
+              也可以在 <a href="https://github.com/FreneticWind60/LiteChunk/releases">Releases 页面</a> 查看全部版本。
+            </p>
+          </div>
+
+          <dl class="dl__specs">
+            <div>
+              <dt>版本</dt>
+              <dd>1.21.0 build1</dd>
+            </div>
+            <div>
+              <dt>体积</dt>
+              <dd>2.5 MB</dd>
+            </div>
+            <div>
+              <dt>最低系统</dt>
+              <dd>Android 8.1</dd>
+            </div>
+            <div>
+              <dt>转换</dt>
+              <dd>本机完成</dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         开源声明与许可
+         ========================================================== -->
+    <section class="section" id="license">
+      <div class="wrap">
+        <header class="reveal">
+          <p class="eyebrow">Open Source</p>
+          <h2 class="h2">站在 Chunker 的肩上</h2>
+        </header>
+
+        <div class="lic">
+          <div class="lic__intro reveal">
+            <p>
+              转换引擎来自 <a href="https://github.com/HiveGamesOSS/Chunker" rel="noopener">Chunker</a> —— 一个由
+              Hive Games 开源、以 MIT 协议发布的 Minecraft 存档转换器。这份移植保留了它的核心逻辑，裁掉了手机端用不上的
+              部分，并为 Android 运行时补了几处必要的兼容补丁。
+            </p>
+            <p>
+              这个项目的起点是同类应用
+              <a href="https://chunkoid.top/" target="_blank" rel="noopener">Chunkoid</a>：它先证明了在手机上做存档转换
+              是行得通的，也促成了 LiteChunk 的出现。不同的是，LiteChunk 不追求功能齐全，而是把包体、内存和界面都压到最小 ——
+              谢谢它蹚出的这条路，也推荐给有同样需要的朋友。
+            </p>
+            <p>
+              引擎以独立的 dex 随安装包一起分发，通过 DexClassLoader 加载；这部分同样以 MIT 协议开源。改了哪些地方、
+              为什么改，都写在仓库的 README 里。
+            </p>
+            <a class="lic__more" href="https://github.com/FreneticWind60/LiteChunk">
+              去 GitHub 读源码
+              <svg aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+            </a>
+          </div>
+
+          <div class="lic__list reveal">
+            <div class="lic__item">
+              <span class="lic__name">Chunker 引擎</span>
+              <span class="lic__tag">MIT</span>
+              <p>转换逻辑的来源，版权归 Hive Games 及其贡献者所有。</p>
+            </div>
+            <div class="lic__item">
+              <span class="lic__name">LiteChunk Logo</span>
+              <span class="lic__tag">CC0</span>
+              <p>公共领域贡献，可自由使用与修改。</p>
+            </div>
+            <div class="lic__item">
+              <span class="lic__name">界面图标</span>
+              <span class="lic__tag">MIT</span>
+              <p>取自 Fluent UI Regular 图标集，按 MIT 协议使用。</p>
+            </div>
+          </div>
+        </div>
+
+        <aside class="notice reveal">
+          <svg aria-hidden="true"><use href="#i-info"></use></svg>
+          <div>
+            <h3>非官方声明</h3>
+            <p>
+              LiteChunk 是第三方非官方工具，与 Mojang Studios、Microsoft 及 Hive Games 均无隶属或合作关系，也未获其背书。
+              Minecraft 是 Mojang Studios 的商标。本站与 APK 内均不含任何 Minecraft 官方素材，方块与图形全部为自绘或来自上述开源图标集。
+              转换会改写存档文件，请先自行备份原档。
+            </p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==========================================================
+       页脚
+       ========================================================== -->
+  <footer class="foot">
+    <div class="wrap">
+      <div class="foot__top">
+        <div>
+          <a class="brand" href="#top" aria-label="回到顶部">
+            <span class="brand__mark" aria-hidden="true"><svg><use href="#i-crate"></use></svg></span>
+            <span class="brand__name">Lite<b>Chunk</b></span>
+          </a>
+          <p class="foot__tagline">轻量的 Minecraft 存档转换器 · Android</p>
+        </div>
+
+        <nav class="foot__links" aria-label="相关链接">
+          <a href="https://github.com/FreneticWind60/LiteChunk">GitHub 仓库</a>
+          <a href="https://github.com/FreneticWind60/LiteChunk/releases">Releases</a>
+          <a href="https://github.com/HiveGamesOSS/Chunker" rel="noopener">Chunker 上游</a>
+          <a href="https://chunkoid.top/" target="_blank" rel="noopener">Chunkoid 友链</a>
+          <a href="#license">许可说明</a>
+        </nav>
+      </div>
+
+      <div class="foot__bottom">
+        <!-- 名字是占位，换成自己的即可 -->
+        <p>© <span id="year">2026</span> LiteChunk · 由 Frenetic 制作</p>
+        <p>非官方项目，与 Mojang / Hive Games 无隶属关系。</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    /* ==========================================================================
+       少量原生 JS：主题切换、滚动入场、顶栏投影、页内索引高亮
+       ========================================================================== */
+    (function () {
+      var root = document.documentElement;
+      var btn = document.getElementById('themeBtn');
+
+      /* ---- 主题开关：写进 localStorage，下次打开保持 ---- */
+      function syncThemeBtn() {
+        var dark = root.getAttribute('data-theme') === 'dark';
+        btn.setAttribute('aria-pressed', String(dark));
+        btn.setAttribute('aria-label', dark ? '切换到浅色主题' : '切换到深色主题');
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', dark ? '#080c11' : '#f4f6f9');
+      }
+
+      btn.addEventListener('click', function () {
+        var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        root.setAttribute('data-theme', next);
+        try { localStorage.setItem('litechunk-theme', next); } catch (e) { }
+        syncThemeBtn();
+      });
+
+      syncThemeBtn();
+
+      /* ---- 滚动入场：首屏内已可见的直接显示，其余等滚动到再淡入 ---- */
+      var reveals = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+      var pending = reveals.filter(function (el) {
+        // 已经在视口里的不要做动画，避免打开页面时"闪一下"
+        if (el.getBoundingClientRect().top < window.innerHeight * 0.94) {
+          el.classList.add('is-in');
+          return false;
+        }
+        return true;
+      });
+
+      var revealObserver = null;
+
+      if ('IntersectionObserver' in window) {
+        revealObserver = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+              entry.target.classList.add('is-in');
+              revealObserver.unobserve(entry.target);
+            }
+          });
+        }, { rootMargin: '0px 0px -8% 0px', threshold: 0.05 });
+      }
+
+      pending.forEach(function (el) {
+        if (revealObserver) revealObserver.observe(el);
+        else el.classList.add('is-in');
+      });
+
+      /* 兜底：点页内索引直接跳转时，可能整段内容被一次跨过去，
+         IntersectionObserver 来不及回调，这里在滚动后补一次检查。 */
+      var sweeping = false;
+
+      function revealSweep() {
+        sweeping = false;
+        pending = pending.filter(function (el) {
+          if (el.getBoundingClientRect().top >= window.innerHeight * 0.94) return true;
+          el.classList.add('is-in');
+          if (revealObserver) revealObserver.unobserve(el);
+          return false;
+        });
+      }
+
+      /* ---- 顶栏：一旦离开首屏顶部就加投影 ---- */
+      var head = document.getElementById('siteHead');
+      var links = Array.prototype.slice.call(document.querySelectorAll('#headNav a'));
+      var targets = links.map(function (a) {
+        return document.querySelector(a.getAttribute('href'));
+      });
+
+      function onScroll() {
+        head.classList.toggle('is-stuck', window.scrollY > 8);
+        if (pending.length && !sweeping) {
+          sweeping = true;
+          window.requestAnimationFrame(revealSweep);
+        }
+      }
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+
+      /* ---- 页内索引高亮：找离视口中线最近的那一节 ---- */
+      if ('IntersectionObserver' in window) {
+        var spy = new IntersectionObserver(function (entries) {
+          entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            var i = targets.indexOf(entry.target);
+            links.forEach(function (a, j) { a.classList.toggle('is-active', i === j); });
+          });
+        }, { rootMargin: '-45% 0px -50% 0px' });
+
+        targets.forEach(function (t) { if (t) spy.observe(t); });
+      }
+
+      /* ---- 页脚年份 ---- */
+      var year = document.getElementById('year');
+      if (year) year.textContent = new Date().getFullYear();
+    })();
+  </script>
+</body>
+
+</html>

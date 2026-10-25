@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.frenetic.litechunk.SwipeRevealLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <!-- Content (child 0) -->
+    <LinearLayout
+        android:id="@+id/content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:background="@drawable/bg_row"
+        android:gravity="center_vertical"
+        android:minHeight="62dp"
+        android:orientation="horizontal"
+        android:paddingStart="10dp"
+        android:paddingEnd="12dp">
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/cbSelect"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone" />
+
+        <ImageView
+            android:id="@+id/ivIcon"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_marginEnd="10dp"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_java"
+            app:tint="@color/accent" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp">
+
+            <TextView
+                android:id="@+id/tvName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="middle"
+                android:singleLine="true"
+                android:textColor="@color/text"
+                android:textSize="14sp" />
+
+            <TextView
+                android:id="@+id/tvMeta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:singleLine="true"
+                android:textAppearance="@style/Text.LiteChunk.Caption" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Actions (child 1): 44dp each, so six of them still fit a 320dp wide screen. -->
+    <LinearLayout
+        android:id="@+id/actions"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_marginTop="6dp"
+        android:background="@color/surface_high"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <LinearLayout
+            android:id="@+id/actionEnqueue"
+            style="@style/Widget.LiteChunk.RowAction"
+            android:contentDescription="放入转化列表">
+
+            <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_queue_add" />
+
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="装填" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/actionZip"
+            style="@style/Widget.LiteChunk.RowAction"
+            android:contentDescription="导出为 zip">
+
+            <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_zip" />
+
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="zip" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/actionMcworld"
+            style="@style/Widget.LiteChunk.RowAction"
+            android:contentDescription="导出为 mcworld">
+
+            <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_bedrock" />
+
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="mcworld" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/actionShare"
+            style="@style/Widget.LiteChunk.RowAction"
+            android:contentDescription="分享">
+
+            <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_share" />
+
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="分享" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/actionGame"
+            style="@style/Widget.LiteChunk.RowAction"
+            android:contentDescription="导入游戏">
+
+            <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_game" />
+
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="导入" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/actionDelete"
+            style="@style/Widget.LiteChunk.RowAction"
+            android:contentDescription="删除">
+
+            <ImageView
+                style="@style/Widget.LiteChunk.RowActionIcon"
+                android:src="@drawable/ic_delete"
+                app:tint="@color/danger" />
+
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="删除" />
+        </LinearLayout>
+    </LinearLayout>
+
+</com.frenetic.litechunk.SwipeRevealLayout>

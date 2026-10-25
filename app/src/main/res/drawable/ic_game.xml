@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fluent UI Games 16 Regular (MIT): hand the archive to the game. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="?attr/colorControlNormal"
+    android:viewportHeight="16"
+    android:viewportWidth="16">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M3.505,7.5a0.5,0.5 0 0,1 0.5,-0.5h1V6a0.5,0.5 0 0,1 1,0v1h1a0.5,0.5 0 0,1 0,1h-1v1a0.5,0.5 0 1,1 -1,0V8h-1a0.5,0.5 0 0,1 -0.5,-0.5M11,9a1,1 0 1,1 -2,0a1,1 0 0,1 2,0m0,-2a1,1 0 1,0 0,-2a1,1 0 0,0 0,2m-9.999,0.5a4.5,4.5 0 0,1 4.5,-4.5h5.008a4.5,4.5 0 1,1 0,9H5.501a4.5,4.5 0 0,1 -4.5,-4.5m4.5,-3.5a3.5,3.5 0 1,0 0,7h5.008a3.5,3.5 0 1,0 0,-7z" />
+</vector>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Fluent UI Folder 16 Regular geometry (MIT). Drawn with evenOdd so the interior is a hole
+    regardless of subpath direction: the whole icon set is filled-path based, no strokes.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="?attr/colorControlNormal"
+    android:viewportHeight="16"
+    android:viewportWidth="16">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M1,4.4A1.9,1.9 0 0,1 2.9,2.5h4.2a1.6,1.6 0 0,1 1.13,0.47l1.2,1.2h4.87A1.7,1.7 0 0,1 16,5.87v5.83a1.8,1.8 0 0,1 -1.8,1.8H2.8A1.8,1.8 0 0,1 1,11.7zM2,5.9v5.8a0.8,0.8 0 0,0 0.8,0.8h11.4a0.8,0.8 0 0,0 0.8,-0.8V6.4a0.7,0.7 0 0,0 -0.7,-0.7H9.06L7.5,4.14a0.6,0.6 0 0,0 -0.42,-0.17H2.8A0.8,0.8 0 0,0 2,4.77z" />
+</vector>

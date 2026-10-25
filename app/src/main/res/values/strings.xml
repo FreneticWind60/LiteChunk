@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LiteChunk</string>
+    <string name="action_theme">切换主题</string>
+    <string name="action_about">关于</string>
+    <string name="tab_convert">转换</string>
+    <string name="tab_files">文件</string>
+</resources>

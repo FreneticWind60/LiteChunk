@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path
+        name="cache"
+        path="." />
+    <files-path
+        name="files"
+        path="." />
+    <!-- Output archives live in the app's own external directory, which is where the file manager points the
+         user. FileProvider cannot be pointed at the parent of files/, so the path is spelled out relative to the
+         external storage root instead. -->
+    <external-path
+        name="output"
+        path="Android/data/com.frenetic.litechunk/output/" />
+</paths>

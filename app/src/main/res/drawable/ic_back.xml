@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fluent UI Chevron Left 16 Regular geometry (MIT). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="?attr/colorControlNormal"
+    android:viewportHeight="16"
+    android:viewportWidth="16">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9.65,3.15c0.2,0.2 0.2,0.51 0,0.7L5.71,7.65c-0.2,0.2 -0.2,0.5 0,0.7l3.94,3.8c0.19,0.19 0.19,0.51 0,0.7 -0.2,0.2 -0.51,0.2 -0.7,0l-4.3,-4.14a1,1 0 0,1 0,-1.42l4.3,-4.14c0.19,-0.2 0.5,-0.2 0.7,0z" />
+</vector>
