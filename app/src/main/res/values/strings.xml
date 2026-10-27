@@ -3,6 +3,13 @@
     <string name="app_name">LiteChunk</string>
     <string name="action_theme">切换主题</string>
     <string name="action_about">关于</string>
+    <string name="action_details">存档详情</string>
     <string name="tab_convert">转换</string>
     <string name="tab_files">文件</string>
+    <!-- Shown in the system share / open-with sheet for archives sent from other apps. -->
+    <string name="import_label">导入到 LiteChunk</string>
+    <!-- Floating label inside the level.dat text editor. -->
+    <string name="level_field_text_hint">文本 / Text</string>
+    <string name="level_field_number_hint">整数 / Integer</string>
+    <string name="level_field_empty_error">不能为空 / Cannot be empty</string>
 </resources>

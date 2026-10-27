@@ -15,7 +15,8 @@ import java.io.File;
  * Scratch space is the exception. Conversion needs a real directory tree (LevelDB memory maps its files, so a
  * streaming implementation is not possible) and doing that on external storage means going through the FUSE layer,
  * which is measurably slower for the small random writes LevelDB does. Flush space therefore stays in the internal
- * cache directory and is deleted as soon as an item finishes.
+ * cache directory and is deleted as soon as an item finishes; the per-entry copy made for detection is reused by the
+ * conversion and dropped then, so a world is unpacked once instead of twice.
  */
 final class Paths {
 
@@ -59,9 +60,93 @@ final class Paths {
         return new File(parent, "job-" + System.currentTimeMillis());
     }
 
-    /** Clear leftovers from a previous run that was killed mid conversion. */
+    /**
+     * Scratch directory owned by one queue entry, named after it so a later stage can find it again.
+     * <p>
+     * Detection and conversion both need the source unpacked as real files. Detection used to delete its copy when it
+     * finished, which meant a world was unzipped twice: once to read its version, once to convert it. Keeping the
+     * copy keyed by entry id makes the second one free.
+     */
+    static File stageFor(Context context, String itemId) {
+        String safe = itemId == null ? "unknown" : itemId.replaceAll("[^A-Za-z0-9-]", "");
+        return new File(flashParent(context), "stage-" + safe);
+    }
+
+    /**
+     * Marker written once a stage is fully unpacked.
+     * <p>
+     * Without it a conversion that starts while detection is still copying would read a half written world: the
+     * queue row appears the moment the archive is picked, so "add then immediately convert" is a real sequence.
+     */
+    private static final String STAGE_READY = ".ready";
+
+    static void markStageReady(File stage) {
+        try {
+            //noinspection ResultOfMethodCallIgnored
+            new File(stage, STAGE_READY).createNewFile();
+        } catch (Exception ignored) {
+            // A stage without the marker is simply not reused; the conversion unpacks again.
+        }
+    }
+
+    static boolean isStageReady(File stage) {
+        return new File(stage, STAGE_READY).isFile();
+    }
+
+    /**
+     * Drop stage directories that no longer belong to a queued entry.
+     * <p>
+     * Called from the conversion worker, never from the UI: that worker is the only thing that reads a stage, so
+     * deleting other stages there cannot pull the ground out from under a running job. Doing it when an item is
+     * added would race a conversion that started a moment earlier.
+     *
+     * @param keepItemIds ids of the entries in the batch, whose stages must survive.
+     */
+    static void pruneStagesExcept(Context context, java.util.Set<String> keepItemIds) {
+        File parent = flashParent(context);
+        File[] children = parent.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (!child.getName().startsWith("stage-")) {
+                continue;
+            }
+            boolean keep = false;
+            for (String id : keepItemIds) {
+                if (child.getName().equals(stageFor(context, id).getName())) {
+                    keep = true;
+                    break;
+                }
+            }
+            if (!keep) {
+                WorldFiles.delete(child);
+            }
+        }
+    }
+
+    static void deleteStage(Context context, String itemId) {
+        WorldFiles.delete(stageFor(context, itemId));
+    }
+
+    /**
+     * Clear leftovers from a run that was killed mid conversion.
+     * <p>
+     * Only the anonymous {@code job-*} directories are removed. A {@code stage-<itemId>} belongs to a queue entry that
+     * survives in {@code input.json}, and it is validated by its own {@code .ready} marker — wiping it here would pull
+     * the copy out from under a detection thread that the same startup just spawned.
+     */
     static void clearFlash(Context context) {
-        WorldFiles.delete(flashParent(context));
+        File parent = flashParent(context);
+        File[] children = parent.listFiles();
+        if (children == null) {
+            return;
+        }
+        for (File child : children) {
+            if (child.getName().startsWith("job-")) {
+                WorldFiles.delete(child);
+            }
+        }
     }
 
     static File ensure(File directory) {

@@ -130,7 +130,7 @@ public class FilesFragment extends Fragment implements Store.Listener, FileAdapt
     }
 
     private void export(Store.OutputFile file, boolean mcworld) {
-        String name = WorldFiles.baseName(file.name) + (mcworld ? ".mcworld" : ".zip");
+        String name = WorldFiles.stripArchiveExtension(file.name) + (mcworld ? ".mcworld" : ".zip");
         if (requireActivity() instanceof MainActivity activity) {
             activity.startExport(file.file, name);
         }

@@ -3,7 +3,7 @@
 Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换引擎来自
 [Chunker](https://github.com/HiveGamesOSS/Chunker) 的裁剪版，通过 `DexClassLoader` 在独立进程中加载。
 
-- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build1`（与引擎 Chunker 的版本同步）
+- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build3`（与引擎 Chunker 的版本同步）
 - 最低系统 Android 8.1（API 27）—— `java.nio.file` 与基岩版 1.26 的共同下限；目标 API 37
 - 只做一件事：选存档 → 选版本 → 转换 → 保存 / 分享 / 导入
 - MIT 许可，非官方项目，与 Mojang Studios、Microsoft 无关
@@ -12,8 +12,8 @@ Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换
 
 ```
 api/      com.frenetic.litechunk.api    App 与引擎之间的稳定契约（打进 APK，不混入 dex）
-engine/   Chunker 裁剪源码 + EngineImpl 门面 + R8 打包任务
-app/      UI（转换页 / 文件页）、文件流、:chunker 隔离进程服务、DexClassLoader 加载器
+engine/   Chunker 裁剪源码 + EngineImpl 门面 + level.dat 读写 + R8 打包任务
+app/      UI（转换页 / 文件页 / 存档详情）、文件流、外部导入、:chunker 隔离进程服务、DexClassLoader 加载器
 website/  官网单页（单文件 HTML，零外部请求，可直接丢到 GitHub Pages）
 ```
 
@@ -78,6 +78,7 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
 ./gradlew :engine:engineCli -PheapSize=512m \
   --args="<世界目录或zip> <工作目录> BEDROCK_1.26.60 nores 2"
 ./gradlew :engine:actorDump --args="<基岩世界目录>"   # 统计 digp / actorprefix / definitions
+./gradlew :engine:levelTest --args="<世界目录>"       # level.dat 读写自检（JE 与 BE 都支持）
 ```
 
 `engineCli` 跑的是与 APK 内完全相同的引擎源码，只是 GC 不同，用来回答「这段世界要跑多久、多少内存」——
@@ -91,8 +92,29 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
 | 路径 | 用途 |
 | --- | --- |
 | `output/` | 转换成品。基岩版 `.mcworld`，Java 版 `.zip` |
+| `output/backup/` | 存档详情改 `level.dat` 之前的原文件备份 |
 | `input.json` | 转化列表的快照（只存路径与格式，不复制存档） |
-| 内部 `cacheDir/flush/job-*` | 转换期的暂存目录，任务结束即删 |
+| 内部 `cacheDir/flush/stage-<id>` | 解压后的世界，按队列项复用（详见「暂存与复用」） |
+| 内部 `cacheDir/flush/job-*` | 转换期的临时工作目录，任务结束即删 |
+| 内部 `cacheDir/detail/<hash>` | 存档详情页抽出的 `level.dat`，离开页面即删 |
+
+## 从别的应用导入
+
+`ImportActivity`（指向 `MainActivity` 的 `activity-alias`）接两种入口：
+
+| 入口 | action | 典型来源 |
+| --- | --- | --- |
+| 分享 | `SEND` / `SEND_MULTIPLE` | 文件管理器、网盘、微信 / QQ 的「分享」 |
+| 打开方式 | `VIEW` + `content://` / `file://` | 微信、QQ、浏览器点开 `.mcworld` |
+
+流程：收到 URI → `Inbox.accept()` 复制到 `inbox/` → 入队并切到转换页 → 自动识别版本。
+**必须在入口就复制**：队列只存引用、转换时才读字节，而 `SEND` / `VIEW` 的读授权活不过当前 Activity。
+
+过滤器的 mime 要写宽（含 `*/*`）。微信、QQ 与多数文件管理器对未知扩展名一律报
+`application/octet-stream` 或 `*/*`，收窄了它就根本不出现在「打开方式」里；代价是它也会出现在别的文件上，
+所以真正的把关在 `Inbox.isArchive()`：不是 `.zip` / `.mcworld` / `.mctemplate` 就一个字节都不复制，只提示忽略。
+
+同名同大小的再次分享复用 `inbox/` 里已有的副本；转换成功后该副本会被删除（那是应用的拷贝，不是用户保存的文件）。
 
 ## 界面
 
@@ -102,6 +124,10 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
 - **输出格式**：Java 版 / 基岩版，目标版本从引擎枚举出的 124 个版本里选。
   - `转出后自动删除原存档`（默认不勾）—— 只在**打包成功之后**才删，失败不会丢原档。
   - `打包为 .mcworld`（仅基岩版可见，默认勾选）—— 取消后输出 `.zip`。
+- **输出命名**：由「存档原名 / 版本标记（BE/JE）/ 时间戳」三块拼成，可开关、可上下调序、分隔符可选
+  `-` `_` 无，默认 `原名-版本-时间`（`草稿-BE-20261027-1652.mcworld`）。点开是带实时预览的 BottomSheet，
+  设置存 `SharedPreferences`，转换时随 Intent 传给 `:chunker` 进程（跨进程读 prefs 不保证可见）。
+  同名不覆盖：`WorldFiles.unique` 自动加 `(2)`。
 - **本轮输出**：本轮产出的清单，每行可「放入转化列表 / 导出为 zip / 导出为 mcworld / 分享 / 导入游戏 / 删除」。
 
 ### 文件页
@@ -116,6 +142,30 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
 - 删除一律弹 `AlertDialog` 二次确认；「导出」是另存一份副本，`output/` 里的原件不动。
 
 > 代价：因为整行都归手势所有，在**行上**左右滑动不能再翻页，请用顶部页签或在列表空白区域滑动。
+
+### 存档详情页（`LevelActivity`）
+
+点存档弹出的操作面板里有「存档详情」。读的是 `level.dat`，不是区块。
+
+存在的理由：**很多「转换没解决问题」的疑难其实不是转换**——存档只是需要改名字、改游戏模式，或者声明错了版本。
+这类需求走完整转换要解码再编码每个区块（大存档几分钟），还会把引擎不认识的方块换成占位块；
+只改头部是毫秒级，而且不动区块。
+
+- **只读诊断**：版本（由 `DataVersion` / `NetworkVersion` 反查）、字节数，以及几条会真正影响游玩的检查
+  —— 存档名为空、缺 `DataVersion`、缺出生点、基岩版开了哪些实验性玩法（新方块变空气的最常见原因）。
+- **白名单修补**：中文名 + 英文键名 + 当前值，点一下改一项，不做树形编辑器。
+  Java 侧 `LevelName / GameType / Difficulty / allowCommands / hardcore / RandomSeed / SpawnXYZ / DayTime`；
+  基岩侧 `LevelName / GameType / Difficulty / commandsEnabled / Generator / RandomSeed / SpawnXYZ / Time`。
+  `DataVersion`、`StorageVersion`、`NetworkVersion` 一律只读并在下方说明原因：改这些数字只改声明、
+  不升级区块数据，反而可能让游戏判定存档损坏。
+- **类型安全**：枚举字段只能从固定选项里选，不许手输；难度在 Java 里是 `byte`、基岩里是 `int`，写入时按版本选宽度。
+  读取走原始 tag 再走 `Number`——同一个键在不同版本里宽度不同，直接 `getInt()` 遇到 `ByteTag` 会抛
+  `ClassCastException`（这个 bug 是 `:engine:levelTest` 抓到的）。
+- **写入安全**：先 `level.dat.bak-<时间>`，再写 `.tmp`，**读回校验每个被改字段**后才替换原文件；
+  存档本身是 zip，重写走同目录 `.tmp` 再 rename，中途失败原包不动。备份会复制到 `output/backup/`，
+  因为临时目录随时可能被系统清掉。
+- 引擎接口 `inspectLevel` / `applyLevelChanges` 同样在 `:chunker` 进程执行——UI 进程不加载 Chunker，
+  结果按平行数组跨进程传（`api` 是纯 Java 库，用不了 `Parcelable`）。
 
 ### 关于页
 
@@ -188,8 +238,15 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
   上限是 2 而不是 8：同一世界 8 线程实测比 2 线程更慢，线程越多 GC 压力越大。
   首次失败若是 OOM，自动降 1 线程 + 精简模式重试一次。
 - **进度**：200ms 轮询 + `ResultReceiver` 回传，前台服务通知同步。
-- **文件**：世界先解压 / 复制到 `cacheDir/flush/job-*`（LevelDB 需要真实文件 mmap，不能直接读写 SAF 路径），
+- **文件**：世界先解压 / 复制成 `cacheDir/flush/` 下的真实文件（LevelDB 需要 mmap，不能直接读写 SAF 路径），
   输出打包成 `.zip` / `.mcworld` 放进 `output/`，再由 SAF `CreateDocument` 导出副本。
+- **暂存与复用**：识别与转换都需要解压后的世界，所以暂存目录按队列项命名（`stage-<id>`）而不是匿名 `job-*`。
+  识别完不再删除，转换时直接复用——同一个世界以前要解压两遍，现在第二遍是 0 秒（日志里 `read=0.0s(staged)`）。
+  完整写入后会落 `.ready` 标记，否则「添加后立刻点转换」可能读到写了一半的世界。
+  清理只在转换线程里做（`pruneStagesExcept`），删掉不属于本批次条目的暂存目录——放在 UI 线程会与刚启动的转换打架。
+- **两条写入路径**：完整转换走引擎管线（解码区块 → 重新编码），改 `level.dat` 走 `LevelEditor` 直写。
+  后者不碰区块，因此没有「引擎不认识的方块变占位块」的代价，也不受堆预算约束；
+  前者仍是唯一能跨版本改地形的手段。两者共用同一个 `:chunker` 进程。
 - **dex 加载**：`assets/chunker.jar` → `code_cache/engine/chunker-<size>.jar` → `setReadOnly()`
   （Android 14 起动态加载的代码必须来自只读文件）→ `DexClassLoader`。
 
@@ -205,10 +262,26 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
 | 上一条输出的实体统计 | `actorDump` | 5 幅画全部保留，`Motif` 完好，`without definitions: 0` |
 | 世界 C（Java 1.21.8，257MB，实体密集）→ 基岩 | 桌面 `engineCli` | `actorprefix` 1392 条、28 种生物，`without definitions: 0` |
 | 世界 D（Java 1.21.8，25MB）→ 基岩 | 模拟器，**release 包（R8）** | **19.3 s**，产物 4.0MB |
+| 世界 E（Java，压缩前 1.29GB）→ 基岩 | 真机，512MB 堆（未 root） | **290 s**，≈4.5 MB/s |
+| 同一次转换的分阶段耗时 | 真机，release 包 | `read=0.2s convert=3.0s pack=0.5s`（25MB 世界） |
+
+世界 E 的数字值得单独说明：日志里进度在 60s/120s/180s/240s 时分别是 14%/32%/57%/73%，而 CPU 平均占用
+不到 50%、并且越到后期越低。这是 IO 与 LevelDB compaction 受限，不是 CPU 饱和——所以并发参数（线程数、
+写缓冲、在飞 region 数）没有调整的余地。大世界要快，只有换更大的堆（桌面 CLI）或减少工作量。
 
 UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：添加与识别、自动切换目标平台、批量转换、
 文件页六个操作（导出落到 `/sdcard/Download` 且字节一致、分享走 `FileProvider`、导入无启动器时回退分享、
 删除二次确认）、右滑多选、转化列表滑删、明暗三态、关于页明暗两套。
+
+`1.21.0 build3` 新增能力的实测（同一台模拟器，debug 与 release 双包）：
+
+- **导入**：`VIEW` 与 `SEND` 两个入口都能把 `.mcworld` 送进队列并识别出版本；`notes.txt` 被
+  `Inbox.isArchive()` 拒绝，`inbox/` 里没有留下任何文件。
+- **命名模板**：三块全开 / 只留原名 / 换分隔符，产物名与预览一致；同名第二次转换自动加 `(2)`。
+- **暂存复用**：先识别再转换，第二次日志出现 `read=0.0s(staged)`；转换结束后 `inbox/` 与 `stage-*` 都已清理。
+- **存档详情**：真实 Java 1.21.8 存档与基岩 1.26.60 产物双向读写通过——改值生效、**未改字段一个都没变**、
+  备份字节数等于原文件、只读字段写入被拒；模拟器上改完拉起 zip 里的 `level.dat` 复核，
+  `Difficulty=2`、`GameType=0`，zip 的 7 个条目完整。
 
 仍需人工确认：
 
@@ -224,6 +297,10 @@ UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：�
   旧客户端打不开，属预期。
 - 转换在 `:chunker` 进程中进行，App 被划掉后任务会继续；重启 App 不恢复进度（成品仍在 `output/`）。
 - 关掉 LevelDB 尾部 compaction 后，中间 `.ldb` 是未压缩的，`db/` 目录会比上游大；打包成 `.mcworld` 后回落。
+- 存档详情改的是 `level.dat`，不会升级区块数据。改完的存档若正被游戏打开着，游戏退出时会用内存里的旧数据
+  覆盖回去——改之前先关掉游戏。
+- 存档详情保存要重写整个压缩包（同目录 `.tmp` 再 rename），所以需要**与包体等量**的剩余空间；
+  空间不足时写 `.tmp` 会失败，原包保持不动。
 - 卸载重装后系统不一定清理 `/sdcard/Android/data/com.frenetic.litechunk/`。如果它留着且属主还是旧 uid，
   `output/` 里会写不进去（`EACCES`）。启动时会把不可写的 `output/` 改名成 `output.old-<时间戳>` 再新建；
   这层存储不一定允许改名，失败时错误提示会引导用户清除应用数据（不会动原存档）。

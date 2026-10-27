@@ -1,18 +1,24 @@
 package com.frenetic.litechunk;
 
+import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -20,10 +26,13 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.frenetic.litechunk.databinding.FragmentConvertBinding;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.google.android.material.button.MaterialButtonToggleGroup;
+import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -114,6 +123,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             render();
         });
         binding.rowVersion.setOnClickListener(v -> showVersionPicker());
+        binding.rowNaming.setOnClickListener(v -> showNamingSheet());
 
         store.addListener(this);
         controller.addListener(this);
@@ -288,6 +298,156 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
     }
 
     // ---------------------------------------------------------------------------------------------
+    // Output naming
+    // ---------------------------------------------------------------------------------------------
+
+    /** A real name to preview the template with, so the row shows something meaningful before any conversion. */
+    private String namingSampleName() {
+        List<QueueItem> queue = Store.get(requireContext()).queue;
+        return queue.isEmpty() ? "存档名" : queue.get(0).name;
+    }
+
+    private String namingPreview(boolean bedrock) {
+        String name = Naming.preview(requireContext(), namingSampleName(), bedrock);
+        // The extension is part of what the user is choosing: turning off "打包为 .mcworld" changes it.
+        String extension = bedrock && binding.cbPackMcworld.isChecked() ? ".mcworld" : ".zip";
+        return name + extension;
+    }
+
+    /**
+     * The naming sheet: order, inclusion and separator, with a live preview.
+     * <p>
+     * Rows are built in code rather than declared three times in XML because the row order itself is what the user is
+     * editing — a fixed row could not be moved.
+     */
+    private void showNamingSheet() {
+        Controller controller = Controller.get(requireContext());
+        if (controller.isRunning()) {
+            Toast.makeText(requireContext(), "转换进行中，先取消再修改命名", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Context context = requireContext();
+        BottomSheetDialog sheet = new BottomSheetDialog(context);
+        View content = LayoutInflater.from(context).inflate(R.layout.sheet_naming, null);
+        LinearLayout rows = content.findViewById(R.id.namingRows);
+        TextView preview = content.findViewById(R.id.tvSheetPreview);
+        TextView note = content.findViewById(R.id.tvSheetNote);
+        MaterialButtonToggleGroup separators = content.findViewById(R.id.toggleSeparator);
+
+        List<String> order = Naming.split(Naming.order(context));
+        List<String> enabled = Naming.split(Naming.enabled(context));
+        String[] separator = {Naming.separator(context)};
+        boolean bedrock = edition.equals("BEDROCK");
+        String sample = namingSampleName();
+
+        Runnable[] refresh = new Runnable[1];
+        refresh[0] = () -> {
+            String rendered = Naming.render(Naming.join(order), Naming.join(enabled), separator[0],
+                    sample, bedrock, System.currentTimeMillis());
+            preview.setText(rendered + (bedrock ? ".mcworld" : ".zip"));
+            note.setText(enabled.isEmpty()
+                    ? "一个都没勾选时会退回 world，同名文件自动加序号。"
+                    : "分隔符 " + Naming.describeSeparator(separator[0]) + "，同名文件自动加序号，不会覆盖。");
+            rows.removeAllViews();
+            for (int index = 0; index < order.size(); index++) {
+                rows.addView(namingRow(context, order, enabled, index, refresh[0]));
+            }
+        };
+
+        separators.check("-".equals(separator[0]) ? R.id.sepDash
+                : "_".equals(separator[0]) ? R.id.sepUnder : R.id.sepNone);
+        separators.addOnButtonCheckedListener((group, checkedId, isChecked) -> {
+            if (!isChecked) {
+                return;
+            }
+            separator[0] = checkedId == R.id.sepDash ? "-" : checkedId == R.id.sepUnder ? "_" : "";
+            refresh[0].run();
+        });
+
+        content.findViewById(R.id.btnNamingReset).setOnClickListener(v -> {
+            Naming.reset(context);
+            order.clear();
+            order.addAll(Naming.split(Naming.DEFAULT_ORDER));
+            enabled.clear();
+            enabled.addAll(Naming.split(Naming.DEFAULT_ENABLED));
+            separator[0] = Naming.DEFAULT_SEPARATOR;
+            separators.check(R.id.sepDash);
+            refresh[0].run();
+        });
+        content.findViewById(R.id.btnNamingDone).setOnClickListener(v -> {
+            Naming.save(context, Naming.join(order), Naming.join(enabled), separator[0]);
+            sheet.dismiss();
+            render();
+        });
+
+        refresh[0].run();
+        sheet.setContentView(content);
+        sheet.show();
+    }
+
+    /** One row of the naming sheet: the checkbox that includes the token, and the arrows that move it. */
+    private View namingRow(Context context, List<String> order, List<String> enabled, int index, Runnable refresh) {
+        String token = order.get(index);
+        LinearLayout row = new LinearLayout(context);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+
+        MaterialCheckBox check = new MaterialCheckBox(context);
+        check.setText(Naming.label(token));
+        check.setTextSize(14F);
+        check.setTextColor(ContextCompat.getColor(context, R.color.text));
+        check.setChecked(enabled.contains(token));
+        check.setLayoutParams(new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1F));
+        // Attached after the initial value so restoring the saved state does not fire a change.
+        check.setOnCheckedChangeListener((button, checked) -> {
+            if (checked && !enabled.contains(token)) {
+                enabled.add(token);
+            } else if (!checked) {
+                enabled.remove(token);
+            }
+            refresh.run();
+        });
+        row.addView(check);
+
+        row.addView(namingMoveButton(context, true, index > 0, () -> {
+            Collections.swap(order, index, index - 1);
+            refresh.run();
+        }));
+        row.addView(namingMoveButton(context, false, index < order.size() - 1, () -> {
+            Collections.swap(order, index, index + 1);
+            refresh.run();
+        }));
+        return row;
+    }
+
+    private ImageButton namingMoveButton(Context context, boolean up, boolean enabled, Runnable action) {
+        ImageButton button = new ImageButton(context);
+        button.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
+        android.util.TypedValue background = new android.util.TypedValue();
+        context.getTheme().resolveAttribute(
+                android.R.attr.selectableItemBackgroundBorderless, background, true);
+        button.setBackgroundResource(background.resourceId);
+        button.setImageResource(R.drawable.ic_expand_more);
+        // One icon, two directions: the drawable is a chevron pointing down.
+        button.setRotation(up ? 180F : 0F);
+        button.setColorFilter(ContextCompat.getColor(context,
+                enabled ? R.color.text_dim : R.color.divider));
+        button.setEnabled(enabled);
+        button.setContentDescription(up ? "上移" : "下移");
+        if (enabled) {
+            button.setOnClickListener(v -> action.run());
+        }
+        return button;
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    // ---------------------------------------------------------------------------------------------
     // Conversion
     // ---------------------------------------------------------------------------------------------
 
@@ -356,6 +516,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         binding.toggleEdition.check(bedrock ? R.id.btnBedrock : R.id.btnJava);
         binding.tvVersion.setText(currentVersionLabel());
         binding.cbPackMcworld.setVisibility(bedrock ? View.VISIBLE : View.GONE);
+        binding.tvNamingPreview.setText(namingPreview(bedrock));
 
         int count = store.queue.size();
         binding.tvQueueCount.setText(count == 0 ? "" : count + " 个");
@@ -382,6 +543,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         binding.cbDeleteSource.setEnabled(!running);
         binding.cbPackMcworld.setEnabled(!running);
         binding.rowVersion.setEnabled(!running);
+        binding.rowNaming.setEnabled(!running);
 
         if (formats == null) {
             binding.tvEngine.setText("正在加载转换引擎…");

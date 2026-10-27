@@ -41,6 +41,15 @@
     </LinearLayout>
 
     <LinearLayout
+        android:id="@+id/rowDetails"
+        style="@style/Widget.LiteChunk.SheetRow">
+
+        <ImageView style="@style/Widget.LiteChunk.SheetRowIcon" android:src="@drawable/ic_info" />
+
+        <TextView style="@style/Widget.LiteChunk.SheetRowLabel" android:text="存档详情" />
+    </LinearLayout>
+
+    <LinearLayout
         android:id="@+id/rowExportZip"
         style="@style/Widget.LiteChunk.SheetRow">
 

@@ -76,4 +76,33 @@ public interface ChunkerEngine {
      * @param lean {@code true} to skip those stages.
      */
     void setLeanMode(boolean lean);
+
+    /**
+     * Read {@code level.dat} and describe the world without modifying anything.
+     * <p>
+     * This is the repair path for the cases that are not conversions: a world that only needs its name, game mode or
+     * declared version changed. Feeding those through {@link #convert} re-encodes every chunk, which is both slow (it
+     * is a full conversion) and lossy (identifiers the engine cannot represent become placeholder blocks). Reading
+     * the level alone avoids both.
+     *
+     * @param worldDirectory the world directory containing {@code level.dat}.
+     * @return the description, never {@code null}.
+     * @throws Exception when there is no readable {@code level.dat} in the directory.
+     */
+    LevelInfo inspectLevel(File worldDirectory) throws Exception;
+
+    /**
+     * Write the given fields back to {@code level.dat}.
+     * <p>
+     * Only the fields reported by {@link #inspectLevel(File)} with {@link LevelField#isEditable()} are accepted, any
+     * other key is ignored rather than created. The previous file is copied to {@code level.dat.bak-<timestamp>}
+     * first, the new content is written to a temporary file and read back for verification, and only then does it
+     * replace the original: a failed write leaves the world exactly as it was.
+     *
+     * @param worldDirectory the world directory containing {@code level.dat}.
+     * @param changes        field id to new value, in the same string form {@link LevelInfo} reports.
+     * @return the timestamp suffix of the backup file that was created.
+     * @throws Exception when the file cannot be read, or when the written file fails verification.
+     */
+    String applyLevelChanges(File worldDirectory, java.util.Map<String, String> changes) throws Exception;
 }

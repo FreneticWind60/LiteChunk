@@ -1,8 +1,10 @@
 package com.frenetic.litechunk;
 
+import android.content.ClipData;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -23,6 +25,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -79,6 +83,15 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+
+        handleIntent(getIntent());
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleIntent(intent);
     }
 
     @Override
@@ -93,6 +106,129 @@ public class MainActivity extends AppCompatActivity {
 
     void showConvertPage() {
         binding.pager.setCurrentItem(0, true);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Incoming archives (share / open with)
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Take a world handed over by another app and put it in the conversion list.
+     * <p>
+     * Two shapes arrive here. "Share" is {@code SEND} / {@code SEND_MULTIPLE}, which is what a file manager or a
+     * cloud app offers. "Open with" is {@code VIEW}, which is what WeChat, QQ and browsers use when an
+     * {@code .mcworld} is tapped. Neither grants a permission that outlives the activity, and the queue only stores
+     * a reference to be read at conversion time, so the file is copied into {@code inbox/} before anything else —
+     * see {@link Inbox} for why an archive that is not recognised there is rejected rather than listed.
+     */
+    private void handleIntent(Intent intent) {
+        if (intent == null) {
+            return;
+        }
+        List<Uri> uris = incomingUris(intent);
+        if (uris.isEmpty()) {
+            return;
+        }
+        // Consume the action so a configuration change (or the activity being recreated) cannot import twice.
+        intent.setAction(null);
+        if (io.isShutdown()) {
+            return;
+        }
+        android.util.Log.i("MainActivity", "importing " + uris.size() + " uri(s)");
+        Toast.makeText(this, "正在导入存档…", Toast.LENGTH_SHORT).show();
+        io.execute(() -> {
+            List<File> accepted = new ArrayList<>();
+            List<String> rejected = new ArrayList<>();
+            for (Uri uri : uris) {
+                String name = WorldFiles.displayName(this, uri);
+                if (!Inbox.isArchive(name)) {
+                    rejected.add(name);
+                    continue;
+                }
+                try {
+                    accepted.add(Inbox.accept(this, uri));
+                } catch (Throwable failure) {
+                    rejected.add(name + "：" + Job.describe(failure));
+                }
+            }
+            runOnUiThread(() -> onIncoming(accepted, rejected));
+        });
+    }
+
+    private void onIncoming(List<File> files, List<String> rejected) {
+        if (isFinishing() || isDestroyed()) {
+            android.util.Log.w("MainActivity", "import finished after the activity went away");
+            return;
+        }
+        android.util.Log.i("MainActivity", "import finished: " + files.size() + " accepted, "
+                + rejected.size() + " rejected " + rejected);
+        Store store = Store.get(this);
+        int added = 0;
+        for (File file : files) {
+            QueueItem item = QueueItem.fromLocal(file);
+            if (store.add(item)) {
+                added++;
+                // Detection needs real files, so it runs on its own thread and reports the version back into the row.
+                Controller.get(this).detect(this, item);
+            }
+        }
+        if (added > 0) {
+            // The list is the whole point of accepting a share, so show it instead of leaving the user on a page
+            // where nothing appears to have happened.
+            showConvertPage();
+            Toast.makeText(this, added == 1 ? "已加入转化列表" : "已加入 " + added + " 个存档",
+                    Toast.LENGTH_SHORT).show();
+        }
+        if (!rejected.isEmpty()) {
+            String detail = rejected.size() == 1
+                    ? rejected.get(0)
+                    : rejected.get(0) + " 等 " + rejected.size() + " 个";
+            Toast.makeText(this, "已忽略 " + detail, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /**
+     * Every URI an incoming intent carries, in the order the sender listed them.
+     * <p>
+     * Senders are inconsistent: {@code SEND} puts one URI in {@code EXTRA_STREAM}, {@code SEND_MULTIPLE} an
+     * {@code ArrayList}, {@code VIEW} in the data field, and some only fill in the {@code ClipData}.
+     */
+    @SuppressWarnings("deprecation")
+    private static List<Uri> incomingUris(Intent intent) {
+        List<Uri> uris = new ArrayList<>();
+        String action = intent.getAction();
+        if (Intent.ACTION_VIEW.equals(action)) {
+            if (intent.getData() != null) {
+                uris.add(intent.getData());
+            }
+        } else if (Intent.ACTION_SEND.equals(action) || Intent.ACTION_SEND_MULTIPLE.equals(action)) {
+            Parcelable single = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (single instanceof Uri) {
+                uris.add((Uri) single);
+            }
+            ArrayList<Parcelable> many = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
+            if (many != null) {
+                for (Parcelable parcelable : many) {
+                    if (parcelable instanceof Uri && !uris.contains(parcelable)) {
+                        uris.add((Uri) parcelable);
+                    }
+                }
+            }
+        } else {
+            return uris;
+        }
+        if (uris.isEmpty()) {
+            ClipData clip = intent.getClipData();
+            if (clip != null) {
+                for (int index = 0; index < clip.getItemCount(); index++) {
+                    Uri uri = clip.getItemAt(index).getUri();
+                    if (uri != null && !uris.contains(uri)) {
+                        uris.add(uri);
+                    }
+                }
+            }
+        }
+        return uris;
     }
 
     // ---------------------------------------------------------------------------------------------

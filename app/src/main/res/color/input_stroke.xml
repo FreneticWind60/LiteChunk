@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Outline colour for the text editors in the level detail dialogs: a hairline when idle, accent when focused. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:alpha="0.38" android:color="@color/danger" android:state_enabled="false" />
+    <item android:color="@color/accent" android:state_focused="true" />
+    <item android:color="@color/accent_dim" android:state_hovered="true" />
+    <item android:color="@color/divider" />
+</selector>

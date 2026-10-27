@@ -50,7 +50,8 @@ final class Controller {
     /** Ids of queue entries that finished, so they can leave the list when the batch ends. */
     private final java.util.Set<String> completedIds = new java.util.LinkedHashSet<>();
 
-    private State state = State.IDLE;
+    /** Written on the main thread, read from the detection thread, so the runner state has to be visible. */
+    private volatile State state = State.IDLE;
     private int index;
     private int total;
     private String currentName = "";
@@ -177,26 +178,46 @@ final class Controller {
      * Detection needs a real directory (the readers sniff level.dat and the database), so this costs a copy of the
      * world. It runs right after the user adds an item, which is while they are still reading the list, rather than
      * at conversion time.
+     * <p>
+     * The copy is kept, keyed by entry id, and the conversion picks it up instead of unpacking the world a second
+     * time: on a 278 MB world that removes one full unzip from the pipeline. It is written only when the whole
+     * archive has been unpacked ({@link Paths#markStageReady}) — the queue row appears as soon as the archive is
+     * picked, and "add then convert immediately" must not read a half written copy.
      */
     void detect(Context context, QueueItem item) {
+        if (isRunning()) {
+            // The service runs one job thread at a time and refuses a second one, which would surface as
+            // "已有转换任务正在进行" in the middle of a conversion. Leave the entry undetected: detectPending()
+            // catches it up as soon as the batch ends.
+            return;
+        }
         final Context appContext = context.getApplicationContext();
         new Thread(() -> {
-            File flush = Paths.newFlushDirectory(appContext);
-            File staged = new File(flush, "in");
+            File flush = Paths.stageFor(appContext, item.id);
+            File root = Paths.isStageReady(flush) ? WorldFiles.locateWorldRoot(new File(flush, "in")) : null;
             try {
-                File root = ConversionService.materialize(appContext, item, staged, null);
+                if (root == null) {
+                    // No complete copy yet (first detection, or a previous one was interrupted): build it.
+                    WorldFiles.delete(flush);
+                    root = ConversionService.materialize(appContext, item, new File(flush, "in"), null);
+                    if (root != null) {
+                        Paths.markStageReady(flush);
+                    }
+                }
                 if (root == null) {
                     throw new IllegalStateException("没有找到世界数据（缺少 level.dat）");
                 }
-                // The service owns the scratch directory from here: it deletes it after the reader has finished
-                // with it. Deleting it here would race the detection that was just dispatched.
+                // The service owns the scratch directory from here: it keeps it for the conversion and deletes it
+                // once that item is done. Deleting it here would race the detection that was just dispatched.
                 start(new Intent(app, ConversionService.class)
                         .setAction(Job.ACTION_DETECT)
                         .putExtra(Job.EXTRA_PATH, root.getAbsolutePath())
                         .putExtra(Job.EXTRA_FLUSH, flush.getAbsolutePath())
+                        .putExtra(Job.EXTRA_KEEP_FLUSH, true)
                         .putExtra(Job.KEY_ITEM_ID, item.id)
                         .putExtra(Job.EXTRA_RECEIVER, callback));
             } catch (Throwable failure) {
+                android.util.Log.w("Controller", "detection failed for " + item.name, failure);
                 WorldFiles.delete(flush);
                 main.post(() -> {
                     item.formatId = null;
@@ -206,6 +227,47 @@ final class Controller {
                 });
             }
         }, "litechunk-detect").start();
+    }
+
+    /**
+     * Describe the {@code level.dat} inside a directory that holds one.
+     * <p>
+     * The caller owns the receiver rather than using {@link #callback}: the details screen is a separate activity
+     * with its own lifecycle, and routing its answers through the conversion state machine would make a details
+     * refresh look like a job event.
+     *
+     * @param directory a directory containing {@code level.dat}.
+     * @param receiver  receives {@link Job#CODE_LEVEL_INFO} or {@link Job#CODE_FATAL}.
+     */
+    void inspectLevel(File directory, ResultReceiver receiver) {
+        start(new Intent(app, ConversionService.class)
+                .setAction(Job.ACTION_INSPECT)
+                .putExtra(Job.EXTRA_PATH, directory.getAbsolutePath())
+                .putExtra(Job.EXTRA_RECEIVER, receiver));
+    }
+
+    /**
+     * Write edited {@code level.dat} fields back.
+     *
+     * @param directory a directory containing {@code level.dat}.
+     * @param changes   field id to new value.
+     * @param receiver  receives {@link Job#CODE_LEVEL_SAVED} or {@link Job#CODE_FATAL}.
+     */
+    void applyLevel(File directory, java.util.Map<String, String> changes, ResultReceiver receiver) {
+        String[] ids = new String[changes.size()];
+        String[] values = new String[changes.size()];
+        int index = 0;
+        for (java.util.Map.Entry<String, String> entry : changes.entrySet()) {
+            ids[index] = entry.getKey();
+            values[index] = entry.getValue();
+            index++;
+        }
+        start(new Intent(app, ConversionService.class)
+                .setAction(Job.ACTION_APPLY_LEVEL)
+                .putExtra(Job.EXTRA_PATH, directory.getAbsolutePath())
+                .putExtra(Job.EXTRA_LEVEL_IDS, ids)
+                .putExtra(Job.EXTRA_LEVEL_VALUES, values)
+                .putExtra(Job.EXTRA_RECEIVER, receiver));
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -234,6 +296,9 @@ final class Controller {
                 .putExtra(Job.EXTRA_FORMAT, formatId)
                 .putExtra(Job.EXTRA_PACK_MCWORLD, packMcworld)
                 .putExtra(Job.EXTRA_DELETE_SOURCE, deleteSource)
+                .putExtra(Job.EXTRA_NAMING_ORDER, Naming.order(app))
+                .putExtra(Job.EXTRA_NAMING_ENABLED, Naming.enabled(app))
+                .putExtra(Job.EXTRA_NAMING_SEPARATOR, Naming.separator(app))
                 .putExtra(Job.EXTRA_RECEIVER, callback);
         ContextCompat.startForegroundService(app, intent);
         notifyChanged();
@@ -320,6 +385,7 @@ final class Controller {
                     startedAt = 0L;
                     removeCompleted();
                     Store.get(app).refreshOutputs();
+                    detectPending();
                     notifyChanged();
                     break;
                 case Job.CODE_FATAL:
@@ -342,6 +408,20 @@ final class Controller {
         Store store = Store.get(app);
         store.removeIds(completedIds);
         completedIds.clear();
+    }
+
+    /**
+     * Catch up on entries that arrived while a batch was running.
+     * <p>
+     * The service runs one job thread at a time, so a detection requested mid batch is refused — which used to leave
+     * anything shared in from another app sitting in the list as "未识别版本" until it was removed and added again.
+     */
+    private void detectPending() {
+        for (QueueItem item : new ArrayList<>(Store.get(app).queue)) {
+            if (!item.isDetected()) {
+                detect(app, item);
+            }
+        }
     }
 
     private void onDetected(Bundle data) {

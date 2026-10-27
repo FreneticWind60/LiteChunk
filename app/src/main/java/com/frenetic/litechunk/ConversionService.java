@@ -21,6 +21,7 @@ import androidx.core.app.NotificationCompat;
 
 import com.frenetic.litechunk.api.ChunkerEngine;
 import com.frenetic.litechunk.api.Detection;
+import com.frenetic.litechunk.api.LevelInfo;
 
 import java.io.File;
 import java.io.InputStream;
@@ -48,9 +49,24 @@ public class ConversionService extends Service {
     private static final Object ENGINE_LOCK = new Object();
     private static ChunkerEngine engine;
 
-    private final Object lock = new Object();
-    private Thread worker;
+    /**
+     * One job at a time, in arrival order.
+     * <p>
+     * A plain "is a worker alive?" check used to reject the newcomer, and that lost work: the conversion page asks
+     * for the format list ({@code INFO}) the moment it is created, which on a cold start lands within the same
+     * millisecond as a detection ({@code DETECT}) triggered by a shared archive — the detection was then refused and
+     * the entry stayed "未识别版本" forever. Serialising instead keeps the engine single-threaded (it has per-instance
+     * state) without ever dropping a request.
+     */
+    private final java.util.concurrent.ExecutorService jobs =
+            java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "chunker-job");
+                thread.setPriority(Thread.NORM_PRIORITY);
+                return thread;
+            });
     private volatile boolean foreground;
+    /** A conversion is in flight; a second one is refused (that is a real conflict, unlike two detections). */
+    private volatile boolean converting;
     /** Last numeric fraction the engine reported, so a stage-only update can carry it along. */
     private volatile float lastFraction;
     private volatile ResultReceiver currentReceiver;
@@ -71,6 +87,12 @@ public class ConversionService extends Service {
             channel.setShowBadge(false);
             manager.createNotificationChannel(channel);
         }
+    }
+
+    @Override
+    public void onDestroy() {
+        jobs.shutdown();
+        super.onDestroy();
     }
 
     @Override
@@ -96,6 +118,13 @@ public class ConversionService extends Service {
         }
 
         if (Job.ACTION_CONVERT.equals(action)) {
+            if (converting) {
+                Log.w(TAG, "refused a second conversion");
+                sendError(receiver, Job.CODE_FATAL, "已有转换任务正在进行");
+                stopSelfResult(startId);
+                return START_NOT_STICKY;
+            }
+            converting = true;
             startForeground(NOTIFICATION_ID, buildNotification("准备转换…", 0F, true));
             foreground = true;
         }
@@ -104,37 +133,43 @@ public class ConversionService extends Service {
         final String format = intent.getStringExtra(Job.EXTRA_FORMAT);
         final String itemId = intent.getStringExtra(Job.KEY_ITEM_ID);
         final String flushPath = intent.getStringExtra(Job.EXTRA_FLUSH);
+        final boolean keepFlush = intent.getBooleanExtra(Job.EXTRA_KEEP_FLUSH, false);
         final List<QueueItem> items = readItems(intent);
         final boolean packMcworld = intent.getBooleanExtra(Job.EXTRA_PACK_MCWORLD, true);
         final boolean deleteSource = intent.getBooleanExtra(Job.EXTRA_DELETE_SOURCE, false);
+        final NamingSettings naming = new NamingSettings(
+                intent.getStringExtra(Job.EXTRA_NAMING_ORDER),
+                intent.getStringExtra(Job.EXTRA_NAMING_ENABLED),
+                intent.getStringExtra(Job.EXTRA_NAMING_SEPARATOR));
+        final String[] levelIds = intent.getStringArrayExtra(Job.EXTRA_LEVEL_IDS);
+        final String[] levelValues = intent.getStringArrayExtra(Job.EXTRA_LEVEL_VALUES);
 
-        synchronized (lock) {
-            if (worker != null && worker.isAlive()) {
-                sendError(receiver, Job.CODE_FATAL, "已有转换任务正在进行");
-                return START_NOT_STICKY;
-            }
-            worker = new Thread(() -> {
-                try {
-                    if (Job.ACTION_INFO.equals(action)) {
-                        sendInfo(receiver);
-                    } else if (Job.ACTION_DETECT.equals(action)) {
-                        sendDetection(receiver, path, itemId, flushPath);
-                    } else if (Job.ACTION_CONVERT.equals(action)) {
-                        runQueue(receiver, items, format, packMcworld, deleteSource);
-                    }
-                } catch (Throwable throwable) {
-                    Log.e(TAG, "job failed", throwable);
-                    sendError(receiver, Job.CODE_FATAL, Job.describe(throwable));
-                } finally {
-                    synchronized (lock) {
-                        worker = null;
-                    }
-                    stopForegroundCompat();
-                    stopSelfResult(startId);
+        jobs.execute(() -> {
+            Log.i(TAG, "job start " + action);
+            try {
+                if (Job.ACTION_INFO.equals(action)) {
+                    sendInfo(receiver);
+                } else if (Job.ACTION_DETECT.equals(action)) {
+                    sendDetection(receiver, path, itemId, flushPath, keepFlush);
+                } else if (Job.ACTION_CONVERT.equals(action)) {
+                    runQueue(receiver, items, format, packMcworld, deleteSource, naming);
+                } else if (Job.ACTION_INSPECT.equals(action)) {
+                    sendLevelInfo(receiver, path);
+                } else if (Job.ACTION_APPLY_LEVEL.equals(action)) {
+                    applyLevelChanges(receiver, path, levelIds, levelValues);
                 }
-            }, "chunker-job");
-            worker.start();
-        }
+            } catch (Throwable throwable) {
+                Log.e(TAG, "job failed", throwable);
+                sendError(receiver, Job.CODE_FATAL, Job.describe(throwable));
+            } finally {
+                if (Job.ACTION_CONVERT.equals(action)) {
+                    converting = false;
+                    stopForegroundCompat();
+                }
+                // Keeps the service alive while a newer startId is still queued behind this job.
+                stopSelfResult(startId);
+            }
+        });
 
         return START_NOT_STICKY;
     }
@@ -166,16 +201,22 @@ public class ConversionService extends Service {
     /**
      * Detect one world and report the result.
      * <p>
-     * The caller stages the world into flush space first, so it also hands over that directory: deleting it has to
-     * happen here, after the reader is done with it. The UI used to delete it right after dispatching this intent,
-     * which raced the service and made every archive come back as "unrecognised".
+     * The caller stages the world into flush space first, so it also hands over that directory. Deleting it has to
+     * happen here, after the reader is done with it: the UI used to delete it right after dispatching this intent,
+     * which raced the service and made every archive come back as "unrecognised". When {@code keepFlush} is set the
+     * directory is left in place instead — it is keyed by entry id, so the conversion of that same entry finds it and
+     * skips unpacking the world again.
      */
-    private void sendDetection(ResultReceiver receiver, String path, String itemId, String flushPath) throws Exception {
+    private void sendDetection(ResultReceiver receiver, String path, String itemId, String flushPath,
+                               boolean keepFlush) throws Exception {
         try {
             if (receiver == null) {
+                Log.w(TAG, "no receiver for detection of " + path);
                 return;
             }
             Detection detection = engine().detect(new File(path));
+            Log.i(TAG, "detected " + path + " -> "
+                    + (detection == null ? "null" : detection.formatId + " " + detection.version));
             Bundle bundle = new Bundle();
             if (detection != null) {
                 bundle.putString(Job.KEY_FORMAT_ID, detection.formatId);
@@ -185,18 +226,51 @@ public class ConversionService extends Service {
             bundle.putString(Job.KEY_ITEM_ID, itemId);
             receiver.send(Job.CODE_DETECTED, bundle);
         } finally {
-            if (flushPath != null && !flushPath.isEmpty()) {
+            if (!keepFlush && flushPath != null && !flushPath.isEmpty()) {
                 WorldFiles.delete(new File(flushPath));
             }
         }
     }
 
+    /**
+     * Describe the {@code level.dat} in a directory and send it back.
+     * <p>
+     * Runs in the engine process for the same reason the format list does: the UI process never loads Chunker, so
+     * anything that needs to parse a world happens here and crosses the boundary as primitives.
+     */
+    private void sendLevelInfo(ResultReceiver receiver, String path) throws Exception {
+        if (receiver == null) {
+            Log.w(TAG, "no receiver for inspection of " + path);
+            return;
+        }
+        LevelInfo info = engine().inspectLevel(new File(path));
+        receiver.send(Job.CODE_LEVEL_INFO, Job.packLevel(info));
+    }
+
+    /** Write edited fields back, and report the backup suffix so the UI can say where the old copy is. */
+    private void applyLevelChanges(ResultReceiver receiver, String path, String[] ids, String[] values) throws Exception {
+        if (receiver == null) {
+            Log.w(TAG, "no receiver for level write of " + path);
+            return;
+        }
+        java.util.Map<String, String> changes = new java.util.LinkedHashMap<>();
+        if (ids != null && values != null) {
+            for (int i = 0; i < ids.length && i < values.length; i++) {
+                changes.put(ids[i], values[i]);
+            }
+        }
+        // The directory the UI hands over only holds level.dat; it exists because the world itself is an archive.
+        String backup = engine().applyLevelChanges(new File(path), changes);
+        Bundle bundle = new Bundle();
+        bundle.putString(Job.KEY_LEVEL_BACKUP, backup);
+        receiver.send(Job.CODE_LEVEL_SAVED, bundle);
+    }
+
     // ---------------------------------------------------------------------------------------------
     // Batch conversion
     // ---------------------------------------------------------------------------------------------
-
     private void runQueue(ResultReceiver receiver, List<QueueItem> items, String format,
-                          boolean packMcworld, boolean deleteSource) {
+                          boolean packMcworld, boolean deleteSource, NamingSettings naming) {
         if (items.isEmpty()) {
             sendQueueDone(receiver, 0, 0);
             return;
@@ -206,6 +280,14 @@ public class ConversionService extends Service {
         int succeeded = 0;
         int failed = 0;
         currentReceiver = receiver;
+
+        // Stages are the unpacked copies detection left behind. Anything not in this batch is dead weight, and this
+        // worker is the only reader of those directories, so it is the only safe place to remove them.
+        java.util.Set<String> batchIds = new java.util.HashSet<>();
+        for (QueueItem item : items) {
+            batchIds.add(item.id);
+        }
+        Paths.pruneStagesExcept(this, batchIds);
 
         for (int index = 0; index < items.size(); index++) {
             QueueItem item = items.get(index);
@@ -218,23 +300,49 @@ public class ConversionService extends Service {
                 receiver.send(Job.CODE_ITEM_START, started);
             }
 
-            File flush = Paths.newFlushDirectory(this);
+            // Detection already unpacked this entry into a directory named after it; using that copy here is the
+            // difference between one and two full unzips of the source. It is rebuilt when missing or incomplete
+            // (entry converted before, cache cleared, detection refused because another batch was running).
+            File flush = Paths.stageFor(this, item.id);
+            File worldRoot = Paths.isStageReady(flush) ? WorldFiles.locateWorldRoot(new File(flush, "in")) : null;
+            boolean staged = worldRoot != null;
+            if (!staged) {
+                WorldFiles.delete(flush);
+                flush = Paths.newFlushDirectory(this);
+            }
+
             long itemStarted = SystemClock.elapsedRealtime();
+            // The per-item number used to be a single total, which made every performance question a guess. The batch
+            // has exactly three phases (stage the source, run the engine, pack the result), so each one gets a mark;
+            // WorldFiles.zip logs through the same line, which is how the packing change is judged.
+            long mark = itemStarted;
+            long readMs = 0L;
+            long convertMs = 0L;
+            long packMs = 0L;
+            long inputBytes = 0L;
             lastFraction = 0F;
             try {
-                notifyStage("正在读取存档…");
-                File incoming = new File(flush, "in");
-                File worldRoot = materialize(this, item, incoming, this::notifyStage);
-                if (worldRoot == null) {
-                    throw new IllegalStateException("没有找到世界数据（缺少 level.dat），请确认选中的是世界根目录");
+                if (!staged) {
+                    notifyStage("正在读取存档…");
+                    File incoming = new File(flush, "in");
+                    worldRoot = materialize(this, item, incoming, this::notifyStage);
+                    if (worldRoot == null) {
+                        throw new IllegalStateException("没有找到世界数据（缺少 level.dat），请确认选中的是世界根目录");
+                    }
+                    readMs = SystemClock.elapsedRealtime() - mark;
+                    mark += readMs;
                 }
+                inputBytes = WorldFiles.size(worldRoot);
 
                 File output = new File(flush, "out");
-                notifyStage("正在启动引擎…");
+                notifyStage("已读取存档，正在启动引擎…");
                 convert(receiver, worldRoot, output, format);
+                convertMs = SystemClock.elapsedRealtime() - mark;
+                mark += convertMs;
 
                 notifyStage("正在打包…");
-                File archive = pack(output, item, bedrockTarget, packMcworld);
+                File archive = pack(output, item, bedrockTarget, packMcworld, naming);
+                packMs = SystemClock.elapsedRealtime() - mark;
 
                 Bundle done = new Bundle();
                 done.putInt(Job.KEY_INDEX, index);
@@ -245,10 +353,17 @@ public class ConversionService extends Service {
                 if (receiver != null) {
                     receiver.send(Job.CODE_ITEM_DONE, done);
                 }
+                Log.i(TAG, describeTiming(item.name, inputBytes, archive.length(), readMs, convertMs, packMs,
+                        SystemClock.elapsedRealtime() - itemStarted, staged));
                 succeeded++;
 
                 if (deleteSource) {
                     deleteSource(item);
+                }
+                // A shared-in archive is our own copy of somebody else's file, not a file the user saved; leaving it
+                // behind after a successful conversion turns every share into a permanent duplicate.
+                if (item.kind == QueueItem.Kind.LOCAL && Inbox.isInside(this, item.path)) {
+                    WorldFiles.delete(new File(item.path));
                 }
             } catch (Throwable throwable) {
                 Log.e(TAG, "item failed: " + item.name, throwable);
@@ -335,14 +450,62 @@ public class ConversionService extends Service {
      * Pack the converted folder into {@code output/}.
      * <p>
      * Bedrock archives get the {@code .mcworld} extension unless the user turned that off, in which case they get a
-     * plain {@code .zip} of the same contents; Java archives are always {@code .zip}.
+     * plain {@code .zip} of the same contents; Java archives are always {@code .zip}. The base name comes from the
+     * user's naming template, and {@link WorldFiles#unique} still runs afterwards so a template that produces the
+     * same name twice keeps both archives instead of overwriting the first.
      */
-    private File pack(File outputDirectory, QueueItem item, boolean bedrockTarget, boolean packMcworld) throws Exception {
+    private File pack(File outputDirectory, QueueItem item, boolean bedrockTarget, boolean packMcworld,
+                      NamingSettings naming) throws Exception {
         File directory = Paths.output(this);
         String extension = bedrockTarget && packMcworld ? ".mcworld" : ".zip";
-        File target = WorldFiles.unique(directory, WorldFiles.baseName(item.name) + extension);
+        String base = Naming.render(naming.order, naming.enabled, naming.separator,
+                item.name, bedrockTarget, System.currentTimeMillis());
+        // Already sanitised and extension-free by Naming.render(): running baseName() again would cut the name at the
+        // last dot, and a world called "我的世界 v1.2" would lose everything after it.
+        File target = WorldFiles.unique(directory, base + extension);
         WorldFiles.zip(outputDirectory, target);
         return target;
+    }
+
+    /**
+     * One log line per converted world with the phase split.
+     * <p>
+     * Times are wall clock, so they include waiting on storage and on the collector. Throughput is measured against
+     * the staged source rather than the output: the output size changes with the target format, which would make two
+     * different targets look like two different speeds.
+     *
+     * @param name        the world name, for matching the line against the queue.
+     * @param inputBytes  size of the staged source world.
+     * @param outputBytes size of the produced archive.
+     * @param readMs      staging (unzip / copy) time.
+     * @param convertMs   engine time.
+     * @param packMs      packing time.
+     * @param totalMs     wall clock for the whole item.
+     * @param staged      whether the copy made for detection was reused, i.e. whether staging was skipped.
+     * @return a single line suitable for logcat.
+     */
+    private static String describeTiming(String name, long inputBytes, long outputBytes,
+                                         long readMs, long convertMs, long packMs, long totalMs, boolean staged) {
+        double seconds = totalMs / 1000D;
+        double megabytesPerSecond = seconds <= 0 ? 0 : inputBytes / 1048576D / seconds;
+        return String.format(Locale.ROOT,
+                "timing %s: read=%.1fs%s convert=%.1fs pack=%.1fs total=%.1fs in=%.1fMB out=%.1fMB %.2fMB/s",
+                name, readMs / 1000D, staged ? "(staged)" : "",
+                convertMs / 1000D, packMs / 1000D, seconds,
+                inputBytes / 1048576D, outputBytes / 1048576D, megabytesPerSecond);
+    }
+
+    /** Naming settings travelling with the batch; see {@link Job#EXTRA_NAMING_ORDER}. */
+    private static final class NamingSettings {
+        final String order;
+        final String enabled;
+        final String separator;
+
+        NamingSettings(String order, String enabled, String separator) {
+            this.order = order == null ? Naming.DEFAULT_ORDER : order;
+            this.enabled = enabled == null ? Naming.DEFAULT_ENABLED : enabled;
+            this.separator = separator == null ? Naming.DEFAULT_SEPARATOR : separator;
+        }
     }
 
     private void deleteSource(QueueItem item) {

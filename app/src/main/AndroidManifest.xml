@@ -34,6 +34,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -41,6 +42,43 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!--
+            A second entry point for archives coming from other apps, so the share sheet says what it does
+            ("导入到 LiteChunk") instead of reusing the launcher label, and so the icon can differ later.
+
+            The mime list is deliberately broad. WeChat, QQ and most file managers report an unknown extension as
+            application/octet-stream, and browsers often as */*, so anything narrower simply never appears in their
+            "open with" sheet. The breadth is paid for in code: Inbox.isArchive() rejects everything that is not a
+            .zip / .mcworld before a single byte is copied.
+        -->
+        <activity-alias
+            android:name=".ImportActivity"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/import_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/octet-stream" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- Conversion runs in its own process: a second heap budget, a crash boundary and a hard cancel. -->
         <service
@@ -55,6 +93,15 @@
             android:label="@string/action_about"
             android:parentActivityName=".MainActivity"
             android:screenOrientation="portrait" />
+
+        <!-- Reads and rewrites level.dat. Not exported: worlds only come from this app's own output folder. -->
+        <activity
+            android:name=".LevelActivity"
+            android:exported="false"
+            android:label="@string/action_details"
+            android:parentActivityName=".MainActivity"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

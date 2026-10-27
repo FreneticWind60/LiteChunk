@@ -61,6 +61,17 @@ tasks.register<JavaExec>("roundTrip") {
     notCompatibleWithConfigurationCache("Ad-hoc verification task")
 }
 
+// Verifies the level.dat reader/writer against a real world on the desktop JVM: round trip, backup, allow list.
+// Usage: gradlew :engine:levelTest --args="<worldDir>"
+tasks.register<JavaExec>("levelTest") {
+    group = "verification"
+    description = "Runs LevelEditor against a copy of a real level.dat."
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.frenetic.litechunk.engine.LevelEditorTest")
+    notCompatibleWithConfigurationCache("Ad-hoc verification task")
+}
+
 // Dumps the actor (entity) records of a Bedrock world so entity conversion can be inspected without launching the
 // game. Usage: gradlew :engine:actorDump --args="<worldDir> [maxSamples]"
 tasks.register<JavaExec>("actorDump") {

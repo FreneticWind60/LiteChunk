@@ -164,6 +164,7 @@ final class Store {
             return null;
         }
         QueueItem removed = queue.remove(index);
+        discardStage(removed);
         saveQueue();
         notifyQueue();
         return removed;
@@ -172,6 +173,9 @@ final class Store {
     void clearQueue() {
         if (queue.isEmpty()) {
             return;
+        }
+        for (QueueItem item : queue) {
+            discardStage(item);
         }
         queue.clear();
         saveQueue();
@@ -183,7 +187,8 @@ final class Store {
         boolean changed = false;
         for (int position = queue.size() - 1; position >= 0; position--) {
             if (ids.contains(queue.get(position).id)) {
-                queue.remove(position);
+                QueueItem removed = queue.remove(position);
+                discardStage(removed);
                 changed = true;
             }
         }
@@ -191,6 +196,25 @@ final class Store {
             saveQueue();
             notifyQueue();
         }
+    }
+
+    /**
+     * Drop the unpacked copy that detection left behind for an entry that is leaving the list, and any import copy.
+     * <p>
+     * The stage exists only so the conversion can reuse it; once the entry is gone it is dead weight in the cache, and
+     * a world can be hundreds of megabytes — too much to delete on the main thread, hence the io executor.
+     */
+    private void discardStage(QueueItem item) {
+        if (item == null) {
+            return;
+        }
+        io.execute(() -> {
+            Paths.deleteStage(app, item.id);
+            // An archive that arrived through a share is our own copy, not something the user saved.
+            if (item.kind == QueueItem.Kind.LOCAL && Inbox.isInside(app, item.path)) {
+                WorldFiles.delete(new File(item.path));
+            }
+        });
     }
 
     /**

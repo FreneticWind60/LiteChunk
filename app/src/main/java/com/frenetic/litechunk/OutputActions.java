@@ -35,6 +35,10 @@ final class OutputActions {
             sheet.dismiss();
             enqueue(activity, file);
         });
+        content.findViewById(R.id.rowDetails).setOnClickListener(view -> {
+            sheet.dismiss();
+            details(activity, file);
+        });
         content.findViewById(R.id.rowExportZip).setOnClickListener(view -> {
             sheet.dismiss();
             export(activity, file, false);
@@ -60,6 +64,12 @@ final class OutputActions {
 
         sheet.setContentView(content);
         sheet.show();
+    }
+
+    /** Open the details screen, which reads {@code level.dat} out of the archive into cache. */
+    static void details(FragmentActivity activity, Store.OutputFile file) {
+        activity.startActivity(new android.content.Intent(activity, LevelActivity.class)
+                .putExtra(LevelActivity.EXTRA_PATH, file.file.getAbsolutePath()));
     }
 
     static void enqueue(FragmentActivity activity, Store.OutputFile file) {

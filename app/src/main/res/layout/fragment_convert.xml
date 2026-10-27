@@ -178,6 +178,45 @@
                         app:tint="@color/text_dim" />
                 </LinearLayout>
 
+                <LinearLayout
+                    android:id="@+id/rowNaming"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_row"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="10dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="输出命名"
+                        android:textAppearance="@style/Text.LiteChunk.Caption" />
+
+                    <TextView
+                        android:id="@+id/tvNamingPreview"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:ellipsize="middle"
+                        android:singleLine="true"
+                        android:textColor="@color/text"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <ImageView
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:contentDescription="@null"
+                        android:src="@drawable/ic_expand_more"
+                        app:tint="@color/text_dim" />
+                </LinearLayout>
+
                 <com.google.android.material.checkbox.MaterialCheckBox
                     android:id="@+id/cbDeleteSource"
                     android:layout_width="match_parent"

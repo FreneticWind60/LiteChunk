@@ -4,6 +4,7 @@ import com.frenetic.litechunk.api.ChunkerEngine;
 import com.frenetic.litechunk.api.Detection;
 import com.frenetic.litechunk.api.FormatGroup;
 import com.frenetic.litechunk.api.FormatVersion;
+import com.frenetic.litechunk.api.LevelInfo;
 import com.frenetic.litechunk.api.ProgressListener;
 import com.hivemc.chunker.conversion.WorldConverter;
 import com.hivemc.chunker.conversion.encoding.EncodingType;
@@ -19,6 +20,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -193,6 +195,19 @@ public final class EngineImpl implements ChunkerEngine {
         if (listener != null) {
             listener.onProgress(1D, STAGE_FINISH);
         }
+    }
+
+    @Override
+    public LevelInfo inspectLevel(File worldDirectory) throws Exception {
+        return LevelEditor.open(worldDirectory).inspect();
+    }
+
+    @Override
+    public String applyLevelChanges(File worldDirectory, Map<String, String> changes) throws Exception {
+        if (changes == null || changes.isEmpty()) {
+            return null;
+        }
+        return LevelEditor.open(worldDirectory).apply(changes);
     }
 
     @Override

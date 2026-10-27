@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Locale;
+import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -150,34 +151,48 @@ final class WorldFiles {
         }
     }
 
+    /**
+     * Pack a converted world into a {@code .zip} / {@code .mcworld}.
+     * <p>
+     * The obvious optimisation here - "everything in a world is already compressed, so deflate is wasted CPU, store
+     * it" - was measured and is false. A converted Bedrock output (80 MB of {@code db/*.ldb} and {@code .log} for a
+     * 278 MB Java world) still deflates to 38%, because the writer leaves most of the LevelDB payload as palette
+     * runs and zero padding. Storing it verbatim multiplies the archive 2.6x for a saving of ~2% of the pipeline.
+     * <p>
+     * What <em>is</em> free is a cheaper level for Java region files, see {@link #levelFor(String)}.
+     */
     static void zip(File directory, File zipFile) throws IOException {
         File parent = zipFile.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
             throw new IOException("无法创建输出目录");
         }
-        String rootPath = directory.getCanonicalPath();
-        try (ZipOutputStream zip = new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(zipFile)))) {
-            addToZip(zip, directory, rootPath);
+        try (ZipOutputStream zip = new ZipOutputStream(
+                new BufferedOutputStream(new FileOutputStream(zipFile), BUFFER))) {
+            addToZip(zip, directory, "");
         }
     }
 
-    private static void addToZip(ZipOutputStream zip, File file, String rootPath) throws IOException {
+    /**
+     * @param entryName the name this file will have inside the archive, empty for the root directory.
+     */
+    private static void addToZip(ZipOutputStream zip, File file, String entryName) throws IOException {
         if (file.isDirectory()) {
             File[] children = file.listFiles();
             if (children != null) {
+                String prefix = entryName.isEmpty() ? "" : entryName + "/";
                 for (File child : children) {
-                    addToZip(zip, child, rootPath);
+                    addToZip(zip, child, prefix + child.getName());
                 }
             }
             return;
         }
-        String absolute = file.getCanonicalPath();
-        if (absolute.length() <= rootPath.length()) {
+        if (entryName.isEmpty()) {
             return;
         }
-        String entryName = absolute.substring(rootPath.length() + 1).replace(File.separatorChar, '/');
+        // The level has to be set before putNextEntry: that is where the stream initialises the deflater.
+        zip.setLevel(levelFor(entryName));
         zip.putNextEntry(new ZipEntry(entryName));
-        try (InputStream in = new BufferedInputStream(new FileInputStream(file))) {
+        try (InputStream in = new BufferedInputStream(new FileInputStream(file), BUFFER)) {
             byte[] buffer = new byte[BUFFER];
             int read;
             while ((read = in.read(buffer)) > 0) {
@@ -185,6 +200,31 @@ final class WorldFiles {
             }
         }
         zip.closeEntry();
+    }
+
+    /**
+     * Deflate level for a single entry.
+     * <p>
+     * Java region files are the one case where a cheaper level is free, because two thirds of a converted
+     * {@code .mca} is 4 KB sector padding and repeated zlib headers, which even the fast level catches:
+     * <ul>
+     *   <li>converted 278 MB world, 80 MB output: level 1 = 38.7% of source, level 6 = 38.0%, 1.4x faster;</li>
+     *   <li>converted 25 MB world, 11 MB output: both 38%, 3x faster.</li>
+     * </ul>
+     * Level 0 was rejected everywhere: 20x faster, but it stores the bytes verbatim, so an 80 MB folder becomes an
+     * 80 MB archive instead of 30 MB. LevelDB files keep the default level for the same reason.
+     *
+     * @param entryName the path inside the archive.
+     * @return the deflate level to use for this entry.
+     */
+    private static int levelFor(String entryName) {
+        String lower = entryName.toLowerCase(Locale.ROOT);
+        int dot = lower.lastIndexOf('.');
+        String extension = dot == -1 ? "" : lower.substring(dot + 1);
+        if ("mca".equals(extension) || "mcr".equals(extension)) {
+            return Deflater.BEST_SPEED;
+        }
+        return Deflater.DEFAULT_COMPRESSION;
     }
 
     static long size(File file) {
@@ -268,6 +308,26 @@ final class WorldFiles {
     }
 
     /**
+     * Drop only a known archive extension, keeping dots that belong to the world's own name.
+     * <p>
+     * {@link #baseName} cuts at the last dot, which is right for a file picked from disk and wrong for a name we
+     * produced ourselves: "我的世界 v1.2-BE-20261027" would come back as "我的世界 v1".
+     */
+    static String stripArchiveExtension(String name) {
+        if (name == null) {
+            return "world";
+        }
+        String lower = name.toLowerCase(Locale.ROOT);
+        for (String extension : new String[]{".mcworld", ".zip"}) {
+            if (lower.endsWith(extension)) {
+                String trimmed = name.substring(0, name.length() - extension.length()).trim();
+                return trimmed.isEmpty() ? "world" : trimmed;
+            }
+        }
+        return baseName(name);
+    }
+
+    /**
      * Find a name that does not collide, so converting the same world twice keeps both results instead of silently
      * overwriting the first one -- or worse, overwriting the file a second queue entry is about to convert.
      */
@@ -276,8 +336,11 @@ final class WorldFiles {
         if (!candidate.exists()) {
             return candidate;
         }
-        String base = baseName(name);
-        String extension = name.substring(base.length());
+        // Split at the last dot rather than reusing baseName(): a world may legitimately contain a dot ("我的世界
+        // v1.2"), and baseName() would treat the tail as the extension and produce "我的世界 v1 (2).2".
+        int dot = name.lastIndexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        String extension = dot > 0 ? name.substring(dot) : "";
         for (int index = 2; index < 1000; index++) {
             candidate = new File(directory, base + " (" + index + ")" + extension);
             if (!candidate.exists()) {
