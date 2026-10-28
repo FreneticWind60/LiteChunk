@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The save button is the only thing in the header that goes away; a disabled ImageButton keeps its tint, so the
+     colour has to come from a selector or it looks tappable while doing nothing. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/text_faint" android:state_enabled="false" />
+    <item android:color="@color/accent" />
+</selector>

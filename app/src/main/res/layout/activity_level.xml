@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
@@ -33,16 +34,24 @@
             android:textSize="18sp"
             android:textStyle="bold" />
 
-        <com.google.android.material.button.MaterialButton
+        <ImageButton
             android:id="@+id/btnSave"
-            style="@style/Widget.LiteChunk.OutlinedButton"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/level_action_save"
             android:enabled="false"
-            android:minWidth="0dp"
-            android:paddingLeft="18dp"
-            android:paddingRight="18dp"
-            android:text="保存" />
+            android:src="@drawable/ic_save"
+            app:tint="@color/save_tint" />
+
+        <ImageButton
+            android:id="@+id/btnMenu"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/level_action_more"
+            android:src="@drawable/ic_menu"
+            app:tint="@color/text_dim" />
     </LinearLayout>
 
     <androidx.core.widget.NestedScrollView
@@ -169,7 +178,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
                         android:lineSpacingExtra="3dp"
-                        android:text="灰色项只读。写入只改 level.dat，不重新编码区块，因此比重转一遍快得多，也不会把不认识的方块变成占位块。保存前会自动备份原文件。"
+                        android:text="灰色项只读。写入只改 level.dat，不重新编码区块，因此比重转一遍快得多，也不会把不认识的方块变成占位块。覆盖保存不可找回，想保留原档请用「另存为」。"
                         android:textAppearance="@style/Text.LiteChunk.Caption"
                         android:textColor="@color/text_faint" />
                 </LinearLayout>

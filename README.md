@@ -3,7 +3,7 @@
 Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换引擎来自
 [Chunker](https://github.com/HiveGamesOSS/Chunker) 的裁剪版，通过 `DexClassLoader` 在独立进程中加载。
 
-- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build3`（与引擎 Chunker 的版本同步）
+- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build3 pr3`（与引擎 Chunker 的版本同步）
 - 最低系统 Android 8.1（API 27）—— `java.nio.file` 与基岩版 1.26 的共同下限；目标 API 37
 - 只做一件事：选存档 → 选版本 → 转换 → 保存 / 分享 / 导入
 - MIT 许可，非官方项目，与 Mojang Studios、Microsoft 无关
@@ -66,6 +66,7 @@ versionCode = major*10^8 + minor*10^6 + patch*10^4 + build*100 + stage
 ### 发布
 
 GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build1`）。
+Release 正文直接取仓库根目录的 `RELEASE_NOTES.md`（每次发版前重写，只放当前版本的说明）。
 关于页的「检查更新」把 tag 与 `BuildConfig.VERSION_NAME` 去掉所有非字母数字字符后比对，
 所以这两种写法都认作同一个版本 —— tag 里不能有空格，git 也不允许。
 仓库地址写死在 `AboutActivity.REPO`，fork 之后要改那一行。
@@ -92,7 +93,6 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
 | 路径 | 用途 |
 | --- | --- |
 | `output/` | 转换成品。基岩版 `.mcworld`，Java 版 `.zip` |
-| `output/backup/` | 存档详情改 `level.dat` 之前的原文件备份 |
 | `input.json` | 转化列表的快照（只存路径与格式，不复制存档） |
 | 内部 `cacheDir/flush/stage-<id>` | 解压后的世界，按队列项复用（详见「暂存与复用」） |
 | 内部 `cacheDir/flush/job-*` | 转换期的临时工作目录，任务结束即删 |
@@ -134,9 +134,12 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
 
 管理 `output/`：
 
-- **左滑整行**展开六个操作：装填 / zip / mcworld / 分享 / 导入 / 删除。
+- **左滑整行**展开六个操作：装填 / 详情 / 导出 / 分享 / 导入 / 删除。
   展开是 `translationX` 位移而不是重新布局，配合 `PathInterpolator(0.2, 0, 0, 1)`、按剩余距离计算的时长、
   甩动速度判定，以及操作条的淡入，拖动跟手且松手后能「顺着力道」吸附。
+  - 「导出」：`zip` 与 `mcworld` 字节完全相同、只差扩展名，作为两个相邻的 44dp 按钮是最容易被点错的一对，
+    改成点一下弹菜单选格式（`.mcworld` 只对基岩版存档出现）。省出来的位置给「详情」。
+  - 「详情」：直接进存档详情页，不必再走操作面板。
 - **右滑整行**直接进入多选并选中该行；右上角按钮是另一个入口，再次点击退出。
   多选时底部出现「已选 N 项 + 删除/导出/分享/取消」，顶部提示同步变成「点行选择，再点右上角退出多选」。
 - 删除一律弹 `AlertDialog` 二次确认；「导出」是另存一份副本，`output/` 里的原件不动。
@@ -145,7 +148,7 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
 
 ### 存档详情页（`LevelActivity`）
 
-点存档弹出的操作面板里有「存档详情」。读的是 `level.dat`，不是区块。
+点存档弹出的操作面板里有「存档详情」，文件页左滑的第二格也是同一个入口。读的是 `level.dat`，不是区块。
 
 存在的理由：**很多「转换没解决问题」的疑难其实不是转换**——存档只是需要改名字、改游戏模式，或者声明错了版本。
 这类需求走完整转换要解码再编码每个区块（大存档几分钟），还会把引擎不认识的方块换成占位块；
@@ -161,11 +164,20 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
 - **类型安全**：枚举字段只能从固定选项里选，不许手输；难度在 Java 里是 `byte`、基岩里是 `int`，写入时按版本选宽度。
   读取走原始 tag 再走 `Number`——同一个键在不同版本里宽度不同，直接 `getInt()` 遇到 `ByteTag` 会抛
   `ClassCastException`（这个 bug 是 `:engine:levelTest` 抓到的）。
-- **写入安全**：先 `level.dat.bak-<时间>`，再写 `.tmp`，**读回校验每个被改字段**后才替换原文件；
-  存档本身是 zip，重写走同目录 `.tmp` 再 rename，中途失败原包不动。备份会复制到 `output/backup/`，
-  因为临时目录随时可能被系统清掉。
+- **写入安全**：写 `.tmp` → **读回校验每个被改字段** → rename 才替换原文件；存档本身是 zip，
+  重写走同目录 `.tmp` 再 rename，中途失败原包不动。所以不会写出半坏的包。
+- **不自动备份**：`level.dat.bak-*` 和 `output/backup/` 都没有了。以前每次保存都在世界目录里堆一个
+  看起来一模一样的 `.bak`，没人找得到、也没人分得清哪个是当前的，最后只会被当成垃圾文件删掉。
+  安全兜底改成由用户显式选择——顶栏保存图标 + 汉堡菜单（保存 / 另存为 / 恢复默认值）：
+  - **保存**：弹确认框，明确写「原文件不会保留副本，覆盖后不可找回」，并引导用「另存为」。
+  - **另存为**：不弹确认，用**新时间戳**生成 `原名-yyyyMMdd-HHmmss.zip|mcworld`，原包不动，完成后回到文件页。
+  - **恢复默认值**：丢弃待写改动，回到打开页面时的值，不写盘。
+  - 没有改动时退出直接放行；改了东西退出才弹「另存为 / 直接退出 / 保存」。
+- 另存为与保存共用一次遍历：`Archive.rewrite(source, target, ...)` 读原包、直接写到目标路径。
+  1 GB 的存档先 `cp` 再重写会白读写两遍，这条路径不能那么干。
 - 引擎接口 `inspectLevel` / `applyLevelChanges` 同样在 `:chunker` 进程执行——UI 进程不加载 Chunker，
-  结果按平行数组跨进程传（`api` 是纯 Java 库，用不了 `Parcelable`）。
+  结果按平行数组跨进程传（`api` 是纯 Java 库，用不了 `Parcelable`）。`applyLevelChanges` 返回 `void`：
+  没有备份时间戳可报了。
 
 ### 关于页
 
@@ -178,10 +190,14 @@ GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build
 - 明暗模式：右上角按钮循环「跟随系统 → 浅色 → 深色」，存 `SharedPreferences`，`LiteChunkApp` 在 Activity 创建前应用。
 - 状态栏 / 导航栏内边距统一打在根布局上，内容不再被状态栏压住。
 - **图标统一**：整套界面用 Fluent UI Regular 16/20 的填充路径（MIT）重绘，不混用 Material 的描边图标。
-  映射：删除 `Delete`、装填 `TextBulletList`、zip（含压缩包入口）`FolderZip`、Java 版存档 `DrinkCoffee`、
-  基岩版存档与 mcworld `Cube`、分享 `ShareAndroid`、导入游戏 `Games`、主题 `DarkTheme`、多选 `LineHorizontal3`；
+  映射：删除 `Delete`、装填 `TextBulletList`、详情 `Info`、导出 `OpenFolder`、Java 版存档 `DrinkCoffee`、
+  基岩版存档与 mcworld `Cube`、分享 `ShareAndroid`、导入游戏 `Games`、主题 `DarkTheme`、多选与汉堡
+  `LineHorizontal3`、保存 `Save`；
   `Add / MoreVertical / ChevronDown / Folder / Info` 按同一套几何手写。全部 `viewBox 16`、`24dp`、
-  `?attr/colorControlNormal` 着色，布局里的 `app:tint` 可覆盖。
+  `?attr/colorControlNormal` 着色，布局里的 `app:tint` 可覆盖。保存图标例外：禁用态必须走
+  `res/color/save_tint.xml` 的 selector，否则灰掉的图标看着仍然可以点。
+- **对话框标题**统一用 `res/layout/dialog_header.xml`（中文 19sp 大号 + 英文 11sp 小号）配 `setCustomTitle`，
+  只用 `setTitle` 会退回单行样式。强调色就是主题的绿色（`@color/accent`）。
 
 ## 官网页面
 
@@ -273,15 +289,28 @@ UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：�
 文件页六个操作（导出落到 `/sdcard/Download` 且字节一致、分享走 `FileProvider`、导入无启动器时回退分享、
 删除二次确认）、右滑多选、转化列表滑删、明暗三态、关于页明暗两套。
 
-`1.21.0 build3` 新增能力的实测（同一台模拟器，debug 与 release 双包）：
+`1.21.0 build3 pr2` 新增能力的实测（同一台模拟器，debug 与 release 双包）：
 
 - **导入**：`VIEW` 与 `SEND` 两个入口都能把 `.mcworld` 送进队列并识别出版本；`notes.txt` 被
   `Inbox.isArchive()` 拒绝，`inbox/` 里没有留下任何文件。
 - **命名模板**：三块全开 / 只留原名 / 换分隔符，产物名与预览一致；同名第二次转换自动加 `(2)`。
 - **暂存复用**：先识别再转换，第二次日志出现 `read=0.0s(staged)`；转换结束后 `inbox/` 与 `stage-*` 都已清理。
 - **存档详情**：真实 Java 1.21.8 存档与基岩 1.26.60 产物双向读写通过——改值生效、**未改字段一个都没变**、
-  备份字节数等于原文件、只读字段写入被拒；模拟器上改完拉起 zip 里的 `level.dat` 复核，
+  只读字段写入被拒；模拟器上改完拉起 zip 里的 `level.dat` 复核，
   `Difficulty=2`、`GameType=0`，zip 的 7 个条目完整。
+
+`1.21.0 build3 pr3` 的保存模型实测（同一台模拟器，debug 与 release 双包都过）：
+
+| 场景 | 结果 |
+| --- | --- |
+| 另存为 | 产出 `test-nbt-20261028-051703.zip`（4393840 B），原包 4392799 B **一个字节都没动**；副本 `GameType=0`、原包仍为 `1` |
+| 覆盖保存 | 原包变成 4393840 B，没有多出文件，也没有 `.bak` / `.tmp` 残留；zip 65 个条目与原包一致，`testzip()` 无坏项 |
+| 未修改退出 | 直接放行，不弹框 |
+| 已修改退出 | 弹「另存为 / 直接退出 / 保存」；选「直接退出」确认不写盘 |
+| 恢复默认值 | `Difficulty` 从「普通」回到「和平」，脏标记消失、保存图标转灰 |
+| 导出二级选择 | Java 存档只出现「导出为 .zip」，点下去进系统 `documentsui` 保存面板 |
+| 引擎自检 | `:engine:levelTest` 输出 `no backup files, as intended` / `ALL CHECKS PASSED` |
+| R8 release 包 | 详情页与覆盖保存均通过，说明没有依赖反射被裁掉的部分 |
 
 仍需人工确认：
 
@@ -301,6 +330,8 @@ UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：�
   覆盖回去——改之前先关掉游戏。
 - 存档详情保存要重写整个压缩包（同目录 `.tmp` 再 rename），所以需要**与包体等量**的剩余空间；
   空间不足时写 `.tmp` 会失败，原包保持不动。
+- **保存没有后悔药**：写入链路能保证不写出半坏的包，但覆盖成功之后旧内容就没有了（不再有 `.bak`）。
+  想留原档只能用「另存为」。
 - 卸载重装后系统不一定清理 `/sdcard/Android/data/com.frenetic.litechunk/`。如果它留着且属主还是旧 uid，
   `output/` 里会写不进去（`EACCES`）。启动时会把不可写的 `output/` 改名成 `output.old-<时间戳>` 再新建；
   这层存储不一定允许改名，失败时错误提示会引导用户清除应用数据（不会动原存档）。

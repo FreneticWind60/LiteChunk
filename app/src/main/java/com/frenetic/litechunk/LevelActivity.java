@@ -12,8 +12,10 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.PopupMenu;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -22,12 +24,15 @@ import com.frenetic.litechunk.api.LevelField;
 import com.frenetic.litechunk.api.LevelInfo;
 import com.frenetic.litechunk.api.LevelNote;
 import com.frenetic.litechunk.databinding.ActivityLevelBinding;
+import com.frenetic.litechunk.databinding.DialogHeaderBinding;
 import com.frenetic.litechunk.databinding.DialogLevelTextBinding;
 import com.frenetic.litechunk.databinding.RowLevelFieldBinding;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -49,6 +54,10 @@ public class LevelActivity extends AppCompatActivity {
 
     static final String EXTRA_PATH = "path";
 
+    private static final int MENU_SAVE = 1;
+    private static final int MENU_SAVE_AS = 2;
+    private static final int MENU_DEFAULTS = 3;
+
     private ActivityLevelBinding binding;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final ExecutorService io = Executors.newSingleThreadExecutor(runnable -> {
@@ -67,6 +76,13 @@ public class LevelActivity extends AppCompatActivity {
     private LevelInfo info;
     /** Edits made since the screen opened, in the engine's own value format. */
     private final Map<String, String> pending = new LinkedHashMap<>();
+
+    /** True while a read or write is in flight; the header buttons are disabled so a save cannot be doubled. */
+    private boolean busy;
+    /** True when the save in flight is meant to land in a new file rather than over the original. */
+    private boolean saveAsCopy;
+    /** Set when leaving on purpose, so the unsaved-changes guard does not fire on the way out. */
+    private boolean leaving;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,10 +104,20 @@ public class LevelActivity extends AppCompatActivity {
         }
         archive = new File(path);
 
-        binding.btnBack.setOnClickListener(view -> finish());
-        binding.btnSave.setOnClickListener(view -> confirmSave());
+        binding.btnBack.setOnClickListener(view -> attemptExit());
+        binding.btnSave.setOnClickListener(view -> requestSave());
+        binding.btnMenu.setOnClickListener(this::showMenu);
         binding.tvName.setText(archive.getName());
         binding.tvPath.setText(archive.getAbsolutePath());
+
+        // Back has to ask the same question as the toolbar's arrow. Registering here rather than overriding
+        // onBackPressed() keeps predictive back on Android 13+ working.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                attemptExit();
+            }
+        });
 
         load();
     }
@@ -132,7 +158,7 @@ public class LevelActivity extends AppCompatActivity {
                 setBusy(false);
                 render();
             } else if (code == Job.CODE_LEVEL_SAVED) {
-                writeBack(data == null ? null : data.getString(Job.KEY_LEVEL_BACKUP));
+                writeBack();
             } else if (code == Job.CODE_FATAL) {
                 setBusy(false);
                 showFailure(new IllegalStateException(
@@ -160,7 +186,13 @@ public class LevelActivity extends AppCompatActivity {
 
         renderNotes();
         renderFields();
-        binding.btnSave.setEnabled(!pending.isEmpty());
+        updateActions();
+    }
+
+    /** The save button reflects "there is something to write"; the menu stays reachable either way. */
+    private void updateActions() {
+        binding.btnSave.setEnabled(!busy && !pending.isEmpty());
+        binding.btnMenu.setEnabled(!busy);
     }
 
     private void renderNotes() {
@@ -273,8 +305,7 @@ public class LevelActivity extends AppCompatActivity {
             labels[i] = field.optionLabel(i);
         }
         int checked = field.optionIndex(current);
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(field.labelZh + "\n" + field.labelEn)
+        titled(field.labelZh, field.labelEn)
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                     pending.put(field.id, field.optionIds[which]);
                     dialog.dismiss();
@@ -286,8 +317,7 @@ public class LevelActivity extends AppCompatActivity {
 
     private void editFlag(LevelField field, String current) {
         boolean on = "true".equalsIgnoreCase(current);
-        new MaterialAlertDialogBuilder(this)
-                .setTitle(field.labelZh + "\n" + field.labelEn)
+        titled(field.labelZh, field.labelEn)
                 .setSingleChoiceItems(new String[]{"开 / On", "关 / Off"}, on ? 0 : 1, (dialog, which) -> {
                     pending.put(field.id, which == 0 ? "true" : "false");
                     dialog.dismiss();
@@ -351,47 +381,62 @@ public class LevelActivity extends AppCompatActivity {
     // Saving
     // ---------------------------------------------------------------------------------------------
 
-    private void confirmSave() {
-        if (pending.isEmpty()) {
+    /**
+     * Ask before overwriting.
+     * <p>
+     * There is deliberately no third option to "keep a copy alongside": backups used to be written next to
+     * {@code level.dat} automatically, and they were a liability. They piled up inside the world folder where
+     * nobody could find them, a second save produced a second file that looked identical to the first, and the
+     * only way to explain which one was current was to open the archive. Making the copy an explicit choice --
+     * "save as" writes a new archive and leaves this one alone -- puts the decision where it can be understood.
+     * What the dialog has to be unambiguous about is that overwriting cannot be undone.
+     */
+    private void requestSave() {
+        if (busy || pending.isEmpty()) {
             return;
         }
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("保存修改")
-                .setMessage("将修改 " + pending.size() + " 项。\n\n"
-                        + "只会重写 level.dat，不会重新编码区块，存档里的方块、实体和地图都保持不变。\n\n"
-                        + "原 level.dat 会备份到 output/backup/；存档本身也是写进临时文件再替换，"
-                        + "中途失败不会损坏原文件。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("保存", (dialog, which) -> save())
+        titled("覆盖原存档", "Overwrite")
+                .setMessage("将修改 " + pending.size() + " 项并直接写入「" + archive.getName() + "」，"
+                        + "原文件不会保留副本，覆盖后不可找回。\n\n"
+                        + "若想保留原档，请用「另存为」。")
+                .setNeutralButton("取消", null)
+                .setNegativeButton("另存为", (dialog, which) -> startSave(true))
+                .setPositiveButton("覆盖", (dialog, which) -> startSave(false))
                 .show();
     }
 
-    private void save() {
+    private void startSave(boolean asCopy) {
+        if (busy || pending.isEmpty()) {
+            return;
+        }
+        saveAsCopy = asCopy;
         setBusy(true);
         Controller.get(this).applyLevel(workDirectory, new LinkedHashMap<>(pending), receiver);
     }
 
-    /** Put the edited file back into the archive once the engine has verified it. */
-    private void writeBack(String backup) {
+    /**
+     * Write the edited {@code level.dat} into an archive once the engine has verified it.
+     * <p>
+     * "Save as" produces the copy and the rewrite in one pass ({@link Archive#rewrite}), so a 1 GB world is read
+     * once instead of being copied and then rewritten.
+     */
+    private void writeBack() {
         File levelDat = new File(workDirectory, "level.dat");
+        boolean asCopy = saveAsCopy;
         io.execute(() -> {
             try {
-                Archive.writeBack(archive, entryName, levelDat);
-                // The engine's backup lives in the scratch directory, which is about to be deleted. Move it
-                // somewhere the user can reach before that happens: the dialog promised them a backup, and a
-                // promise kept in a directory the system clears is not kept.
-                File kept = keepBackup(backup);
+                File target = asCopy ? copyTarget() : archive;
+                Archive.rewrite(archive, target, entryName, levelDat);
                 WorldFiles.delete(workDirectory);
                 post(() -> {
                     setBusy(false);
                     pending.clear();
-                    String message = "已保存到 " + archive.getName();
-                    if (kept != null) {
-                        message += "\n原 level.dat 备份：output/backup/" + kept.getName();
-                    }
-                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                     Store.get(this).refreshOutputs();
-                    finish();
+                    String message = asCopy
+                            ? "已另存为 " + target.getName()
+                            : "已覆盖保存到 " + archive.getName() + "（不可找回）";
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+                    leave();
                 });
             } catch (Throwable failure) {
                 post(() -> {
@@ -403,51 +448,132 @@ public class LevelActivity extends AppCompatActivity {
     }
 
     /**
-     * Copy the engine's {@code level.dat.bak-<stamp>} out of the scratch directory.
-     * <p>
-     * A rename would be cheaper but the scratch directory is internal storage and the output folder is external,
-     * so the two may sit on different volumes.
+     * Name for a "save as" copy: the original name plus a fresh timestamp, in the same folder so the file list
+     * picks it up immediately.
      */
-    private File keepBackup(String stamp) {
-        if (stamp == null) {
-            return null;
+    private File copyTarget() {
+        String base = WorldFiles.stripArchiveExtension(archive.getName());
+        String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(new Date());
+        String extension = archive.getName().toLowerCase(Locale.ROOT).endsWith(".mcworld")
+                ? ".mcworld" : ".zip";
+        return WorldFiles.unique(archive.getParentFile(), base + "-" + stamp + extension);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Leaving
+    // ---------------------------------------------------------------------------------------------
+
+    private void showMenu(View anchor) {
+        if (busy) {
+            return;
         }
-        File source = new File(workDirectory, "level.dat.bak-" + stamp);
-        if (!source.isFile()) {
-            return null;
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add(0, MENU_SAVE, 0, R.string.level_menu_save);
+        menu.getMenu().add(0, MENU_SAVE_AS, 1, R.string.level_menu_save_as);
+        menu.getMenu().add(0, MENU_DEFAULTS, 2, R.string.level_menu_defaults);
+        boolean dirty = !pending.isEmpty();
+        for (int id : new int[]{MENU_SAVE, MENU_SAVE_AS, MENU_DEFAULTS}) {
+            menu.getMenu().findItem(id).setEnabled(dirty);
         }
-        File directory = new File(Paths.output(this), "backup");
-        if (!directory.isDirectory() && !directory.mkdirs()) {
-            return null;
-        }
-        File target = new File(directory,
-                WorldFiles.stripArchiveExtension(archive.getName()) + "-level.dat.bak-" + stamp);
-        try (java.io.InputStream in = new java.io.FileInputStream(source);
-             java.io.OutputStream out = new java.io.FileOutputStream(target)) {
-            byte[] buffer = new byte[16 * 1024];
-            int read;
-            while ((read = in.read(buffer)) > 0) {
-                out.write(buffer, 0, read);
+        menu.setOnMenuItemClickListener(item -> {
+            int id = item.getItemId();
+            if (id == MENU_SAVE) {
+                requestSave();
+                return true;
             }
-            return target;
-        } catch (java.io.IOException failure) {
-            return null;
+            if (id == MENU_SAVE_AS) {
+                startSave(true);
+                return true;
+            }
+            if (id == MENU_DEFAULTS) {
+                restoreDefaults();
+                return true;
+            }
+            return false;
+        });
+        menu.show();
+    }
+
+    /** Drop every edit and show the values the file had when it was opened. Nothing is written. */
+    private void restoreDefaults() {
+        if (pending.isEmpty()) {
+            return;
         }
+        pending.clear();
+        render();
+        Toast.makeText(this, "已恢复为打开时的值", Toast.LENGTH_SHORT).show();
+    }
+
+    /**
+     * The single exit point for the toolbar arrow and the system back gesture.
+     * <p>
+     * Nothing changed means nothing to ask: leaving is immediate. Anything changed gets the three-way question,
+     * because "did I save that?" is exactly the doubt this screen must not create.
+     */
+    private void attemptExit() {
+        if (leaving) {
+            finish();
+            return;
+        }
+        if (busy) {
+            return;
+        }
+        if (pending.isEmpty()) {
+            leave();
+            return;
+        }
+        titled("有未保存的修改", "Unsaved changes")
+                .setMessage("你改了 " + pending.size() + " 项，还没有写入存档。")
+                .setNegativeButton("直接退出", (dialog, which) -> leave())
+                .setNeutralButton("另存为", (dialog, which) -> startSave(true))
+                .setPositiveButton("保存", (dialog, which) -> startSave(false))
+                .show();
+    }
+
+    private void leave() {
+        leaving = true;
+        finish();
     }
 
     // ---------------------------------------------------------------------------------------------
     // Plumbing
     // ---------------------------------------------------------------------------------------------
 
-    private void setBusy(boolean busy) {
-        binding.progress.setVisibility(busy ? View.VISIBLE : View.GONE);
-        binding.btnSave.setEnabled(!busy && !pending.isEmpty());
+    private void setBusy(boolean value) {
+        busy = value;
+        binding.progress.setVisibility(value ? View.VISIBLE : View.GONE);
+        updateActions();
+        // Leaving mid-write would strand the work directory and lose the result silently.
+        binding.btnBack.setEnabled(!value);
+    }
+
+    /**
+     * Title block shared by every dialog on this screen.
+     * <p>
+     * Chinese at 19sp bold, the underlying NBT key at 11sp beneath it. Passing a two-line string to
+     * {@code setTitle()} was the earlier approach and it made the key look like a second heading.
+     */
+    private DialogHeaderBinding header(String titleZh, String titleEn) {
+        DialogHeaderBinding header = DialogHeaderBinding.inflate(getLayoutInflater());
+        header.tvTitle.setText(titleZh);
+        if (titleEn == null || titleEn.isEmpty()) {
+            header.tvSubtitle.setVisibility(View.GONE);
+        } else {
+            header.tvSubtitle.setText(titleEn);
+        }
+        return header;
+    }
+
+    private MaterialAlertDialogBuilder titled(String titleZh, String titleEn) {
+        return new MaterialAlertDialogBuilder(this).setCustomTitle(header(titleZh, titleEn).getRoot());
     }
 
     private void showFailure(Throwable failure) {
         setBusy(false);
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("操作失败")
+        // The only way out of a failure is the button below; an unsaved-changes prompt on top of it would trap
+        // the user in a loop they cannot answer.
+        leaving = true;
+        titled("操作失败", "Failed")
                 .setMessage(Job.describe(failure))
                 .setPositiveButton("返回", (dialog, which) -> finish())
                 .setCancelable(false)

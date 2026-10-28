@@ -61,7 +61,9 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Actions (child 1): 44dp each, so six of them still fit a 320dp wide screen. -->
+    <!-- Actions (child 1): 44dp each, so six of them still fit a 320dp wide screen.
+         zip and mcworld share one "export" slot: they produce identical bytes under a different name, and two
+         adjacent buttons that differ only by extension were the easiest pair in the row to hit by mistake. -->
     <LinearLayout
         android:id="@+id/actions"
         android:layout_width="wrap_content"
@@ -82,23 +84,23 @@
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/actionZip"
+            android:id="@+id/actionLevel"
             style="@style/Widget.LiteChunk.RowAction"
-            android:contentDescription="导出为 zip">
+            android:contentDescription="存档详情">
 
-            <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_zip" />
+            <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_info" />
 
-            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="zip" />
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="详情" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/actionMcworld"
+            android:id="@+id/actionExport"
             style="@style/Widget.LiteChunk.RowAction"
-            android:contentDescription="导出为 mcworld">
+            android:contentDescription="导出">
 
-            <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_bedrock" />
+            <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_export" />
 
-            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="mcworld" />
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="导出" />
         </LinearLayout>
 
         <LinearLayout

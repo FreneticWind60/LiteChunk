@@ -260,10 +260,10 @@ public class ConversionService extends Service {
             }
         }
         // The directory the UI hands over only holds level.dat; it exists because the world itself is an archive.
-        String backup = engine().applyLevelChanges(new File(path), changes);
-        Bundle bundle = new Bundle();
-        bundle.putString(Job.KEY_LEVEL_BACKUP, backup);
-        receiver.send(Job.CODE_LEVEL_SAVED, bundle);
+        // No backup is produced: the details screen offers "save as" instead, and writes the archive through a
+        // temporary file, so this step only has to be atomic, not recoverable.
+        engine().applyLevelChanges(new File(path), changes);
+        receiver.send(Job.CODE_LEVEL_SAVED, new Bundle());
     }
 
     // ---------------------------------------------------------------------------------------------

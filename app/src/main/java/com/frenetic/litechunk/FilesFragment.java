@@ -123,6 +123,11 @@ public class FilesFragment extends Fragment implements Store.Listener, FileAdapt
     }
 
     @Override
+    public void onDetails(Store.OutputFile file) {
+        OutputActions.details(requireActivity(), file);
+    }
+
+    @Override
     public void onExport(Store.OutputFile file, boolean mcworld) {
         // The copy is identical, only the extension differs: mcworld is what Bedrock imports, zip is what a Java
         // launcher or a PC expects.

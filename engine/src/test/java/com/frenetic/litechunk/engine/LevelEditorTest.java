@@ -19,8 +19,8 @@ import java.util.Map;
  * <p>
  * The details screen is the riskiest thing in the app: it writes to a file the user cannot easily restore. This runs
  * the same code path the device does, on a copy of a real world, and asserts the boring properties that matter —
- * the fields come back unchanged through a round trip, the edit lands, a backup exists, and re-opening the edited
- * file still parses.
+ * the fields come back unchanged through a round trip, the edit lands, no stray backup is left behind, and
+ * re-opening the edited file still parses.
  * <p>
  * Usage: {@code gradlew :engine:levelTest --args="<world directory>"}
  */
@@ -78,8 +78,7 @@ public final class LevelEditorTest {
         for (Map.Entry<String, String> change : changes.entrySet()) {
             System.out.println("  " + change.getKey() + " -> " + change.getValue());
         }
-        String backup = LevelEditor.open(work).apply(changes);
-        System.out.println("backup : " + backup);
+        LevelEditor.open(work).apply(changes);
 
         // --- verify ------------------------------------------------------------------------------
         LevelInfo after = LevelEditor.open(work).inspect();
@@ -105,22 +104,20 @@ public final class LevelEditorTest {
             }
         }
 
-        File backupFile = new File(work, "level.dat.bak-" + backup);
-        if (backup == null || !backupFile.isFile()) {
-            System.out.println("FAIL  backup file missing: " + backupFile);
-            failures++;
-        } else if (backupFile.length() != levelDat.length()) {
-            System.out.printf("FAIL  backup size %d != original %d%n", backupFile.length(), levelDat.length());
+        // Backups were removed on purpose: they accumulated inside the world folder and users could not tell the
+        // copies apart. The details screen offers "save as" instead, so nothing should appear here.
+        File[] leftovers = work.listFiles((dir, name) -> name.startsWith("level.dat.bak-"));
+        if (leftovers != null && leftovers.length > 0) {
+            System.out.println("FAIL  " + leftovers.length + " backup file(s) were created");
             failures++;
         } else {
-            System.out.println("backup ok: " + backupFile.getName() + " (" + backupFile.length() + " bytes)");
+            System.out.println("no backup files, as intended");
         }
 
         // A second apply must still produce a readable file: the writer runs twice in a row on a device.
-        String second = LevelEditor.open(work).apply(Map.of("LevelName", "第二次改名"));
+        LevelEditor.open(work).apply(Map.of("LevelName", "第二次改名"));
         LevelInfo third = LevelEditor.open(work).inspect();
         failures += expect("LevelName", "第二次改名", third.field("LevelName"));
-        System.out.println("second backup: " + second);
 
         // Nothing outside the allow list may be written.
         LevelEditor.open(work).apply(Map.of("DataVersion", "9999", "Player", "nope"));

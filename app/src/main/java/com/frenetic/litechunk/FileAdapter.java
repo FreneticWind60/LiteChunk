@@ -7,6 +7,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.widget.PopupMenu;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.checkbox.MaterialCheckBox;
@@ -24,8 +25,14 @@ import java.util.Set;
  */
 final class FileAdapter extends RecyclerView.Adapter<FileAdapter.Holder> {
 
+    private static final int EXPORT_ZIP = 1;
+    private static final int EXPORT_MCWORLD = 2;
+
     interface Listener {
         void onEnqueue(Store.OutputFile file);
+
+        /** Open the level.dat details screen. */
+        void onDetails(Store.OutputFile file);
 
         /** @param mcworld true for a {@code .mcworld} copy, false for a {@code .zip} copy. */
         void onExport(Store.OutputFile file, boolean mcworld);
@@ -199,14 +206,11 @@ final class FileAdapter extends RecyclerView.Adapter<FileAdapter.Holder> {
             holder.row.close();
             listener.onEnqueue(file);
         });
-        holder.actionZip.setOnClickListener(view -> {
+        holder.actionLevel.setOnClickListener(view -> {
             holder.row.close();
-            listener.onExport(file, false);
+            listener.onDetails(file);
         });
-        holder.actionMcworld.setOnClickListener(view -> {
-            holder.row.close();
-            listener.onExport(file, true);
-        });
+        holder.actionExport.setOnClickListener(view -> showExportMenu(view, holder, file));
         holder.actionShare.setOnClickListener(view -> {
             holder.row.close();
             listener.onShare(file);
@@ -219,8 +223,32 @@ final class FileAdapter extends RecyclerView.Adapter<FileAdapter.Holder> {
             holder.row.close();
             listener.onDelete(file);
         });
-        // The mcworld copy only makes sense for a Bedrock archive.
-        holder.actionMcworld.setVisibility(file.bedrock ? View.VISIBLE : View.GONE);
+    }
+
+    /**
+     * zip and mcworld hold identical bytes under a different extension, so the choice belongs in a menu. As two
+     * adjacent 44dp buttons they were the pair most likely to be tapped by mistake, and the row still has to fit
+     * inside a 320dp screen.
+     * <p>
+     * The menu is shown before the row closes: a PopupMenu anchors to the view's current position, so closing
+     * first would place it where the button used to be.
+     */
+    private void showExportMenu(View anchor, Holder holder, Store.OutputFile file) {
+        PopupMenu menu = new PopupMenu(anchor.getContext(), anchor);
+        menu.getMenu().add(0, EXPORT_ZIP, 0, "导出为 .zip");
+        if (file.bedrock) {
+            menu.getMenu().add(0, EXPORT_MCWORLD, 1, "导出为 .mcworld");
+        }
+        menu.setOnMenuItemClickListener(item -> {
+            int id = item.getItemId();
+            if (id != EXPORT_ZIP && id != EXPORT_MCWORLD) {
+                return false;
+            }
+            holder.row.close();
+            listener.onExport(file, id == EXPORT_MCWORLD);
+            return true;
+        });
+        menu.show();
     }
 
     @Override
@@ -237,8 +265,8 @@ final class FileAdapter extends RecyclerView.Adapter<FileAdapter.Holder> {
         final TextView name;
         final TextView meta;
         final View actionEnqueue;
-        final View actionZip;
-        final View actionMcworld;
+        final View actionLevel;
+        final View actionExport;
         final View actionShare;
         final View actionGame;
         final View actionDelete;
@@ -253,8 +281,8 @@ final class FileAdapter extends RecyclerView.Adapter<FileAdapter.Holder> {
             name = itemView.findViewById(R.id.tvName);
             meta = itemView.findViewById(R.id.tvMeta);
             actionEnqueue = itemView.findViewById(R.id.actionEnqueue);
-            actionZip = itemView.findViewById(R.id.actionZip);
-            actionMcworld = itemView.findViewById(R.id.actionMcworld);
+            actionLevel = itemView.findViewById(R.id.actionLevel);
+            actionExport = itemView.findViewById(R.id.actionExport);
             actionShare = itemView.findViewById(R.id.actionShare);
             actionGame = itemView.findViewById(R.id.actionGame);
             actionDelete = itemView.findViewById(R.id.actionDelete);

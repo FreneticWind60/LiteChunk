@@ -95,14 +95,15 @@ public interface ChunkerEngine {
      * Write the given fields back to {@code level.dat}.
      * <p>
      * Only the fields reported by {@link #inspectLevel(File)} with {@link LevelField#isEditable()} are accepted, any
-     * other key is ignored rather than created. The previous file is copied to {@code level.dat.bak-<timestamp>}
-     * first, the new content is written to a temporary file and read back for verification, and only then does it
-     * replace the original: a failed write leaves the world exactly as it was.
+     * other key is ignored rather than created. The new content is written to a temporary file and read back for
+     * verification, and only then does it replace the original: a failed write leaves the world exactly as it was.
+     * <p>
+     * No backup of the previous file is kept. Callers that want the old header preserved must copy the archive
+     * before calling this, and must tell the user that overwriting is not undoable.
      *
      * @param worldDirectory the world directory containing {@code level.dat}.
      * @param changes        field id to new value, in the same string form {@link LevelInfo} reports.
-     * @return the timestamp suffix of the backup file that was created.
      * @throws Exception when the file cannot be read, or when the written file fails verification.
      */
-    String applyLevelChanges(File worldDirectory, java.util.Map<String, String> changes) throws Exception;
+    void applyLevelChanges(File worldDirectory, java.util.Map<String, String> changes) throws Exception;
 }

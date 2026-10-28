@@ -110,8 +110,6 @@ final class Job {
     static final String KEY_LEVEL_NOTE_SEVERITY = "levelNoteSeverity";
     static final String KEY_LEVEL_NOTE_ZH = "levelNoteZh";
     static final String KEY_LEVEL_NOTE_EN = "levelNoteEn";
-    /** Backup file suffix created by the save, so the UI can tell the user where the previous copy went. */
-    static final String KEY_LEVEL_BACKUP = "levelBackup";
 
     /**
      * Flatten a {@link LevelInfo} into a bundle.

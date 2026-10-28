@@ -12,4 +12,10 @@
     <string name="level_field_text_hint">文本 / Text</string>
     <string name="level_field_number_hint">整数 / Integer</string>
     <string name="level_field_empty_error">不能为空 / Cannot be empty</string>
+    <string name="level_action_save">保存</string>
+    <string name="level_action_more">更多操作</string>
+    <string name="level_menu_save">保存</string>
+    <string name="level_menu_save_as">另存为</string>
+    <string name="level_menu_defaults">恢复默认值</string>
+    <string name="level_title_choice">选择一项 / Choose a value</string>
 </resources>

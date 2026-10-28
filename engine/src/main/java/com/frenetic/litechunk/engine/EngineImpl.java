@@ -203,11 +203,11 @@ public final class EngineImpl implements ChunkerEngine {
     }
 
     @Override
-    public String applyLevelChanges(File worldDirectory, Map<String, String> changes) throws Exception {
+    public void applyLevelChanges(File worldDirectory, Map<String, String> changes) throws Exception {
         if (changes == null || changes.isEmpty()) {
-            return null;
+            return;
         }
-        return LevelEditor.open(worldDirectory).apply(changes);
+        LevelEditor.open(worldDirectory).apply(changes);
     }
 
     @Override

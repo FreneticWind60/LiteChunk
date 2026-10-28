@@ -12,9 +12,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -36,8 +34,6 @@ import java.util.Map;
 final class LevelEditor {
 
     private static final String LEVEL_DAT = "level.dat";
-    /** How many dated backups to keep next to {@code level.dat}. */
-    private static final int KEEP_BACKUPS = 5;
 
     private final File directory;
     private final File levelDat;
@@ -363,12 +359,19 @@ final class LevelEditor {
      * Write the changes back, or leave the world untouched.
      * <p>
      * The new content goes to a temporary file first and is read back before it replaces the original: a truncated
-     * write on a phone that ran out of storage would otherwise be indistinguishable from a corrupt save, and the
-     * user's only copy would be gone.
+     * write on a phone that ran out of storage would otherwise be indistinguishable from a corrupt save.
+     * <p>
+     * No dated backup is kept next to {@code level.dat}. There used to be one, and its cost was real: the copies
+     * piled up inside the world directory, the app had to prune them, and a user who saved three times ended up
+     * with three near-identical 2 KB files whose relationship to the current state was impossible to explain. The
+     * safety net now sits one level up, where the user can reason about it: the details screen writes into an
+     * archive through a temporary file, and offers "save as" for anyone who wants the original kept. What remains
+     * here is the guarantee that matters -- a failed write never leaves a half-written header behind.
      *
-     * @return the timestamp suffix of the backup file.
+     * @throws IOException when a value is rejected or the written file does not read back as expected. The
+     *                     original {@code level.dat} is untouched in that case.
      */
-    String apply(Map<String, String> changes) throws IOException {
+    void apply(Map<String, String> changes) throws IOException {
         List<String> applied = new ArrayList<>();
 
         for (Map.Entry<String, String> change : changes.entrySet()) {
@@ -386,12 +389,8 @@ final class LevelEditor {
         }
 
         if (applied.isEmpty()) {
-            return null;
+            return;
         }
-
-        String stamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(new Date());
-        File backup = new File(directory, LEVEL_DAT + ".bak-" + stamp);
-        copy(levelDat, backup);
 
         File temporary = new File(directory, LEVEL_DAT + ".tmp");
         try {
@@ -412,9 +411,6 @@ final class LevelEditor {
                 throw new IOException("无法写入 level.dat");
             }
         }
-
-        pruneBackups();
-        return stamp;
     }
 
     private void write(boolean bedrock, File file, int storageVersion, CompoundTag data) throws IOException {
@@ -593,26 +589,4 @@ final class LevelEditor {
     // Housekeeping
     // ---------------------------------------------------------------------------------------------
 
-    private void pruneBackups() {
-        File[] backups = directory.listFiles((dir, name) -> name.startsWith(LEVEL_DAT + ".bak-"));
-        if (backups == null || backups.length <= KEEP_BACKUPS) {
-            return;
-        }
-        java.util.Arrays.sort(backups, (left, right) -> left.getName().compareTo(right.getName()));
-        for (int i = 0; i < backups.length - KEEP_BACKUPS; i++) {
-            //noinspection ResultOfMethodCallIgnored
-            backups[i].delete();
-        }
-    }
-
-    private static void copy(File source, File target) throws IOException {
-        try (InputStream in = new FileInputStream(source);
-             java.io.OutputStream out = new java.io.FileOutputStream(target)) {
-            byte[] buffer = new byte[64 * 1024];
-            int read;
-            while ((read = in.read(buffer)) > 0) {
-                out.write(buffer, 0, read);
-            }
-        }
-    }
 }
