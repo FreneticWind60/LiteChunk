@@ -311,7 +311,10 @@ final class LevelEditor {
         fields.add(choice("Generator", "世界类型", "World type / Generator",
                 new String[]{"0", "1", "2", "3"},
                 new String[]{"旧世界", "无限", "平坦", "虚空"},
-                new String[]{"Legacy", "Infinite", "Flat", "Void"}, null, null));
+                new String[]{"Legacy", "Infinite", "Flat", "Void"},
+                "只是声明，改它不会重生地形。转换沿用源存档的类型：超平坦转出来仍是平坦，普通世界仍是无限。",
+                "A declaration only: changing it does not regenerate terrain. Conversion keeps the source type, "
+                        + "so a superflat save stays flat and a normal one stays infinite."));
         fields.add(whole("RandomSeed", "世界种子", "Seed", LevelField.KIND_LONG));
         fields.add(whole("SpawnX", "出生点 X", "Spawn X", LevelField.KIND_INT));
         fields.add(whole("SpawnY", "出生点 Y", "Spawn Y", LevelField.KIND_INT));

@@ -14,6 +14,7 @@ public class LiteChunkApp extends Application {
 
     private static final String PREFS = "litechunk";
     private static final String KEY_NIGHT_MODE = "nightMode";
+    private static final String KEY_BACKGROUND_HINT = "backgroundHintShown";
 
     @Override
     public void onCreate() {
@@ -37,8 +38,20 @@ public class LiteChunkApp extends Application {
                 .apply();
     }
 
-    /** Next value in the follow system -> light -> dark -> follow system cycle. */
-    static int nextNightMode(int current) {
+    /** Whether the "system may freeze the conversion" hint has already been shown. Asked once per install. */
+    static boolean hasSeenBackgroundHint(android.content.Context context) {
+        return context.getSharedPreferences(PREFS, MODE_PRIVATE)
+                .getBoolean(KEY_BACKGROUND_HINT, false);
+    }
+
+    static void markBackgroundHintSeen(android.content.Context context) {
+        context.getSharedPreferences(PREFS, MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_BACKGROUND_HINT, true)
+                .apply();
+    }
+
+    /** Next value in the follow system -> light -> dark -> follow system cycle. */    static int nextNightMode(int current) {
         switch (normalise(current)) {
             case AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM:
                 return AppCompatDelegate.MODE_NIGHT_NO;

@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Parcelable;
+import android.os.PowerManager;
 import android.os.Process;
 import android.os.ResultReceiver;
 import android.os.SystemClock;
@@ -70,6 +71,15 @@ public class ConversionService extends Service {
     /** Last numeric fraction the engine reported, so a stage-only update can carry it along. */
     private volatile float lastFraction;
     private volatile ResultReceiver currentReceiver;
+    /**
+     * Held for the whole batch.
+     * <p>
+     * A foreground service keeps the process from being killed, but it does not keep the CPU awake: once the screen
+     * goes off the device suspends and the conversion threads stop mid-region. That is indistinguishable from a
+     * hang, and on a two minute world it looks like a crash. The lock is released in the same block that stops the
+     * notification, and if the process is ever killed the kernel drops it for us.
+     */
+    private PowerManager.WakeLock wakeLock;
 
     /** Reported while a world is being unpacked, which has no numeric progress of its own. */
     interface StageListener {
@@ -91,6 +101,7 @@ public class ConversionService extends Service {
 
     @Override
     public void onDestroy() {
+        releaseWakeLock();
         jobs.shutdown();
         super.onDestroy();
     }
@@ -127,6 +138,7 @@ public class ConversionService extends Service {
             converting = true;
             startForeground(NOTIFICATION_ID, buildNotification("准备转换…", 0F, true));
             foreground = true;
+            acquireWakeLock();
         }
 
         final String path = intent.getStringExtra(Job.EXTRA_PATH);
@@ -164,6 +176,7 @@ public class ConversionService extends Service {
             } finally {
                 if (Job.ACTION_CONVERT.equals(action)) {
                     converting = false;
+                    releaseWakeLock();
                     stopForegroundCompat();
                 }
                 // Keeps the service alive while a newer startId is still queued behind this job.
@@ -683,5 +696,33 @@ public class ConversionService extends Service {
             stopForeground(STOP_FOREGROUND_REMOVE);
             foreground = false;
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // CPU wake lock
+    // ---------------------------------------------------------------------------------------------
+
+    private void acquireWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) {
+            return;
+        }
+        PowerManager power = (PowerManager) getSystemService(POWER_SERVICE);
+        if (power == null) {
+            Log.w(TAG, "no power manager, conversion may stall when the screen turns off");
+            return;
+        }
+        // No timeout on purpose: a batch of large worlds can legitimately take many minutes, and the lock is
+        // released by the `finally` above, by process death, or by cancel (which kills this process).
+        wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "LiteChunk:convert");
+        wakeLock.setReferenceCounted(false);
+        wakeLock.acquire();
+        Log.i(TAG, "wake lock held");
+    }
+
+    private void releaseWakeLock() {
+        if (wakeLock != null && wakeLock.isHeld()) {
+            wakeLock.release();
+        }
+        wakeLock = null;
     }
 }

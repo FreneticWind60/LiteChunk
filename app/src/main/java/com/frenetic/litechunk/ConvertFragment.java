@@ -1,14 +1,18 @@
 package com.frenetic.litechunk;
 
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -25,6 +29,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.frenetic.litechunk.databinding.FragmentConvertBinding;
+import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.checkbox.MaterialCheckBox;
@@ -58,6 +63,15 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
     private int renderedQueueSize = -1;
     private boolean renderedRunning;
     private String renderedSignature = "";
+
+    /** Bundled once; the resource lookup is not worth repeating five times a second. */
+    private String[] quotes;
+    /** Last line put in {@code tvQuote}, so a progress tick that lands inside the same window does not re-layout. */
+    private String shownQuote = "";
+    /** One scroll per run, see {@link #renderInternal()}. */
+    private boolean autoScrolled;
+    /** Kept so a finished conversion can close the game sheet instead of leaving the player stranded in it. */
+    private BottomSheetDialog gameSheet;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -100,6 +114,8 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         binding.btnAdd.setOnClickListener(this::showSourceSheet);
         binding.btnConvert.setOnClickListener(this::startConversion);
         binding.btnCancel.setOnClickListener(v -> controller.cancel());
+        binding.tvGameEntry.setOnClickListener(v -> showGameSheet());
+        quotes = getResources().getStringArray(R.array.quote_lines);
         binding.tvGoFiles.setOnClickListener(v -> {
             if (requireActivity() instanceof MainActivity activity) {
                 activity.showFilesPage();
@@ -447,6 +463,22 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
+    /**
+     * The shared two-line dialog header: what to decide in Chinese at 19sp, the NBT / system key in English at 11sp.
+     * A plain {@code setTitle()} renders both at the same size, which made the English line read as a second heading.
+     */
+    private View dialogTitle(String titleZh, String titleEn) {
+        com.frenetic.litechunk.databinding.DialogHeaderBinding header =
+                com.frenetic.litechunk.databinding.DialogHeaderBinding.inflate(getLayoutInflater());
+        header.tvTitle.setText(titleZh);
+        if (titleEn == null || titleEn.isEmpty()) {
+            header.tvSubtitle.setVisibility(View.GONE);
+        } else {
+            header.tvSubtitle.setText(titleEn);
+        }
+        return header.getRoot();
+    }
+
     // ---------------------------------------------------------------------------------------------
     // Conversion
     // ---------------------------------------------------------------------------------------------
@@ -469,6 +501,85 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         boolean bedrock = edition.equals("BEDROCK");
         boolean packMcworld = bedrock && binding.cbPackMcworld.isChecked();
         boolean deleteSource = binding.cbDeleteSource.isChecked();
+
+        // A conversion that runs out of room fails halfway, and the user is left guessing which of the two things
+        // went wrong (bad save, or full disk). Asking here turns that into a decision. Only a warning: the estimate
+        // is deliberately generous, so refusing outright would block work that would have fit.
+        long needed = Space.estimate(store.queue);
+        long free = Space.free(requireContext());
+        if (needed > 0L && free > 0L && free < needed) {
+            new MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("空间可能不足")
+                    .setMessage("按两倍余量估算，这批存档需要约 " + WorldFiles.humanSize(needed)
+                            + " 可用空间，当前只剩 " + WorldFiles.humanSize(free) + "。\n\n"
+                            + "转换中途写满会失败，已经完成的存档不受影响，但正在转换的这一项要重来。"
+                            + "可以先到文件页删掉 output/ 里不再需要的成品。")
+                    .setNegativeButton("取消", null)
+                    .setPositiveButton("仍然继续", (dialog, which) -> {
+                        announceBackgroundLimits(() -> begin(controller, store, id, packMcworld, deleteSource));
+                    })
+                    .show();
+            return;
+        }
+        announceBackgroundLimits(() -> begin(controller, store, id, packMcworld, deleteSource));
+    }
+
+    /**
+     * Explain, once, that the system is allowed to freeze a background app and how to stop it doing so.
+     * <p>
+     * The screen already stays on while the conversion runs (see {@link MainActivity}), which is what removes the
+     * need to babysit it. The remaining risk is the OEM freezer — a foreground service survives it in theory, but
+     * MIUI, ColorOS and OriginOS suspend workers anyway — and there is no API to lift that except asking the user
+     * to whitelist the app. Shown on the first conversion only, and never when the app is already exempt, so the
+     * user who has dealt with it is not asked twice.
+     */
+    private void announceBackgroundLimits(Runnable start) {
+        Context context = requireContext();
+        if (LiteChunkApp.hasSeenBackgroundHint(context) || isExemptFromBatteryOptimisation(context)) {
+            LiteChunkApp.markBackgroundHintSeen(context);
+            start.run();
+            return;
+        }
+        new MaterialAlertDialogBuilder(context)
+                .setCustomTitle(dialogTitle("让转换安静地跑完", "Background limits"))
+                .setMessage("转换期间屏幕会一直亮着，不会中途睡过去。\n\n"
+                        + "如果切到别的应用，系统仍可能暂停转换（MIUI、ColorOS、OriginOS 都会）。"
+                        + "把 LiteChunk 加入电池优化白名单可以避免，这里改完就不用再管了。")
+                .setNegativeButton("直接开始", (dialog, which) -> {
+                    LiteChunkApp.markBackgroundHintSeen(context);
+                    start.run();
+                })
+                .setPositiveButton("去设置", (dialog, which) -> {
+                    LiteChunkApp.markBackgroundHintSeen(context);
+                    openBatterySettings(context);
+                    start.run();
+                })
+                .show();
+    }
+
+    private static boolean isExemptFromBatteryOptimisation(Context context) {
+        PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+        return power != null && power.isIgnoringBatteryOptimizations(context.getPackageName());
+    }
+
+    /** The request dialog first; the settings list is the fallback when a ROM does not implement the former. */
+    private static void openBatterySettings(Context context) {
+        try {
+            Intent request = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:" + context.getPackageName()));
+            context.startActivity(request);
+            return;
+        } catch (RuntimeException ignored) {
+            // Some OEMs ship a stub for this action; fall through to the list.
+        }
+        try {
+            context.startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+        } catch (RuntimeException ignored) {
+            // Nothing left to try, the hint text was still read.
+        }
+    }
+
+    private void begin(Controller controller, Store store, String id, boolean packMcworld, boolean deleteSource) {
         controller.start(new ArrayList<>(store.queue), id, packMcworld, deleteSource);
         render();
     }
@@ -566,8 +677,29 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             binding.tvStage.setText(stage == null || stage.isEmpty()
                     ? "已用时 " + controller.elapsedSeconds() + " 秒"
                     : stage + " · " + controller.elapsedSeconds() + " 秒");
+            // Indexed off the elapsed time rather than a counter: this method runs on every progress tick (five
+            // times a second), so any "advance to the next line" state would burn the whole list in 12 seconds.
+            String quote = quoteFor(controller.elapsedSeconds());
+            if (!quote.equals(shownQuote)) {
+                shownQuote = quote;
+                binding.tvQuote.setText(quote);
+            }
+            binding.tvGameEntry.setVisibility(View.VISIBLE);
+            if (!autoScrolled) {
+                // The cancel / game row is the last thing in the card, and on a tall phone the card grows past the
+                // fold the moment it appears: the row would land under the gesture area, where taps never arrive.
+                // Scrolling to the end once, at the start of a run, is also what a user would do by hand.
+                autoScrolled = true;
+                binding.getRoot().post(() -> binding.getRoot()
+                        .smoothScrollTo(0, binding.getRoot().getChildAt(0).getHeight()));
+            }
         } else {
+            autoScrolled = false;
             binding.cardProgress.setVisibility(View.GONE);
+            // The game is a way to pass the time until this moment, so do not leave the player in it.
+            if (gameSheet != null && gameSheet.isShowing()) {
+                gameSheet.dismiss();
+            }
         }
 
         // Outputs of this round
@@ -587,6 +719,69 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             binding.cardError.setVisibility(View.VISIBLE);
             binding.tvError.setText(error);
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Passing the time
+    // ---------------------------------------------------------------------------------------------
+
+    /** How long one line stays on screen. The brief was "every 5 to 10 seconds"; the middle is 7. */
+    private static final long QUOTE_SECONDS = 7L;
+
+    /**
+     * The line for a given moment of this run.
+     * <p>
+     * Derived from the clock instead of being stepped forward on each render, because {@link #renderInternal()} is
+     * driven by the progress callback and runs roughly five times a second. A counter would cycle through the whole
+     * list in seconds and look like flicker; a time window is also stable across a re-render, a rotation and a
+     * configuration change, and needs no extra timer to wake the device up for.
+     */
+    private String quoteFor(long elapsedSeconds) {
+        if (quotes == null || quotes.length == 0) {
+            return "";
+        }
+        int index = (int) ((elapsedSeconds / QUOTE_SECONDS) % quotes.length);
+        return quotes[index];
+    }
+
+    /**
+     * Open the game sheet.
+     * <p>
+     * The board keeps running only while the sheet is on screen: {@link TetrisView#stop()} is called from the
+     * dismiss listener, so a closed sheet costs nothing while eight conversion threads carry on.
+     */
+    private void showGameSheet() {
+        if (gameSheet != null && gameSheet.isShowing()) {
+            return;
+        }
+        Context context = requireContext();
+        BottomSheetDialog sheet = new BottomSheetDialog(context);
+        View content = LayoutInflater.from(context).inflate(R.layout.sheet_game, null);
+        TextView stats = content.findViewById(R.id.tvGameStats);
+        TetrisView board = content.findViewById(R.id.tetris);
+        board.setListener((score, lines, over) -> stats.setText(over
+                ? "得分 " + score + " · " + lines + " 行 · 结束"
+                : "得分 " + score + " · " + lines + " 行"));
+
+        // A fixed fraction of the screen rather than wrap_content: the board sizes itself from the space it is
+        // given, so the sheet needs a height before the first measure or it collapses to the header.
+        int height = Math.round(getResources().getDisplayMetrics().heightPixels * 0.74F);
+        content.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height));
+
+        content.findViewById(R.id.btnGameClose).setOnClickListener(v -> sheet.dismiss());
+        sheet.setContentView(content);
+        sheet.setOnDismissListener(dialog -> {
+            board.stop();
+            if (gameSheet == sheet) {
+                gameSheet = null;
+            }
+        });
+        sheet.show();
+        BottomSheetBehavior<FrameLayout> behavior = sheet.getBehavior();
+        behavior.setSkipCollapsed(true);
+        behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+        gameSheet = sheet;
+        board.startGame();
     }
 
     private String queueSignature(Store store, boolean running) {

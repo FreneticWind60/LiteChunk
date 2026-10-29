@@ -511,7 +511,12 @@ public class BedrockLevelWriter implements LevelWriter, BedrockReaderWriter {
 
 
         if (!data.contains("Generator")) {
-            data.put("Generator", 2); // Flat map
+            // Nothing was written, which only happens for a generator type Chunker does not recognise (a datapack
+            // world, or a Java world whose generator node is missing). Declaring "flat" here used to be the default
+            // and it is the wrong guess: a flat world is a specific, mostly-empty terrain preset, so the game would
+            // describe a converted world as flat while showing real terrain. "Normal" at least matches what the
+            // player sees, and ungenerated chunks then use ordinary terrain instead of a bedrock-and-grass slab.
+            data.put("Generator", 1); // Normal map
         }
 
         if (!data.contains("StorageVersion")) {

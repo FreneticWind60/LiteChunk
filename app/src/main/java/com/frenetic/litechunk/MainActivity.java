@@ -45,6 +45,16 @@ public class MainActivity extends AppCompatActivity {
     private File pendingExport;
     private int currentNightMode;
 
+    /**
+     * Keeps the display awake for exactly as long as a conversion runs.
+     * <p>
+     * The whole point of the screen flag is that a conversion takes minutes and the phone is in the user's hand
+     * while it does. Letting it sleep used to stall the worker until the user touched the screen again, which read
+     * as "the app froze". The flag is on the window, so it only applies while this activity is visible; the wake
+     * lock in {@link ConversionService} covers the background case.
+     */
+    private final Controller.Listener conversionListener = this::applyKeepScreenOn;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -85,6 +95,30 @@ public class MainActivity extends AppCompatActivity {
         });
 
         handleIntent(getIntent());
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // The state can change while this activity is stopped (a batch finishing in the background), and the window
+        // flag is not restored automatically when the activity comes back.
+        Controller.get(this).addListener(conversionListener);
+        applyKeepScreenOn();
+    }
+
+    @Override
+    protected void onPause() {
+        Controller.get(this).removeListener(conversionListener);
+        super.onPause();
+    }
+
+    private void applyKeepScreenOn() {
+        boolean running = Controller.get(this).isRunning();
+        if (running) {
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
     }
 
     @Override

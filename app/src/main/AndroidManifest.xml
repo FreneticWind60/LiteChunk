@@ -7,6 +7,18 @@
     <!-- The about page checks GitHub for a newer release. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!--
+        A conversion is a foreground service, which buys "don't kill me" but not "don't suspend the CPU": with the
+        screen off the device suspends and the worker simply stops mid-region. The partial wake lock is held only
+        while a conversion is running and released in the same `finally` block that stops the notification.
+    -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!--
+        Used to open the system "ignore battery optimisations" dialog once, on the first conversion. OEMs freeze
+        background apps regardless of the foreground service state, and a frozen worker looks exactly like a hung
+        one. This app is not distributed through Play, so no policy stake.
+    -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!--
         Package visibility (API 30+): without these entries getPackageInfo() always throws, so "is Minecraft Bedrock

@@ -178,7 +178,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
                         android:lineSpacingExtra="3dp"
-                        android:text="灰色项只读。写入只改 level.dat，不重新编码区块，因此比重转一遍快得多，也不会把不认识的方块变成占位块。覆盖保存不可找回，想保留原档请用「另存为」。"
+                        android:text="灰色项只读。写入只改 level.dat，不重新编码区块，因此比重转一遍快得多，也不会把不认识的方块变成占位块。覆盖保存不可找回，想保留原档请用「另存为」。转换会保留源存档的地形类型：超平坦转出来仍是平坦，普通世界仍是无限。"
                         android:textAppearance="@style/Text.LiteChunk.Caption"
                         android:textColor="@color/text_faint" />
                 </LinearLayout>

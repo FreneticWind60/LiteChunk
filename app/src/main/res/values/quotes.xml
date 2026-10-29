@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Rotating lines shown under the progress bar while a world is converting.
+
+        Deliberately bundled instead of fetched: a conversion is exactly the moment when a network call is most
+        likely to sit in a timeout, and a joke that arrives three seconds late is worse than no joke. The list also
+        has to survive being read in a car with no signal.
+
+        Rules for adding a line: at most ~24 characters so it never wraps beyond two lines, no emoji (they render
+        with a different metric on every OEM skin), and nothing that could be read as progress information — the
+        real stage text sits one line above and must stay the source of truth.
+    -->
+    <string-array name="quote_lines">
+        <!-- Homegrown, for people who are watching blocks move. -->
+        <item>正在把 16×16 的方块一块块搬过去。</item>
+        <item>区块很多，一块都不会少。</item>
+        <item>你的存档正在穿越版本边界。</item>
+        <item>LevelDB 正在打嗝，请稍候。</item>
+        <item>从 Java 到基岩，只隔着一次翻译。</item>
+        <item>转换不生产方块，只是搬家。</item>
+        <item>一个区块，是 16×16×384 个方块的容身之处。</item>
+        <item>今天的 CPU 很努力，风扇也知道。</item>
+        <item>进度不动的时候，它在整理数据库。</item>
+        <item>基岩版喜欢安静，给它一点耐心。</item>
+        <item>一千个区块之后，时间就不按秒算了。</item>
+        <item>存档越大，越值得等。</item>
+        <item>刷怪笼里的怪也在排队搬家。</item>
+        <item>你养的猫会在新世界里认出你。</item>
+        <item>红石时钟会重新开始滴答。</item>
+        <item>画和告示牌有点难搬，但我们尽力。</item>
+        <item>方块没有情绪，但会记住自己的位置。</item>
+        <item>种子不变，世界就还在。</item>
+        <item>出生点会被安全地留在原地。</item>
+        <item>天空还是一样的蓝。</item>
+        <item>你在意的那个存档，我们轻拿轻放。</item>
+        <item>这不是卡住了，这是在读区块。</item>
+        <item>内存紧张的时候，我们会少开几条线程。</item>
+        <item>世界很大，一次只搬一个。</item>
+        <item>进度条是诚实的，只是有些阶段没有百分比。</item>
+        <item>存档是时间胶囊，转换是换个壳。</item>
+        <item>别急着删原存档，确认能进再说。</item>
+        <item>树木、洞穴和村庄，正在按顺序排队。</item>
+        <item>屏幕会一直亮着，你不用担心它睡过去。</item>
+        <item>Java 版用 Anvil，基岩版用 LevelDB，只是说法不同。</item>
+        <item>世界边界之外什么也没有，包括进度条。</item>
+        <item>转换不是魔法，是一堆 for 循环。</item>
+        <item>如果失败了，原存档完好无损。</item>
+        <item>你在等世界，世界也在等你。</item>
+        <item>好存档不怕慢，怕的是没备份。</item>
+        <item>生物群系会被完整地带过去。</item>
+        <item>箱子里的东西，一件都不会掉。</item>
+        <item>有人在用手机造宇宙，比如你。</item>
+        <item>耐心是免费的，CPU 不是。</item>
+        <item>这时候可以起来喝口水。</item>
+        <item>眼睛离开屏幕二十秒，世界还在。</item>
+        <item>你已经比大部分人有耐心了。</item>
+        <item>一个方块的旅程，是几千次内存拷贝。</item>
+        <item>别偷看进度条，它不会变快。</item>
+        <item>存档会记得你走过的每一格。</item>
+
+        <!-- From the list the author of this app submitted, the ones that read as patience rather than a promise. -->
+        <item>慢一点没关系，我在。</item>
+        <item>时间慢，心意满。</item>
+        <item>每一秒，都算数。</item>
+        <item>时间在走，我没动。</item>
+        <item>等待不是空，是蓄满。</item>
+        <item>等待是沉默的相信。</item>
+        <item>等待让我更懂珍惜。</item>
+        <item>我把等待，过成日子。</item>
+        <item>等你的灯，一直亮着。</item>
+        <item>我把时间，都存给你了。</item>
+        <item>等你的坐标，从未偏移。</item>
+        <item>你晚到，但不会缺席。</item>
+        <item>等待是给你的留白。</item>
+        <item>等是动词，心是静的。</item>
+        <item>你慢慢来，我慢慢等。</item>
+    </string-array>
+</resources>

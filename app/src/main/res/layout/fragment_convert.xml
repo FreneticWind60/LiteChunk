@@ -14,7 +14,7 @@
         android:paddingStart="16dp"
         android:paddingTop="8dp"
         android:paddingEnd="16dp"
-        android:paddingBottom="28dp">
+        android:paddingBottom="48dp">
 
         <!-- Conversion list -->
         <com.google.android.material.card.MaterialCardView
@@ -311,13 +311,53 @@
                     android:layout_marginTop="10dp"
                     android:textAppearance="@style/Text.LiteChunk.Caption" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnCancel"
-                    style="@style/Widget.LiteChunk.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="44dp"
+                <!--
+                    Its own line rather than appended to the stage text: the lines rotate every few seconds and vary
+                    in length, so sharing a line made the whole card change height mid-conversion. Two lines is the
+                    ceiling; ellipsis keeps a long one from pushing the cancel row off the card.
+                -->
+                <TextView
+                    android:id="@+id/tvQuote"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textAppearance="@style/Text.LiteChunk.Caption"
+                    android:textColor="@color/text_faint" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text="取消" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnCancel"
+                        style="@style/Widget.LiteChunk.OutlinedButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:text="取消" />
+
+                    <TextView
+                        android:id="@+id/tvGameEntry"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:background="?attr/selectableItemBackground"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="end"
+                        android:paddingStart="8dp"
+                        android:paddingTop="12dp"
+                        android:paddingEnd="4dp"
+                        android:paddingBottom="12dp"
+                        android:text="等待的时候玩会儿小游戏？"
+                        android:textColor="@color/accent"
+                        android:textSize="12sp" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

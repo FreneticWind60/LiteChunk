@@ -22,4 +22,17 @@
     <color name="row_bg_pressed">#FFEDF1F6</color>
     <color name="header_start">#FFE9F7F0</color>
     <color name="header_end">#FFEFF4FB</color>
+
+    <!--
+        Tetris pieces. Mid tones on purpose: these are drawn on both the light surface (#FFFFFFFF) and the dark one
+        (#FF111922), so they have to carry contrast against either, which rules out the pastel and the neon ends of
+        the palette. No night variant, because one set that works on both is cheaper than two that drift apart.
+    -->
+    <color name="piece_i">#FF29B6C6</color>
+    <color name="piece_o">#FFD29A1C</color>
+    <color name="piece_t">#FF9C4FBF</color>
+    <color name="piece_s">#FF4CAF50</color>
+    <color name="piece_z">#FFDC4C4C</color>
+    <color name="piece_j">#FF3D8BD9</color>
+    <color name="piece_l">#FFE07A3A</color>
 </resources>

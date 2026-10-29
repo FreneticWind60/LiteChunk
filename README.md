@@ -3,7 +3,7 @@
 Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换引擎来自
 [Chunker](https://github.com/HiveGamesOSS/Chunker) 的裁剪版，通过 `DexClassLoader` 在独立进程中加载。
 
-- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build3 pr3`（与引擎 Chunker 的版本同步）
+- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build3 pr4`（与引擎 Chunker 的版本同步）
 - 最低系统 Android 8.1（API 27）—— `java.nio.file` 与基岩版 1.26 的共同下限；目标 API 37
 - 只做一件事：选存档 → 选版本 → 转换 → 保存 / 分享 / 导入
 - MIT 许可，非官方项目，与 Mojang Studios、Microsoft 无关
@@ -129,6 +129,35 @@ Release 正文直接取仓库根目录的 `RELEASE_NOTES.md`（每次发版前�
   设置存 `SharedPreferences`，转换时随 Intent 传给 `:chunker` 进程（跨进程读 prefs 不保证可见）。
   同名不覆盖：`WorldFiles.unique` 自动加 `(2)`。
 - **本轮输出**：本轮产出的清单，每行可「放入转化列表 / 导出为 zip / 导出为 mcworld / 分享 / 导入游戏 / 删除」。
+- **转换进行中**：进度卡显示阶段、百分比、已用时，下面一行是一言（每 7 秒换一句，60 条内置短句），
+  最右侧入口「等待的时候玩会儿小游戏？」打开俄罗斯方块。开始时页面自动滚到底，卡片底部留 48dp，
+  避免按钮落进系统手势区。转换结束（或取消）时游戏面板自动关闭。
+
+### 为什么转换期间要占住屏幕
+
+`ConversionService` 是前台服务，只能保证进程不被优先杀掉，**不阻止灭屏后 CPU 挂起**——用户看到的现象就是
+「切到后台或灭屏，进度就停了，回来才继续」。厂商的电池策略只会让这件事更早发生。三层处理：
+
+- **常亮**：`isRunning()` 时给 MainActivity 的窗口加 `FLAG_KEEP_SCREEN_ON`，结束或 `onPause` 清掉。
+  用窗口标志而不是 `WakeLock`，因为它的生命周期跟窗口一致，不会忘记释放。
+- **唤醒锁**：`:chunker` 进程在转换期间持 `PARTIAL_WAKE_LOCK("LiteChunk:convert")`，`finally` 里释放。
+  只锁 CPU 不锁屏幕，灭屏也能跑完。
+- **白名单引导**：首次转换前弹一次「让转换安静地跑完 / Background limits」，按
+  `isIgnoringBatteryOptimizations` 判断后跳系统设置；两个按钮都会开始转换，看过一次就不再弹。
+
+### 等待时的一言与小游戏
+
+一句话和游戏都是**零依赖**的：短句是 `res/values/quotes.xml` 里的 60 条静态文本（不走网络 API——断网超时
+比没有更烦，且全应用只该有「检查更新」一个网络请求）；游戏是纯 Canvas 自绘的 10×20 俄罗斯方块。
+
+两处实现细节值得记下来：
+
+- 一言的索引是**无状态**的 `quotes[elapsedSeconds / 7 % n]`。`renderInternal` 由 180ms 一次的进度回调驱动，
+  若用计数器递增，一轮 60 条会在 12 秒内放完。
+- 方块**不跑 60fps 循环**，只有重力 tick（700ms 起，随等级降到 110ms）和输入时 `invalidate()`。
+  转换本身已占满 CPU 与内存带宽，多一个渲染循环会直接拖慢转换。
+- 手势：点一下旋转、横拖移动、下滑软降、快速下滑落底；`ACTION_DOWN` 里
+  `requestDisallowInterceptTouchEvent(true)`，否则 BottomSheet 会把拖动吃掉。
 
 ### 文件页
 
@@ -245,6 +274,11 @@ Release 正文直接取仓库根目录的 `RELEASE_NOTES.md`（每次发版前�
     - `BedrockEntityResolver` 写入 `definitions: ["+minecraft:xxx"]`，否则基岩版丢弃实体；
     - `applyProfile` 的 lean 模式**不再**关实体与方块实体（原先 OOM 降级会整列丢实体，
       这是「JE→BE 后生物和画全消失」的第二条成因）。
+11. `BedrockLevelWriter` 的 `Generator` 兜底从 `2`（平坦）改成 `1`（无限）。只有引擎不认识的地形类型
+    （数据包世界，或 `generator` 节点缺失）才走到这里；声明成平坦会让游戏把一片正常地形说成「超平坦」，
+    而未生成的区块按 y=-60 的基岩层生成。改成「无限」至少和玩家看到的相符。
+    —— 注：pr3 曾把「产物 Generator=2」当成 bug 写进已知限制，那其实是**测试存档本身都是超平坦**，
+    转换正确复现了源存档的平坦地形。用 `minecraft:noise` 世界复测，输出就是 `generatorType=NORMAL`。
 
 ## 运行时设计
 
@@ -312,6 +346,20 @@ UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：�
 | 引擎自检 | `:engine:levelTest` 输出 `no backup files, as intended` / `ALL CHECKS PASSED` |
 | R8 release 包 | 详情页与覆盖保存均通过，说明没有依赖反射被裁掉的部分 |
 
+`1.21.0 build3 pr4` 的熬夜修复实测（同一台模拟器 API 35，release 包在 R8 下逐条过）：
+
+| 场景 | 结果 |
+| --- | --- |
+| 唤醒锁 | 转换中 `dumpsys power` 出现 `PARTIAL_WAKE_LOCK 'LiteChunk:convert'`，结束后只剩无关的 `fiid-sync` |
+| 常亮 | `dumpsys power` 出现 `SCREEN_BRIGHT_WAKE_LOCK ... WorkSource{...com.frenetic.litechunk}`；结束后 `dumpsys window \| grep -c KEEP_SCREEN_ON` = 0 |
+| 电池白名单引导 | 首次转换前弹一次，两行标题 + 「直接开始 / 去设置」；第二次转换直接开始，不再弹 |
+| 一言轮换 | t=3 → 第 1 条，9 → 第 2，17 → 第 3，31 → 第 5，54 → 第 8，与 `elapsed/7 % n` 完全吻合 |
+| 小游戏 | 面板可开、方块落底堆叠、幽灵落点轮廓正确、撞顶后点一下重开；转换结束三次都自动关闭 |
+| 自动滚到底 | 开始转换后进度卡整体可见，「取消」与游戏入口都能点到 |
+
+另有两条**没有直接观察到**、只做过代码复核：撞顶后「结束了 / 点一下重来」遮罩（下一次滑动会立刻重开，
+截不到那一帧），以及消行加分（随机落点堆不出整行）。诚实标注，别当成已验证。
+
 仍需人工确认：
 
 1. 把输出的 `.mcworld` 导入真机基岩版，确认生物与画真的出现在世界里 —— `actorDump` 只能证明数据写对了，
@@ -325,6 +373,10 @@ UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：�
 - 目标版本列表来自引擎枚举，最新 Java 版本用 `dimensions/<namespace>/<dimension>/region` 新目录结构，
   旧客户端打不开，属预期。
 - 转换在 `:chunker` 进程中进行，App 被划掉后任务会继续；重启 App 不恢复进度（成品仍在 `output/`）。
+- 常亮 + 唤醒锁解决的是「灭屏后被挂起」，**不是厂商的强制冻结**。部分 ROM 在极低电量或长时间无交互时
+  仍会冻结后台进程，白名单引导只是一个引导，能不能免疫取决于系统。
+- 小游戏再怎么省，转换期间玩是会拖慢转换的（同一个 CPU、同一块内存带宽）。它是消磨时间用的，
+  不是免费午餐——想让它最快跑完就别开。
 - 关掉 LevelDB 尾部 compaction 后，中间 `.ldb` 是未压缩的，`db/` 目录会比上游大；打包成 `.mcworld` 后回落。
 - 存档详情改的是 `level.dat`，不会升级区块数据。改完的存档若正被游戏打开着，游戏退出时会用内存里的旧数据
   覆盖回去——改之前先关掉游戏。

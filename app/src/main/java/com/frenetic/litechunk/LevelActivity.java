@@ -409,6 +409,26 @@ public class LevelActivity extends AppCompatActivity {
         if (busy || pending.isEmpty()) {
             return;
         }
+        // Both paths write a whole second copy of the archive before anything is replaced, so the room needed is the
+        // archive's own size. Catching it here costs a dialog; catching it at write time costs a failure the user has
+        // to interpret while the screen still shows their edits.
+        long needed = archive.length();
+        long free = Space.free(this);
+        if (free > 0L && free < needed) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("空间可能不足")
+                    .setMessage((asCopy ? "另存为要写出" : "保存要先写出")
+                            + "一份约 " + WorldFiles.humanSize(needed) + " 的新文件再替换，当前只剩 "
+                            + WorldFiles.humanSize(free) + "。\n\n写入失败时原档不会损坏，但这次修改也不会生效。")
+                    .setNegativeButton("取消", null)
+                    .setPositiveButton("仍然继续", (dialog, which) -> performSave(asCopy))
+                    .show();
+            return;
+        }
+        performSave(asCopy);
+    }
+
+    private void performSave(boolean asCopy) {
         saveAsCopy = asCopy;
         setBusy(true);
         Controller.get(this).applyLevel(workDirectory, new LinkedHashMap<>(pending), receiver);
