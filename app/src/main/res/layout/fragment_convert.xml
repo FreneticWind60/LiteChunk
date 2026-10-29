@@ -227,15 +227,6 @@
                     android:textColor="@color/text"
                     android:textSize="13sp" />
 
-                <com.google.android.material.checkbox.MaterialCheckBox
-                    android:id="@+id/cbPackMcworld"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="打包为 .mcworld（仅基岩版）"
-                    android:textColor="@color/text"
-                    android:textSize="13sp" />
-
                 <TextView
                     android:id="@+id/tvEngine"
                     android:layout_width="match_parent"
@@ -304,6 +295,17 @@
                     app:trackCornerRadius="4dp"
                     app:trackThickness="8dp" />
 
+                <!--
+                    Whack-a-mole grid, shown in place right under the progress bar instead of in a sheet: the point is
+                    something to do while glancing back at the timer, and covering the screen with a sheet defeats that.
+                -->
+                <com.frenetic.litechunk.MoleGrid
+                    android:id="@+id/moleGrid"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:visibility="gone" />
+
                 <TextView
                     android:id="@+id/tvStage"
                     android:layout_width="match_parent"
@@ -354,7 +356,7 @@
                         android:paddingTop="12dp"
                         android:paddingEnd="4dp"
                         android:paddingBottom="12dp"
-                        android:text="等待的时候玩会儿小游戏？"
+                        android:text="等待时玩点游戏？"
                         android:textColor="@color/accent"
                         android:textSize="12sp" />
                 </LinearLayout>

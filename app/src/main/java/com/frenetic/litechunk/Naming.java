@@ -41,6 +41,7 @@ final class Naming {
     private static final String KEY_ORDER = "namingOrder";
     private static final String KEY_ENABLED = "namingEnabled";
     private static final String KEY_SEPARATOR = "namingSeparator";
+    private static final String KEY_MCWORLD = "namingMcworld";
     /** Compact and sortable, which is the point of putting a timestamp in a file name. */
     private static final String TIME_PATTERN = "yyyyMMdd-HHmm";
 
@@ -83,6 +84,25 @@ final class Naming {
 
     static void reset(Context context) {
         save(context, DEFAULT_ORDER, DEFAULT_ENABLED, DEFAULT_SEPARATOR);
+        saveMcworld(context, true);
+    }
+
+    /**
+     * Whether a Bedrock target is packaged as {@code .mcworld} rather than {@code .zip}.
+     * <p>
+     * Stored next to the rest of the naming settings because it decides the extension, which is the last part of the
+     * name the sheet previews. It used to be a checkbox on the convert card that forgot its state whenever the page
+     * was rebuilt.
+     */
+    static boolean mcworld(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_MCWORLD, true);
+    }
+
+    static void saveMcworld(Context context, boolean value) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putBoolean(KEY_MCWORLD, value)
+                .apply();
     }
 
     // ---------------------------------------------------------------------------------------------

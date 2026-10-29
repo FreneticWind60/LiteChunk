@@ -22,7 +22,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="勾选要用的部分，用箭头调整先后顺序"
+        android:text="勾选要用的部分，按住右侧把手拖动排先后"
         android:textColor="@color/text_dim"
         android:textSize="12sp" />
 
@@ -40,12 +40,44 @@
         android:textSize="15sp"
         android:textStyle="bold" />
 
-    <LinearLayout
+    <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/namingRows"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
-        android:orientation="vertical" />
+        android:nestedScrollingEnabled="false"
+        android:overScrollMode="never" />
+
+    <!--
+        Bedrock packaging decision, moved out of the convert card: it is part of what the file will be called, and the
+        card was carrying two unrelated checkboxes while the naming row already previews the extension. Only shown for
+        a Bedrock target, since a Java conversion cannot produce a .mcworld.
+    -->
+    <LinearLayout
+        android:id="@+id/rowSheetMcworld"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="vertical">
+
+        <com.google.android.material.checkbox.MaterialCheckBox
+            android:id="@+id/cbSheetMcworld"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="打包为 .mcworld"
+            android:textColor="@color/text"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/tvMcworldNote"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="2dp"
+            android:paddingEnd="2dp"
+            android:text="关掉后输出 .zip，内容完全相同，只是扩展名不同。"
+            android:textAppearance="@style/Text.LiteChunk.Caption" />
+    </LinearLayout>
 
     <TextView
         android:layout_width="wrap_content"

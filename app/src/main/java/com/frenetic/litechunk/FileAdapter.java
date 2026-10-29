@@ -1,13 +1,15 @@
 package com.frenetic.litechunk;
 
+import android.graphics.Color;
+import android.graphics.drawable.ColorDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.PopupWindow;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.widget.PopupMenu;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.checkbox.MaterialCheckBox;
@@ -24,9 +26,6 @@ import java.util.Set;
  * actions, swipe right to switch the whole list into multi select with that row ticked.
  */
 final class FileAdapter extends RecyclerView.Adapter<FileAdapter.Holder> {
-
-    private static final int EXPORT_ZIP = 1;
-    private static final int EXPORT_MCWORLD = 2;
 
     interface Listener {
         void onEnqueue(Store.OutputFile file);
@@ -210,7 +209,16 @@ final class FileAdapter extends RecyclerView.Adapter<FileAdapter.Holder> {
             holder.row.close();
             listener.onDetails(file);
         });
-        holder.actionExport.setOnClickListener(view -> showExportMenu(view, holder, file));
+        holder.actionExport.setOnClickListener(view -> {
+            // A Java save has exactly one sensible export: a .zip. Asking "zip or mcworld?" there offers a format the
+            // game it came from cannot open, so the menu is only worth showing for a Bedrock save.
+            if (!file.bedrock) {
+                holder.row.close();
+                listener.onExport(file, false);
+                return;
+            }
+            showExportMenu(view, holder, file);
+        });
         holder.actionShare.setOnClickListener(view -> {
             holder.row.close();
             listener.onShare(file);
@@ -226,29 +234,44 @@ final class FileAdapter extends RecyclerView.Adapter<FileAdapter.Holder> {
     }
 
     /**
-     * zip and mcworld hold identical bytes under a different extension, so the choice belongs in a menu. As two
-     * adjacent 44dp buttons they were the pair most likely to be tapped by mistake, and the row still has to fit
-     * inside a 320dp screen.
+     * The Bedrock export choice: identical bytes under two extensions, only one of which the game will import.
      * <p>
-     * The menu is shown before the row closes: a PopupMenu anchors to the view's current position, so closing
-     * first would place it where the button used to be.
+     * A custom popup rather than a {@code PopupMenu}: the difference between the two entries is what each one is for,
+     * and a 20dp icon of an archive versus a cube says that in a glance where two near-identical strings do not.
+     * The menu is shown before the row closes, because the anchor's position is what the popup is placed against.
      */
     private void showExportMenu(View anchor, Holder holder, Store.OutputFile file) {
-        PopupMenu menu = new PopupMenu(anchor.getContext(), anchor);
-        menu.getMenu().add(0, EXPORT_ZIP, 0, "导出为 .zip");
-        if (file.bedrock) {
-            menu.getMenu().add(0, EXPORT_MCWORLD, 1, "导出为 .mcworld");
-        }
-        menu.setOnMenuItemClickListener(item -> {
-            int id = item.getItemId();
-            if (id != EXPORT_ZIP && id != EXPORT_MCWORLD) {
-                return false;
-            }
+        View content = LayoutInflater.from(anchor.getContext()).inflate(R.layout.popup_export, null);
+        PopupWindow popup = new PopupWindow(content,
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, true);
+        // Transparent, not null: it is what makes "tap outside to close" work, and what keeps the rounded corners
+        // from sitting inside a square frame.
+        popup.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        popup.setOutsideTouchable(true);
+        popup.setElevation(dp(anchor, 10));
+
+        content.findViewById(R.id.itemZip).setOnClickListener(view -> {
+            popup.dismiss();
             holder.row.close();
-            listener.onExport(file, id == EXPORT_MCWORLD);
-            return true;
+            listener.onExport(file, false);
         });
-        menu.show();
+        content.findViewById(R.id.itemMcworld).setOnClickListener(view -> {
+            popup.dismiss();
+            holder.row.close();
+            listener.onExport(file, true);
+        });
+
+        // Measured before showing so it can open upwards: the action row lives at the bottom of the screen, where a
+        // regular drop-down would fall off the edge.
+        content.measure(View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
+        int offsetX = anchor.getWidth() - content.getMeasuredWidth() - dp(anchor, 4);
+        int offsetY = -(anchor.getHeight() + content.getMeasuredHeight() + dp(anchor, 6));
+        popup.showAsDropDown(anchor, offsetX, offsetY);
+    }
+
+    private static int dp(View view, int value) {
+        return Math.round(value * view.getResources().getDisplayMetrics().density);
     }
 
     @Override

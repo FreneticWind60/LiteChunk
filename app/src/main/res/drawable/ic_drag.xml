@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Drag handle: six dots in two columns, the standard "this row can be reordered" affordance.
+    Drawn as six identical circles because a VectorDrawable path cannot stroke a dash pattern reliably across API 27.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="?attr/colorControlNormal"
+    android:viewportHeight="16"
+    android:viewportWidth="16">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.2,3.6a1.3,1.3 0 1,0 2.6,0a1.3,1.3 0 1,0 -2.6,0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9.2,3.6a1.3,1.3 0 1,0 2.6,0a1.3,1.3 0 1,0 -2.6,0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.2,8a1.3,1.3 0 1,0 2.6,0a1.3,1.3 0 1,0 -2.6,0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9.2,8a1.3,1.3 0 1,0 2.6,0a1.3,1.3 0 1,0 -2.6,0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M4.2,12.4a1.3,1.3 0 1,0 2.6,0a1.3,1.3 0 1,0 -2.6,0" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M9.2,12.4a1.3,1.3 0 1,0 2.6,0a1.3,1.3 0 1,0 -2.6,0" />
+</vector>

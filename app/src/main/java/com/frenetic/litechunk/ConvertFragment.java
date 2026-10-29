@@ -12,8 +12,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.MotionEvent;
 import android.view.ViewConfiguration;
-import android.widget.FrameLayout;
-import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -29,11 +28,11 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.frenetic.litechunk.databinding.FragmentConvertBinding;
-import com.google.android.material.bottomsheet.BottomSheetBehavior;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.snackbar.Snackbar;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -70,8 +69,10 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
     private String shownQuote = "";
     /** One scroll per run, see {@link #renderInternal()}. */
     private boolean autoScrolled;
-    /** Kept so a finished conversion can close the game sheet instead of leaving the player stranded in it. */
-    private BottomSheetDialog gameSheet;
+    /** Whether the whack-a-mole grid is currently unfolded; the run ending closes it. */
+    private boolean gameOpen;
+    /** The message on screen, so rapid hits replace it instead of queueing a backlog behind the grid. */
+    private Snackbar gameToast;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -114,7 +115,8 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         binding.btnAdd.setOnClickListener(this::showSourceSheet);
         binding.btnConvert.setOnClickListener(this::startConversion);
         binding.btnCancel.setOnClickListener(v -> controller.cancel());
-        binding.tvGameEntry.setOnClickListener(v -> showGameSheet());
+        binding.tvGameEntry.setOnClickListener(v -> toggleGame());
+        binding.moleGrid.setListener(this::onMoleHit);
         quotes = getResources().getStringArray(R.array.quote_lines);
         binding.tvGoFiles.setOnClickListener(v -> {
             if (requireActivity() instanceof MainActivity activity) {
@@ -326,7 +328,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
     private String namingPreview(boolean bedrock) {
         String name = Naming.preview(requireContext(), namingSampleName(), bedrock);
         // The extension is part of what the user is choosing: turning off "打包为 .mcworld" changes it.
-        String extension = bedrock && binding.cbPackMcworld.isChecked() ? ".mcworld" : ".zip";
+        String extension = bedrock && Naming.mcworld(requireContext()) ? ".mcworld" : ".zip";
         return name + extension;
     }
 
@@ -345,30 +347,63 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         Context context = requireContext();
         BottomSheetDialog sheet = new BottomSheetDialog(context);
         View content = LayoutInflater.from(context).inflate(R.layout.sheet_naming, null);
-        LinearLayout rows = content.findViewById(R.id.namingRows);
+        RecyclerView rows = content.findViewById(R.id.namingRows);
         TextView preview = content.findViewById(R.id.tvSheetPreview);
         TextView note = content.findViewById(R.id.tvSheetNote);
         MaterialButtonToggleGroup separators = content.findViewById(R.id.toggleSeparator);
+        View mcworldRow = content.findViewById(R.id.rowSheetMcworld);
+        MaterialCheckBox mcworld = content.findViewById(R.id.cbSheetMcworld);
 
         List<String> order = Naming.split(Naming.order(context));
         List<String> enabled = Naming.split(Naming.enabled(context));
         String[] separator = {Naming.separator(context)};
         boolean bedrock = edition.equals("BEDROCK");
         String sample = namingSampleName();
+        // One timestamp for the whole session in the sheet. Re-reading the clock on every refresh made the minute
+        // field tick over while the user was still deciding, which looks like a bug in the preview.
+        long sampleTime = System.currentTimeMillis();
 
-        Runnable[] refresh = new Runnable[1];
-        refresh[0] = () -> {
+        Runnable refresh = () -> {
             String rendered = Naming.render(Naming.join(order), Naming.join(enabled), separator[0],
-                    sample, bedrock, System.currentTimeMillis());
-            preview.setText(rendered + (bedrock ? ".mcworld" : ".zip"));
+                    sample, bedrock, sampleTime);
+            String extension = bedrock && Naming.mcworld(context) ? ".mcworld" : ".zip";
+            preview.setText(rendered + extension);
             note.setText(enabled.isEmpty()
                     ? "一个都没勾选时会退回 world，同名文件自动加序号。"
                     : "分隔符 " + Naming.describeSeparator(separator[0]) + "，同名文件自动加序号，不会覆盖。");
-            rows.removeAllViews();
-            for (int index = 0; index < order.size(); index++) {
-                rows.addView(namingRow(context, order, enabled, index, refresh[0]));
-            }
         };
+
+        rows.setLayoutManager(new LinearLayoutManager(context));
+        NamingAdapter adapter = new NamingAdapter(context, order, enabled, refresh);
+        rows.setAdapter(adapter);
+        ItemTouchHelper drag = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override
+            public boolean onMove(@NonNull RecyclerView recycler, @NonNull RecyclerView.ViewHolder from,
+                                  @NonNull RecyclerView.ViewHolder to) {
+                int start = from.getBindingAdapterPosition();
+                int end = to.getBindingAdapterPosition();
+                if (start < 0 || end < 0) {
+                    return false;
+                }
+                Collections.swap(order, start, end);
+                adapter.notifyItemMoved(start, end);
+                refresh.run();
+                return true;
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder holder, int direction) {
+                // Swiping a row away would silently drop a token, and there is no sensible replacement for it.
+            }
+
+            @Override
+            public boolean isLongPressDragEnabled() {
+                return true;
+            }
+        });
+        drag.attachToRecyclerView(rows);
+        adapter.setDrag(drag);
 
         separators.check("-".equals(separator[0]) ? R.id.sepDash
                 : "_".equals(separator[0]) ? R.id.sepUnder : R.id.sepNone);
@@ -377,7 +412,14 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
                 return;
             }
             separator[0] = checkedId == R.id.sepDash ? "-" : checkedId == R.id.sepUnder ? "_" : "";
-            refresh[0].run();
+            refresh.run();
+        });
+
+        mcworldRow.setVisibility(bedrock ? View.VISIBLE : View.GONE);
+        mcworld.setChecked(Naming.mcworld(context));
+        mcworld.setOnCheckedChangeListener((button, checked) -> {
+            Naming.saveMcworld(context, checked);
+            refresh.run();
         });
 
         content.findViewById(R.id.btnNamingReset).setOnClickListener(v -> {
@@ -388,75 +430,114 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             enabled.addAll(Naming.split(Naming.DEFAULT_ENABLED));
             separator[0] = Naming.DEFAULT_SEPARATOR;
             separators.check(R.id.sepDash);
-            refresh[0].run();
+            mcworld.setChecked(true);
+            adapter.notifyDataSetChanged();
+            refresh.run();
         });
         content.findViewById(R.id.btnNamingDone).setOnClickListener(v -> {
             Naming.save(context, Naming.join(order), Naming.join(enabled), separator[0]);
+            Naming.saveMcworld(context, mcworld.isChecked());
             sheet.dismiss();
             render();
         });
 
-        refresh[0].run();
+        refresh.run();
         sheet.setContentView(content);
         sheet.show();
     }
 
-    /** One row of the naming sheet: the checkbox that includes the token, and the arrows that move it. */
-    private View namingRow(Context context, List<String> order, List<String> enabled, int index, Runnable refresh) {
-        String token = order.get(index);
-        LinearLayout row = new LinearLayout(context);
-        row.setOrientation(LinearLayout.HORIZONTAL);
-        row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, dp(48)));
+    /**
+     * One draggable row per naming token: the checkbox that includes it, and a handle that starts the drag.
+     * <p>
+     * A RecyclerView rather than three hand-built rows because reordering is now a drag: an {@link ItemTouchHelper}
+     * needs positions to move between, and rebuilding the whole list on every change — which is what the old
+     * arrow-button version did — would cancel the drag under the user's finger on the first move.
+     */
+    private final class NamingAdapter extends RecyclerView.Adapter<NamingAdapter.Holder> {
 
-        MaterialCheckBox check = new MaterialCheckBox(context);
-        check.setText(Naming.label(token));
-        check.setTextSize(14F);
-        check.setTextColor(ContextCompat.getColor(context, R.color.text));
-        check.setChecked(enabled.contains(token));
-        check.setLayoutParams(new LinearLayout.LayoutParams(0,
-                LinearLayout.LayoutParams.WRAP_CONTENT, 1F));
-        // Attached after the initial value so restoring the saved state does not fire a change.
-        check.setOnCheckedChangeListener((button, checked) -> {
-            if (checked && !enabled.contains(token)) {
-                enabled.add(token);
-            } else if (!checked) {
-                enabled.remove(token);
-            }
-            refresh.run();
-        });
-        row.addView(check);
+        private final Context context;
+        private final List<String> order;
+        private final List<String> enabled;
+        private final Runnable onChanged;
+        private ItemTouchHelper drag;
 
-        row.addView(namingMoveButton(context, true, index > 0, () -> {
-            Collections.swap(order, index, index - 1);
-            refresh.run();
-        }));
-        row.addView(namingMoveButton(context, false, index < order.size() - 1, () -> {
-            Collections.swap(order, index, index + 1);
-            refresh.run();
-        }));
-        return row;
-    }
-
-    private ImageButton namingMoveButton(Context context, boolean up, boolean enabled, Runnable action) {
-        ImageButton button = new ImageButton(context);
-        button.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
-        android.util.TypedValue background = new android.util.TypedValue();
-        context.getTheme().resolveAttribute(
-                android.R.attr.selectableItemBackgroundBorderless, background, true);
-        button.setBackgroundResource(background.resourceId);
-        button.setImageResource(R.drawable.ic_expand_more);
-        // One icon, two directions: the drawable is a chevron pointing down.
-        button.setRotation(up ? 180F : 0F);
-        button.setColorFilter(ContextCompat.getColor(context,
-                enabled ? R.color.text_dim : R.color.divider));
-        button.setEnabled(enabled);
-        button.setContentDescription(up ? "上移" : "下移");
-        if (enabled) {
-            button.setOnClickListener(v -> action.run());
+        NamingAdapter(Context context, List<String> order, List<String> enabled, Runnable onChanged) {
+            this.context = context;
+            this.order = order;
+            this.enabled = enabled;
+            this.onChanged = onChanged;
         }
-        return button;
+
+        void setDrag(ItemTouchHelper drag) {
+            this.drag = drag;
+        }
+
+        @NonNull
+        @Override
+        public Holder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            LinearLayout row = new LinearLayout(context);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setLayoutParams(new RecyclerView.LayoutParams(
+                    RecyclerView.LayoutParams.MATCH_PARENT, dp(48)));
+
+            MaterialCheckBox check = new MaterialCheckBox(context);
+            check.setTextSize(14F);
+            check.setTextColor(ContextCompat.getColor(context, R.color.text));
+            check.setLayoutParams(new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1F));
+
+            ImageView handle = new ImageView(context);
+            handle.setImageResource(R.drawable.ic_drag);
+            handle.setColorFilter(ContextCompat.getColor(context, R.color.text_faint));
+            handle.setPadding(dp(8), dp(8), dp(8), dp(8));
+            handle.setLayoutParams(new LinearLayout.LayoutParams(dp(40), dp(40)));
+            handle.setContentDescription("拖动排序");
+
+            row.addView(check);
+            row.addView(handle);
+            return new Holder(row, check, handle);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull Holder holder, int position) {
+            String token = order.get(position);
+            // Detached first: assigning the saved state would otherwise fire the listener and rewrite the list
+            // while the adapter is still binding it.
+            holder.check.setOnCheckedChangeListener(null);
+            holder.check.setText(Naming.label(token));
+            holder.check.setChecked(enabled.contains(token));
+            holder.check.setOnCheckedChangeListener((button, checked) -> {
+                if (checked && !enabled.contains(token)) {
+                    enabled.add(token);
+                } else if (!checked) {
+                    enabled.remove(token);
+                }
+                onChanged.run();
+            });
+            holder.handle.setOnTouchListener((view, event) -> {
+                if (event.getActionMasked() == MotionEvent.ACTION_DOWN && drag != null) {
+                    drag.startDrag(holder);
+                }
+                return false;
+            });
+        }
+
+        @Override
+        public int getItemCount() {
+            return order.size();
+        }
+
+        static final class Holder extends RecyclerView.ViewHolder {
+            final MaterialCheckBox check;
+            final ImageView handle;
+
+            Holder(LinearLayout row, MaterialCheckBox check, ImageView handle) {
+                super(row);
+                this.check = check;
+                this.handle = handle;
+            }
+        }
     }
 
     private int dp(int value) {
@@ -499,7 +580,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             return;
         }
         boolean bedrock = edition.equals("BEDROCK");
-        boolean packMcworld = bedrock && binding.cbPackMcworld.isChecked();
+        boolean packMcworld = bedrock && Naming.mcworld(requireContext());
         boolean deleteSource = binding.cbDeleteSource.isChecked();
 
         // A conversion that runs out of room fails halfway, and the user is left guessing which of the two things
@@ -626,7 +707,6 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
 
         binding.toggleEdition.check(bedrock ? R.id.btnBedrock : R.id.btnJava);
         binding.tvVersion.setText(currentVersionLabel());
-        binding.cbPackMcworld.setVisibility(bedrock ? View.VISIBLE : View.GONE);
         binding.tvNamingPreview.setText(namingPreview(bedrock));
 
         int count = store.queue.size();
@@ -652,7 +732,6 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         binding.btnConvert.setText(running ? "转换中…" : "开始转换");
         binding.btnAdd.setEnabled(!running);
         binding.cbDeleteSource.setEnabled(!running);
-        binding.cbPackMcworld.setEnabled(!running);
         binding.rowVersion.setEnabled(!running);
         binding.rowNaming.setEnabled(!running);
 
@@ -685,6 +764,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
                 binding.tvQuote.setText(quote);
             }
             binding.tvGameEntry.setVisibility(View.VISIBLE);
+            binding.moleGrid.setVisibility(gameOpen ? View.VISIBLE : View.GONE);
             if (!autoScrolled) {
                 // The cancel / game row is the last thing in the card, and on a tall phone the card grows past the
                 // fold the moment it appears: the row would land under the gesture area, where taps never arrive.
@@ -695,11 +775,9 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             }
         } else {
             autoScrolled = false;
+            // The grid only exists while a conversion does: there is nothing left to wait for once it ends.
+            closeGame();
             binding.cardProgress.setVisibility(View.GONE);
-            // The game is a way to pass the time until this moment, so do not leave the player in it.
-            if (gameSheet != null && gameSheet.isShowing()) {
-                gameSheet.dismiss();
-            }
         }
 
         // Outputs of this round
@@ -745,43 +823,51 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
     }
 
     /**
-     * Open the game sheet.
+     * Unfold or fold the whack-a-mole grid under the progress bar.
      * <p>
-     * The board keeps running only while the sheet is on screen: {@link TetrisView#stop()} is called from the
-     * dismiss listener, so a closed sheet costs nothing while eight conversion threads carry on.
+     * In place rather than in a sheet: the reason to play at all is that the conversion is still running, and a sheet
+     * covers the timer, the percentage and the cancel button — the things the user is actually watching. Everything
+     * stops when it is folded away, so a card that is only glanced at costs nothing while eight threads convert.
      */
-    private void showGameSheet() {
-        if (gameSheet != null && gameSheet.isShowing()) {
+    private void toggleGame() {
+        if (gameOpen) {
+            closeGame();
             return;
         }
-        Context context = requireContext();
-        BottomSheetDialog sheet = new BottomSheetDialog(context);
-        View content = LayoutInflater.from(context).inflate(R.layout.sheet_game, null);
-        TextView stats = content.findViewById(R.id.tvGameStats);
-        TetrisView board = content.findViewById(R.id.tetris);
-        board.setListener((score, lines, over) -> stats.setText(over
-                ? "得分 " + score + " · " + lines + " 行 · 结束"
-                : "得分 " + score + " · " + lines + " 行"));
+        gameOpen = true;
+        binding.moleGrid.setVisibility(View.VISIBLE);
+        binding.moleGrid.start();
+        binding.tvGameEntry.setText("收起游戏");
+        // The card just grew by about a third of the screen. Without a second scroll the cancel row ends up below the
+        // gesture bar again, which is the exact problem the first scroll exists to avoid.
+        binding.getRoot().post(() -> binding.getRoot()
+                .smoothScrollTo(0, binding.getRoot().getChildAt(0).getHeight()));
+    }
 
-        // A fixed fraction of the screen rather than wrap_content: the board sizes itself from the space it is
-        // given, so the sheet needs a height before the first measure or it collapses to the header.
-        int height = Math.round(getResources().getDisplayMetrics().heightPixels * 0.74F);
-        content.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height));
+    private void closeGame() {
+        if (!gameOpen) {
+            return;
+        }
+        gameOpen = false;
+        binding.moleGrid.stop();
+        binding.moleGrid.setVisibility(View.GONE);
+        binding.tvGameEntry.setText("等待时玩点游戏？");
+    }
 
-        content.findViewById(R.id.btnGameClose).setOnClickListener(v -> sheet.dismiss());
-        sheet.setContentView(content);
-        sheet.setOnDismissListener(dialog -> {
-            board.stop();
-            if (gameSheet == sheet) {
-                gameSheet = null;
-            }
-        });
-        sheet.show();
-        BottomSheetBehavior<FrameLayout> behavior = sheet.getBehavior();
-        behavior.setSkipCollapsed(true);
-        behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-        gameSheet = sheet;
-        board.startGame();
+    /**
+     * One hit of the grid.
+     * <p>
+     * The percentage in the message is a joke, not a setting: the bar above keeps showing the real number, because a
+     * progress indicator that lies is worse than no game at all.
+     */
+    private void onMoleHit(boolean luck) {
+        if (gameToast != null) {
+            gameToast.dismiss();
+        }
+        gameToast = Snackbar.make(binding.getRoot(),
+                luck ? "抓到一只 LiteChunk！转换速度+3%" : "苦力怕爆炸啦！转换速度-3%",
+                Snackbar.LENGTH_SHORT);
+        gameToast.show();
     }
 
     private String queueSignature(Store store, boolean running) {

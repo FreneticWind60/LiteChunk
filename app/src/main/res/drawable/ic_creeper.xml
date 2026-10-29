@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Creeper face (512x512 source, filled). The "bad" target in the whack-a-mole grid. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="?attr/colorControlNormal"
+    android:viewportHeight="512"
+    android:viewportWidth="512">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M0,0h169.847v172.501H0zM340.775,0h170.094v172.501H340.775zM340.775,172.502H169.847v85.915H84.785V512h85.062v-86.668h170.928V512h85.866V258.417h-85.866z" />
+</vector>
