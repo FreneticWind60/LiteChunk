@@ -50,7 +50,7 @@ LevelDB 只有一个写者。原来一列要写 Metadata、Data2D、Entities、B
 同一轮里 `ShortBasedPalette.containsValue` 也改成了两个 `long` 位掩码（键数超过 128 回落原逻辑），
 它每写一个 section 都要被调用一次来回答「要不要生成液体层」。
 
-### 试过又回退的两项（写在这里免得下次再试）
+### 试过又回退的三项（写在这里免得下次再试）
 
 - **执行器换 work-stealing**（每线程双端队列 + 从别人队头偷，替掉全局 `PriorityBlockingQueue`）：
   墙钟和 CPU 都没赚到，**堆峰值从 ~670 MB 稳定涨到 ~1013 MB（两次实验都一样）**。原因是执行顺序从
