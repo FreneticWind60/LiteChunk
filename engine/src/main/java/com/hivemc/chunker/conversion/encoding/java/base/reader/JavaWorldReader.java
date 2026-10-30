@@ -335,9 +335,8 @@ public class JavaWorldReader implements WorldReader {
 
             // Do the column work in its own task
             batch.add(Task.async("Processing column " + columnsCoords, TaskWeight.NORMAL, () -> {
-                // Iterate through each region file
-                List<Task<CompoundTag>> decompressingTasks = new ArrayList<>(regionFilesCount);
-                List<Integer> decompressingTasksIndexes = new ArrayList<>(regionFilesCount);
+                // Read each region file for this column, the array keeps the order predictable for combining
+                CompoundTag[] compoundTags = new CompoundTag[regionFilesCount];
 
                 for (int regionFileIndex = 0; regionFileIndex < regionFilesCount; regionFileIndex++) {
                     MCAReader mcaReader = mcaReaders[regionFileIndex];
@@ -349,28 +348,18 @@ public class JavaWorldReader implements WorldReader {
 
                     try {
                         // Safe to call from several workers at once: MCAReader reads with positional IO and has no
-                        // shared file pointer, so this no longer has to be serialised with a lock.
-                        decompressingTasks.add(mcaReader.readColumn(columnsCoords, offset));
-
-                        // Add to the indexes, so we know this file was found
-                        decompressingTasksIndexes.add(regionFileIndex);
+                        // shared file pointer, so this no longer has to be serialised with a lock. Reading and
+                        // inflating happen inline here (rather than in a nested task) so the reader can reuse its
+                        // per-thread buffers without handing them to another thread.
+                        compoundTags[regionFileIndex] = mcaReader.readColumn(columnsCoords, offset);
                     } catch (Exception e) {
                         converter.logNonFatalException(e);
                     }
                 }
 
-                // Wait for decompression tasks to complete (note: null tasks will be in place of regions that weren't found)
-                Task.join(decompressingTasks)
-                        .then("Combining input column NBT", TaskWeight.LOW, (results) -> {
-                            // Some indexes may have been skipped if data wasn't found, so we need to make a predictable order for combining tags
-                            CompoundTag[] compoundTags = new CompoundTag[regionFilesCount];
-                            for (int i = 0; i < decompressingTasksIndexes.size(); i++) {
-                                compoundTags[decompressingTasksIndexes.get(i)] = results.get(i);
-                            }
-                            return combineColumnCompounds(compoundTags);
-                        })
-                        .then("Creating Column Reader", TaskWeight.LOW, (column) -> createColumnReader(columnsCoords, column))
-                        .thenConsume("Reading Column", TaskWeight.HIGHER, (columnReader) -> columnReader.readColumn(columnConversionHandler));
+                // Combine the regions into a single column and read it
+                createColumnReader(columnsCoords, combineColumnCompounds(compoundTags))
+                        .readColumn(columnConversionHandler);
             }));
         }
 

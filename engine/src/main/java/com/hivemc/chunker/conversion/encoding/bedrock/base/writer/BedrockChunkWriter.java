@@ -174,12 +174,12 @@ public class BedrockChunkWriter {
      * @return a generated liquid palette.
      */
     protected Palette<BedrockBlockCompoundTag> generateLiquidPalette(Palette<BedrockBlockCompoundTag> blockPalette) {
-        short[][][] values = new short[16][16][16];
-        for (int x = 0; x < 16; x++) {
-            for (int y = 0; y < 16; y++) {
-                for (int z = 0; z < 16; z++) {
+        short[] values = new short[4096];
+        for (int y = 0; y < 16; y++) {
+            for (int z = 0; z < 16; z++) {
+                for (int x = 0; x < 16; x++) {
                     BedrockBlockCompoundTag block = blockPalette.get(x, y, z);
-                    values[x][y][z] = (short) (block == null || !block.waterlogged() ? 0 : 1);
+                    values[(y << 8) | (z << 4) | x] = (short) (block == null || !block.waterlogged() ? 0 : 1);
                 }
             }
         }
@@ -190,6 +190,6 @@ public class BedrockChunkWriter {
                         VanillaBlockStates.FLOWING, Bool.FALSE
                 )))
         );
-        return new ShortBasedPalette<>(keys, values);
+        return new ShortBasedPalette<>(keys, values, 16);
     }
 }

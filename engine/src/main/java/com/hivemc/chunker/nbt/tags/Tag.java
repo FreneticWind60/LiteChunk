@@ -1,6 +1,8 @@
 package com.hivemc.chunker.nbt.tags;
 
 import com.hivemc.chunker.nbt.TagType;
+import com.hivemc.chunker.nbt.io.ByteArrayReader;
+import com.hivemc.chunker.nbt.io.ByteArrayReader;
 import com.hivemc.chunker.nbt.io.Reader;
 import com.hivemc.chunker.nbt.io.Writer;
 import com.hivemc.chunker.nbt.tags.collection.CompoundTag;
@@ -16,6 +18,8 @@ import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.Arrays;
 import java.util.Objects;
 import java.util.function.Supplier;
 import java.util.zip.*;
@@ -31,6 +35,26 @@ public abstract class Tag<T> {
      * factory produces byte compatible output with the upstream default constructors.
      */
     private static final int SEED_LZ4_NBT = 0x9747B28C;
+
+    /**
+     * ChunkBridge: starting size of the per-thread inflate buffer. A chunk's NBT is usually 30-120 KB once inflated;
+     * the previous code inflated through the 8 KB buffer of a BufferedInputStream, i.e. it asked the native inflater
+     * for small chunks over and over and copied the result twice on the way out.
+     */
+    private static final int INFLATE_BUFFER_SIZE = 96 * 1024;
+
+    /**
+     * ChunkBridge: hard cap for an inflated NBT, so a corrupt length field can't eat the heap.
+     */
+    private static final int INFLATE_BUFFER_MAX = 16 * 1024 * 1024;
+
+    /**
+     * Per-thread inflaters. Allocating an Inflater per chunk meant a native zlib stream (plus its input buffer) per
+     * chunk; reset() reuses it instead. Separate instances because gzip needs the 32 KB header window.
+     */
+    private static final ThreadLocal<Inflater> ZLIB_INFLATER = ThreadLocal.withInitial(() -> new Inflater(false));
+    private static final ThreadLocal<Inflater> GZIP_INFLATER = ThreadLocal.withInitial(() -> new Inflater(true));
+    private static final ThreadLocal<byte[]> INFLATE_BUFFER = ThreadLocal.withInitial(() -> new byte[INFLATE_BUFFER_SIZE]);
 
     /**
      * Write a Bedrock edition based NBT to bytes.
@@ -319,28 +343,22 @@ public abstract class Tag<T> {
      */
     @Nullable
     public static CompoundTag readUncompressedJavaNBT(byte[] input) throws IOException {
-        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(input);
-             BufferedInputStream bufferedInputStream = new BufferedInputStream(byteArrayInputStream);
-             DataInputStream readerStream = new DataInputStream(bufferedInputStream)) {
-            TagWithName<CompoundTag> pair = Tag.decodeNamed(Reader.toJavaReader(readerStream), CompoundTag.class);
+        return readUncompressedJavaNBT(input, 0, input.length);
+    }
 
-            // Check pair isn't null
-            if (pair == null) return null;
-
-            // Grab the value (naming isn't important here)
-            CompoundTag root = pair.tag();
-
-            // Try lowercase data
-            CompoundTag data = root.getCompound("data");
-            if (data != null) return data;
-
-            // Try uppercase data
-            data = root.getCompound("Data");
-            if (data != null) return data;
-
-            // Otherwise return root
-            return root;
-        }
+    /**
+     * Read a Java edition based NBT from a section of a byte array, automatically removing the nested "data" tag if
+     * present.
+     *
+     * @param input  the input bytes to read from.
+     * @param offset the first byte of the document.
+     * @param length the number of bytes the document occupies.
+     * @return the parsed CompoundTag or null if there isn't any data to read.
+     * @throws IOException if it failed to read the compound.
+     */
+    @Nullable
+    public static CompoundTag readUncompressedJavaNBT(byte[] input, int offset, int length) throws IOException {
+        return stripDataWrapper(Tag.decodeNamed(new ByteArrayReader(input, offset, length), CompoundTag.class));
     }
 
     /**
@@ -427,29 +445,21 @@ public abstract class Tag<T> {
      */
     @Nullable
     public static CompoundTag readGZipJavaNBT(byte[] input) throws IOException {
-        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(input);
-             GZIPInputStream gzipInputStream = new GZIPInputStream(byteArrayInputStream);
-             BufferedInputStream bufferedInputStream = new BufferedInputStream(gzipInputStream);
-             DataInputStream readerStream = new DataInputStream(bufferedInputStream)) {
-            TagWithName<CompoundTag> pair = Tag.decodeNamed(Reader.toJavaReader(readerStream), CompoundTag.class);
+        return readCompressedJavaNBT(input, 0, input.length, true);
+    }
 
-            // Check pair isn't null
-            if (pair == null) return null;
-
-            // Grab the value (naming isn't important here)
-            CompoundTag root = pair.tag();
-
-            // Try lowercase data
-            CompoundTag data = root.getCompound("data");
-            if (data != null) return data;
-
-            // Try uppercase data
-            data = root.getCompound("Data");
-            if (data != null) return data;
-
-            // Otherwise return root
-            return root;
-        }
+    /**
+     * Read a Java edition based GZIP NBT from a section of a byte array.
+     *
+     * @param input  the input bytes to read from.
+     * @param offset the first byte of the gzip stream.
+     * @param length the number of bytes the gzip stream occupies.
+     * @return the parsed CompoundTag or null if there isn't any data to read.
+     * @throws IOException if it failed to decompress or read the compound.
+     */
+    @Nullable
+    public static CompoundTag readGZipJavaNBT(byte[] input, int offset, int length) throws IOException {
+        return readCompressedJavaNBT(input, offset, length, true);
     }
 
     /**
@@ -527,29 +537,89 @@ public abstract class Tag<T> {
      */
     @Nullable
     public static CompoundTag readZLibJavaNBT(byte[] input) throws IOException {
-        try (ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(input);
-             InflaterInputStream inflaterInputStream = new InflaterInputStream(byteArrayInputStream);
-             BufferedInputStream bufferedInputStream = new BufferedInputStream(inflaterInputStream);
-             DataInputStream readerStream = new DataInputStream(bufferedInputStream)) {
-            TagWithName<CompoundTag> pair = Tag.decodeNamed(Reader.toJavaReader(readerStream), CompoundTag.class);
+        return readCompressedJavaNBT(input, 0, input.length, false);
+    }
 
-            // Check pair isn't null
-            if (pair == null) return null;
+    /**
+     * Read a Java edition based ZLIB NBT from a section of a byte array.
+     *
+     * @param input  the input bytes to read from.
+     * @param offset the first byte of the deflate stream.
+     * @param length the number of bytes the deflate stream occupies.
+     * @return the parsed CompoundTag or null if there isn't any data to read.
+     * @throws IOException if it failed to decompress or read the compound.
+     */
+    @Nullable
+    public static CompoundTag readZLibJavaNBT(byte[] input, int offset, int length) throws IOException {
+        return readCompressedJavaNBT(input, offset, length, false);
+    }
 
-            // Grab the value (naming isn't important here)
-            CompoundTag root = pair.tag();
+    /**
+     * Remove the nested "data" / "Data" tag the game wraps a document in, if there is one.
+     *
+     * @param pair the decoded named tag.
+     * @return the inner compound, or null if there was nothing to read.
+     */
+    @Nullable
+    private static CompoundTag stripDataWrapper(@Nullable TagWithName<CompoundTag> pair) {
+        if (pair == null) return null;
 
-            // Try lowercase data
-            CompoundTag data = root.getCompound("data");
-            if (data != null) return data;
+        // Grab the value (naming isn't important here)
+        CompoundTag root = pair.tag();
 
-            // Try uppercase data
-            data = root.getCompound("Data");
-            if (data != null) return data;
+        // Try lowercase data
+        CompoundTag data = root.getCompound("data");
+        if (data != null) return data;
 
-            // Otherwise return root
-            return root;
+        // Try uppercase data
+        data = root.getCompound("Data");
+        if (data != null) return data;
+
+        // Otherwise return root
+        return root;
+    }
+
+    /**
+     * Inflate a compressed NBT document with the per-thread inflater and parse it straight out of the output buffer.
+     *
+     * @param input  the input bytes to read from.
+     * @param offset the first byte of the compressed stream.
+     * @param length the number of bytes the compressed stream occupies.
+     * @param gzip   whether the stream is gzip (true) or zlib/deflate (false).
+     * @return the parsed CompoundTag or null if there isn't any data to read.
+     * @throws IOException if it failed to decompress or read the compound.
+     */
+    @Nullable
+    private static CompoundTag readCompressedJavaNBT(byte[] input, int offset, int length, boolean gzip) throws IOException {
+        Inflater inflater = (gzip ? GZIP_INFLATER : ZLIB_INFLATER).get();
+        inflater.reset();
+        inflater.setInput(input, offset, length);
+
+        byte[] output = INFLATE_BUFFER.get();
+        int written = 0;
+        try {
+            while (!inflater.finished()) {
+                if (written == output.length) {
+                    if (output.length >= INFLATE_BUFFER_MAX) {
+                        throw new IOException("Inflated NBT is larger than " + INFLATE_BUFFER_MAX + " bytes");
+                    }
+                    output = Arrays.copyOf(output, Math.min(output.length * 2, INFLATE_BUFFER_MAX));
+                }
+                int read = inflater.inflate(output, written, output.length - written);
+                if (read == 0 && (inflater.needsInput() || inflater.needsDictionary())) {
+                    throw new IOException("Truncated compressed NBT ("
+                            + (inflater.needsDictionary() ? "needs dictionary" : "needs more input") + ")");
+                }
+                written += read;
+            }
+        } catch (DataFormatException e) {
+            throw new IOException("Failed to inflate NBT", e);
+        } finally {
+            // Keep the (possibly grown) buffer for the next document on this thread
+            INFLATE_BUFFER.set(output);
         }
+
+        return stripDataWrapper(Tag.decodeNamed(new ByteArrayReader(output, 0, written), CompoundTag.class));
     }
 
     /**

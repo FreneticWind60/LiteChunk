@@ -324,7 +324,8 @@ public class JavaLevelReader implements LevelReader, JavaReaderWriter {
                 // Ignore if this column shouldn't be processed
                 if (!converter.shouldProcessColumn(dimension, columnsCoords)) continue;
 
-                mcaReader.readColumn(columnsCoords, offset).thenConsume("Parsing POI Region", TaskWeight.NORMAL, (compound) -> collectColumnPOIs(compound, collectedPOIs));
+                // readColumn now reads, inflates and parses synchronously (see MCAReader), so no task chaining here
+                collectColumnPOIs(mcaReader.readColumn(columnsCoords, offset), collectedPOIs);
             }
         }
     }

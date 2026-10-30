@@ -59,7 +59,7 @@ public class SingleValuePalette<T> implements Palette<T> {
         keys.add(value);
 
         // Return a new ShortBasedPalette
-        return new ShortBasedPalette<>(keys, new short[dimensionSize][dimensionSize][dimensionSize]);
+        return new ShortBasedPalette<>(keys, new short[dimensionSize * dimensionSize * dimensionSize], dimensionSize);
     }
 
     @Override

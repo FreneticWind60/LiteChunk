@@ -102,6 +102,7 @@ public final class EngineCli {
         sampler.start();
 
         long started = System.currentTimeMillis();
+        long cpuStarted = processCpuNanos();
         try {
             engine.convert(worldRoot, output, formatId, (fraction, stage) -> {
                 callbacks[0]++;
@@ -124,6 +125,7 @@ public final class EngineCli {
 
         log("converted in " + elapsed + "ms with " + callbacks[0] + " callbacks, peak="
                 + String.format("%.3f", peak[0]));
+        log("cpu = " + describeCpu(processCpuNanos() - cpuStarted, elapsed));
         log("peak heap = " + sampler.peakMb() + " MB of "
                 + (Runtime.getRuntime().maxMemory() / (1024 * 1024)) + " MB");
         log("output: level.dat=" + hasLevelDat + " db=" + hasDb + " region=" + hasRegion);
@@ -137,6 +139,46 @@ public final class EngineCli {
 
     private static void log(String message) {
         System.out.println("[EngineCli] " + message);
+    }
+
+    /**
+     * Read the total CPU time this process has burned so far.
+     * <p>
+     * Wall clock on a multi-threaded conversion is mostly waiting, so it hides whether a change actually removed
+     * work. CPU time does not: it sums every thread, which is exactly the quantity that per-block optimisations
+     * move. Reflective because {@code com.sun.management.OperatingSystemMXBean} does not exist on ART and this class
+     * is part of the shipped dex.
+     *
+     * @return nanoseconds of CPU time, or -1 when the platform does not expose it (Android).
+     */
+    private static long processCpuNanos() {
+        try {
+            java.lang.management.OperatingSystemMXBean bean =
+                    java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+            // The runtime object is com.sun.management.internal.OperatingSystemImpl, which lives in a package the
+            // module system does not open; invoking the exported interface method works.
+            Class<?> sunBean = Class.forName("com.sun.management.OperatingSystemMXBean");
+            if (!sunBean.isInstance(bean)) return -1L;
+            Object value = sunBean.getMethod("getProcessCpuTime").invoke(bean);
+            return value instanceof Long ? (Long) value : -1L;
+        } catch (Throwable ignored) {
+            return -1L;
+        }
+    }
+
+    /**
+     * Format a CPU/wall pair as seconds plus the average number of cores it kept busy.
+     *
+     * @param cpuNanos  the CPU time used, or -1 if unavailable.
+     * @param wallMillis the wall clock time used.
+     * @return the formatted description.
+     */
+    private static String describeCpu(long cpuNanos, long wallMillis) {
+        if (cpuNanos < 0) return "unavailable";
+        double cpuSeconds = cpuNanos / 1_000_000_000.0;
+        double wallSeconds = wallMillis / 1000.0;
+        double cores = wallSeconds > 0 ? cpuSeconds / wallSeconds : 0;
+        return String.format("%.1f s over %.1f s wall (%.2f cores avg)", cpuSeconds, wallSeconds, cores);
     }
 
     /**

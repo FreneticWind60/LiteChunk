@@ -1,5 +1,7 @@
 package com.hivemc.chunker.resolver;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,6 +21,21 @@ public interface Resolver<T, U> {
      * intermediate format.
      */
     Optional<U> to(T input);
+
+    /**
+     * Attempt to convert the input to the intermediate format, without wrapping the result in an Optional.
+     * <p>
+     * The default delegates to {@link #to(Object)}, so a resolver only pays for this when it overrides it. Resolvers on
+     * a hot path (per block / per palette entry) override it to skip the Optional allocation entirely - the lookup
+     * itself rarely fails, so the wrapper is pure overhead there.
+     *
+     * @param input the input value to convert.
+     * @return the intermediate value, or null if there is no equivalent.
+     */
+    @Nullable
+    default U toOrNull(T input) {
+        return to(input).orElse(null);
+    }
 
     /**
      * Attempt to convert the intermediate format to the output format.
@@ -75,6 +92,12 @@ public interface Resolver<T, U> {
             }
 
             @Override
+            @Nullable
+            public U toOrNull(T input) {
+                return to(input).orElse(null);
+            }
+
+            @Override
             public Optional<T> from(U input) {
                 Optional<T> cached = fromCache.get(input);
                 if (cached != null) {
@@ -106,6 +129,13 @@ public interface Resolver<T, U> {
         @Override
         public Optional<V> to(T input) {
             return original.to(input).flatMap(chained::to);
+        }
+
+        @Override
+        @Nullable
+        public V toOrNull(T input) {
+            U intermediate = original.toOrNull(input);
+            return intermediate == null ? null : chained.toOrNull(intermediate);
         }
 
         @Override

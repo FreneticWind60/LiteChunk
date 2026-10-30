@@ -44,32 +44,26 @@ public class PaletteUtil {
      * Write values to a 1.13 formatted palette.
      *
      * @param minimumBitsPerEntry the minimum number of bits allowed per entry.
-     * @param dimensionSize       the dimension size of the array, e.g. [16][16][16] for a normal chunk.
+     * @param dimensionSize       the dimension size of the palette, e.g. 16 for a normal chunk.
      * @param keyCount            the number of possible keys.
-     * @param values              the lookup to encode, if null it uses empty values.
+     * @param values              the flat lookup to encode, if null it uses empty values.
      * @return the encoded palette values.
      */
-    public static long[] writePaletteValues1_13(int minimumBitsPerEntry, int dimensionSize, int keyCount, short @Nullable [][][] values) {
+    public static long[] writePaletteValues1_13(int minimumBitsPerEntry, int dimensionSize, int keyCount, short @Nullable [] values) {
         // Calculate bitsPerEntry
         int bitsPerEntry = minimumBitsPerEntry;
         while (keyCount > 1 << bitsPerEntry) bitsPerEntry++;
         long maxEntryValue = (1L << bitsPerEntry) - 1;
 
         int valuesPerPalette = dimensionSize * dimensionSize * dimensionSize;
-        int dimensionBitMask = dimensionSize - 1;
-        int zDimensionBitShift = Integer.numberOfTrailingZeros(dimensionSize);
-        int yDimensionBitShift = zDimensionBitShift + zDimensionBitShift;
 
         // Based on code from https://github.com/ViaVersion/ViaVersion/blob/9ea6c34543d6052f1e91b5035e87b756cb2358b8/common/src/main/java/us/myles/ViaVersion/util/CompactArrayUtil.java
         long[] encodedValues = new long[(int) Math.ceil(valuesPerPalette * bitsPerEntry / 64.0)];
         if (values != null) {
             for (int i = 0; i < valuesPerPalette; i++) {
-                // Get entry
-                int x = i & dimensionBitMask;
-                int z = (i >> zDimensionBitShift) & dimensionBitMask;
-                int y = (i >> yDimensionBitShift) & dimensionBitMask;
-
-                short value = values[x][y][z];
+                // The flat palette array is stored in (y, z, x) order with x varying fastest, which is the same order
+                // i walks in, so the value is simply values[i] - no index maths on the hot path.
+                short value = values[i];
                 int bitIndex = i * bitsPerEntry;
                 int startIndex = bitIndex / 64;
                 int endIndex = ((i + 1) * bitsPerEntry - 1) / 64;
@@ -89,21 +83,18 @@ public class PaletteUtil {
      * Write values to a 1.16 formatted palette.
      *
      * @param minimumBitsPerEntry the minimum number of bits allowed per entry.
-     * @param dimensionSize       the dimension size of the array, e.g. [16][16][16] for a normal chunk.
+     * @param dimensionSize       the dimension size of the palette, e.g. 16 for a normal chunk.
      * @param keyCount            the number of possible keys.
-     * @param values              the lookup to encode, if null it uses empty values.
+     * @param values              the flat lookup to encode, if null it uses empty values.
      * @return the encoded palette values.
      */
-    public static long[] writePaletteValues1_16(int minimumBitsPerEntry, int dimensionSize, int keyCount, short @Nullable [][][] values) {
+    public static long[] writePaletteValues1_16(int minimumBitsPerEntry, int dimensionSize, int keyCount, short @Nullable [] values) {
         // Calculate bitsPerEntry
         int bitsPerEntry = minimumBitsPerEntry;
         while (keyCount > 1 << bitsPerEntry) bitsPerEntry++;
         long maxEntryValue = (1L << bitsPerEntry) - 1;
 
         int valuesPerPalette = dimensionSize * dimensionSize * dimensionSize;
-        int dimensionBitMask = dimensionSize - 1;
-        int zDimensionBitShift = Integer.numberOfTrailingZeros(dimensionSize);
-        int yDimensionBitShift = zDimensionBitShift + zDimensionBitShift;
 
         // Calculate magic value (based on Minecraft)
         char valuesPerLong = (char) (64 / bitsPerEntry);
@@ -115,13 +106,8 @@ public class PaletteUtil {
         long[] encodedValues = new long[(valuesPerPalette + valuesPerLong - 1) / valuesPerLong];
         if (values != null) {
             for (int i = 0; i < valuesPerPalette; i++) {
-                // Get entry
-                int x = i & dimensionBitMask;
-                int z = (i >> zDimensionBitShift) & dimensionBitMask;
-                int y = (i >> yDimensionBitShift) & dimensionBitMask;
-
-                // Grab value + indexes
-                short value = values[x][y][z];
+                // See writePaletteValues1_13: i already walks the flat array in its natural order.
+                short value = values[i];
                 int cellIndex = (int) ((i * divideMul + divideAdd >> 32) >> divideShift);
                 int bitIndex = (i - cellIndex * valuesPerLong) * bitsPerEntry;
                 encodedValues[cellIndex] = (encodedValues[cellIndex] & ~(maxEntryValue << bitIndex)) | ((value & maxEntryValue) << bitIndex);
@@ -139,7 +125,7 @@ public class PaletteUtil {
      * @param encodedValues       the encoded values.
      * @return the decoded palette values.
      */
-    public static short[][][] readPaletteValues(int minimumBitsPerEntry, int dimensionSize, int keyCount, long[] encodedValues) {
+    public static short[] readPaletteValues(int minimumBitsPerEntry, int dimensionSize, int keyCount, long[] encodedValues) {
         // Calculate bitsPerEntry
         int bitsPerEntry = minimumBitsPerEntry;
         while (keyCount > 1 << bitsPerEntry) bitsPerEntry++;
@@ -162,16 +148,13 @@ public class PaletteUtil {
      * Read values from a 1.13 formatted palette.
      *
      * @param bitsPerEntry  the number of bits used per palette key index.
-     * @param dimensionSize the dimension size of the array, e.g. [16][16][16] for a normal chunk.
+     * @param dimensionSize the dimension size of the palette, e.g. 16 for a normal chunk.
      * @param encodedValues the encoded values.
      * @return the decoded palette values.
      */
-    public static short[][][] readPaletteValues1_13(int bitsPerEntry, int dimensionSize, long[] encodedValues) {
-        short[][][] output = new short[dimensionSize][dimensionSize][dimensionSize];
+    public static short[] readPaletteValues1_13(int bitsPerEntry, int dimensionSize, long[] encodedValues) {
+        short[] output = new short[dimensionSize * dimensionSize * dimensionSize];
         int valuesPerPalette = dimensionSize * dimensionSize * dimensionSize;
-        int dimensionBitMask = dimensionSize - 1;
-        int zDimensionBitShift = Integer.numberOfTrailingZeros(dimensionSize);
-        int yDimensionBitShift = zDimensionBitShift + zDimensionBitShift;
 
         // Based on code from https://github.com/ViaVersion/ViaVersion/blob/9ea6c34543d6052f1e91b5035e87b756cb2358b8/common/src/main/java/us/myles/ViaVersion/util/CompactArrayUtil.java
         long maxEntryValue = (1L << bitsPerEntry) - 1;
@@ -188,11 +171,8 @@ public class PaletteUtil {
                 value = (short) ((((encodedValues[startIndex] >>> startBitSubIndex) | (encodedValues[endIndex] << endBitSubIndex)) & maxEntryValue) & 0xFFFF);
             }
 
-            // Set entry
-            int x = i & dimensionBitMask;
-            int z = (i >> zDimensionBitShift) & dimensionBitMask;
-            int y = (i >> yDimensionBitShift) & dimensionBitMask;
-            output[x][y][z] = value;
+            // Set entry - i walks (y, z, x) with x fastest, which is the flat array layout
+            output[i] = value;
         }
 
         return output;
@@ -202,16 +182,13 @@ public class PaletteUtil {
      * Read values from a 1.16 formatted palette.
      *
      * @param bitsPerEntry  the number of bits used per palette key index.
-     * @param dimensionSize the dimension size of the array, e.g. [16][16][16] for a normal chunk.
+     * @param dimensionSize the dimension size of the palette, e.g. 16 for a normal chunk.
      * @param encodedValues the encoded values.
      * @return the decoded palette values.
      */
-    public static short[][][] readPaletteValues1_16(int bitsPerEntry, int dimensionSize, long[] encodedValues) {
-        short[][][] output = new short[dimensionSize][dimensionSize][dimensionSize];
+    public static short[] readPaletteValues1_16(int bitsPerEntry, int dimensionSize, long[] encodedValues) {
+        short[] output = new short[dimensionSize * dimensionSize * dimensionSize];
         int valuesPerPalette = dimensionSize * dimensionSize * dimensionSize;
-        int dimensionBitMask = dimensionSize - 1;
-        int zDimensionBitShift = Integer.numberOfTrailingZeros(dimensionSize);
-        int yDimensionBitShift = zDimensionBitShift + zDimensionBitShift;
 
         // Use maxEntryValue for bitmask
         long maxEntryValue = (1L << bitsPerEntry) - 1;
@@ -228,11 +205,8 @@ public class PaletteUtil {
             int bitIndex = (i - cellIndex * valuesPerLong) * bitsPerEntry;
             short value = (short) ((encodedValues[cellIndex] >>> bitIndex) & maxEntryValue);
 
-            // Set entry
-            int x = i & dimensionBitMask;
-            int z = (i >> zDimensionBitShift) & dimensionBitMask;
-            int y = (i >> yDimensionBitShift) & dimensionBitMask;
-            output[x][y][z] = value;
+            // Set entry - i walks (y, z, x) with x fastest, which is the flat array layout
+            output[i] = value;
         }
 
         return output;

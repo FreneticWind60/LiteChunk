@@ -74,19 +74,19 @@ public class PaletteUtil {
         buffer.position(beforeWords);
 
         // Read values
-        short[][][] values = new short[16][16][16];
+        short[] values = new short[4096];
         int i = 0;
         for (int word = 0; word < wordSize; word++) {
             int wordValue = buffer.getInt();
 
             // Skip if over 4096 (extra padding on bitsPerEntry 3,5,6)
             for (int block = 0; block < valuesPerWord && i < 4096; block++) {
-                int x = (i >> 8) & 0xF;
-                int y = i & 0xF;
-                int z = (i >> 4) & 0xF;
+                // Bedrock packs values as (x << 8) | (z << 4) | y, the flat palette is (y << 8) | (z << 4) | x, so the
+                // three fields are permuted here instead of being read out into three separate variables.
+                int index = ((i & 0xF) << 8) | (i & 0xF0) | ((i >> 8) & 0xF);
 
                 // Set the value
-                values[x][y][z] = (short) ((wordValue >>> (i % valuesPerWord * bitsPerEntry)) & ((1 << bitsPerEntry) - 1));
+                values[index] = (short) ((wordValue >>> (i % valuesPerWord * bitsPerEntry)) & ((1 << bitsPerEntry) - 1));
                 i++;
             }
         }
@@ -94,7 +94,7 @@ public class PaletteUtil {
         // Put the buffer back to the end
         buffer.position(afterKeys);
 
-        return new ShortBasedPalette<>(keys, values);
+        return new ShortBasedPalette<>(keys, values, 16);
     }
 
     /**
@@ -134,18 +134,17 @@ public class PaletteUtil {
 
         // Only write the palette if it's not empty and the key count is more than 1
         if (!emptyPalette && palette.getKeyCount() > 1 && palette instanceof ShortBasedPalette<T> shortBasedPalette) {
-            short[][][] values = shortBasedPalette.getValues();
+            short[] values = shortBasedPalette.getValues();
             for (int wordIndex = 0; wordIndex < buffer.length; wordIndex++) {
                 for (int blockIndex = 0; blockIndex < blocksPerWord; blockIndex++) {
                     if (i >= 4096) {
                         break;
                     }
 
-                    int y = i & 0xF;
-                    int z = (i >> 4) & 0xF;
-                    int x = (i >> 8) & 0xF;
+                    // i is (x << 8) | (z << 4) | y for Bedrock, the palette is (y << 8) | (z << 4) | x
+                    int flatIndex = ((i & 0xF) << 8) | (i & 0xF0) | ((i >> 8) & 0xF);
                     int startBitIndex = bitsPerBlock * blockIndex;
-                    short value = values[x][y][z];
+                    short value = values[flatIndex];
                     buffer[wordIndex] = (buffer[wordIndex] & ~(maxValue << startBitIndex)) | ((value & maxValue) << startBitIndex);
                     i++;
                 }
