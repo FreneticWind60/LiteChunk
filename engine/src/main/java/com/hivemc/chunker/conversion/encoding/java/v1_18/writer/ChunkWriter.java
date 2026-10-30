@@ -60,7 +60,7 @@ public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.java.v1_
 
         // Only fetch the values if it's a short based, null should be used when there are no values to write
         // e.g. empty palette or palette with the same value
-        short[][][] values = null;
+        short[] values = null;
         if (palette instanceof ShortBasedPalette<ChunkerBlockIdentifier> shortBasedPalette) {
             values = shortBasedPalette.getValues();
         }
@@ -76,7 +76,7 @@ public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.java.v1_
     }
 
     @Override
-    protected void writeBlockPaletteValues(int keyCount, short[][][] values, List<TagWithName<?>> output) {
+    protected void writeBlockPaletteValues(int keyCount, short[] values, List<TagWithName<?>> output) {
         // Encode the values as a long then write them in 1.16 format
         long[] encodedValues = PaletteUtil.writePaletteValues1_16(PaletteUtil.MINIMUM_BITS_PER_ENTRY_BLOCKS, 16, keyCount, values);
         output.add(new TagWithName<>("data", new LongArrayTag(encodedValues)));
@@ -114,7 +114,7 @@ public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.java.v1_
 
         // Write the values if it has more than 1 key
         if (keyCount > 1) {
-            short[][][] values = null;
+            short[] values = null;
             if (biomePalette instanceof ShortBasedPalette<ChunkerBiome> shortBasedPalette) {
                 values = shortBasedPalette.getValues();
             }

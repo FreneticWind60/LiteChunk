@@ -96,13 +96,14 @@ public class JavaResolversBuilder {
 
             @Override
             public ChunkerBlockIdentifier readBlock(CompoundTag input) {
-                return nbtChunkerBlockIdentifierResolver.to(input).orElseGet(() -> {
-                    // Report the error
-                    converter.logMissingMapping(Converter.MissingMappingType.BLOCK, input.toSNBT());
+                ChunkerBlockIdentifier output = nbtChunkerBlockIdentifierResolver.toOrNull(input);
+                if (output != null) return output;
 
-                    // Return air
-                    return ChunkerBlockIdentifier.AIR;
-                });
+                // Report the error
+                converter.logMissingMapping(Converter.MissingMappingType.BLOCK, input.toSNBT());
+
+                // Return air
+                return ChunkerBlockIdentifier.AIR;
             }
 
             @Override
@@ -124,13 +125,14 @@ public class JavaResolversBuilder {
 
             @Override
             public ChunkerBlockIdentifier readBlockIdentifier(Identifier input) {
-                return blockIdentifierResolver.to(input).orElseGet(() -> {
-                    // Report the error
-                    converter.logMissingMapping(Converter.MissingMappingType.BLOCK, String.valueOf(input));
+                ChunkerBlockIdentifier output = blockIdentifierResolver.toOrNull(input);
+                if (output != null) return output;
 
-                    // Return air
-                    return ChunkerBlockIdentifier.AIR;
-                });
+                // Report the error
+                converter.logMissingMapping(Converter.MissingMappingType.BLOCK, String.valueOf(input));
+
+                // Return air
+                return ChunkerBlockIdentifier.AIR;
             }
 
             @Override

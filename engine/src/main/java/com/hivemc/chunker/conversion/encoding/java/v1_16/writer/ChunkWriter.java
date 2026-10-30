@@ -16,7 +16,7 @@ public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.java.v1_
     }
 
     @Override
-    protected void writeBlockPaletteValues(int keyCount, short[][][] values, List<TagWithName<?>> output) {
+    protected void writeBlockPaletteValues(int keyCount, short[] values, List<TagWithName<?>> output) {
         // Encode the values as a long then write them in 1.16 format
         long[] encodedValues = PaletteUtil.writePaletteValues1_16(PaletteUtil.MINIMUM_BITS_PER_ENTRY_BLOCKS, 16, keyCount, values);
         output.add(new TagWithName<>("BlockStates", new LongArrayTag(encodedValues)));

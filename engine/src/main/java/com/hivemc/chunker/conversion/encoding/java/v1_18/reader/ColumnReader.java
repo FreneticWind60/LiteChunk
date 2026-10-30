@@ -64,7 +64,8 @@ public class ColumnReader extends com.hivemc.chunker.conversion.encoding.java.v1
                     // Add the palette to the chunk
                     chunks.add(new ShortBasedPalette<>(
                             biomeKeys,
-                            PaletteUtil.readPaletteValues(PaletteUtil.MINIMUM_BITS_PER_ENTRY_BIOMES, 4, keys.size(), values)
+                            PaletteUtil.readPaletteValues(PaletteUtil.MINIMUM_BITS_PER_ENTRY_BIOMES, 4, keys.size(), values),
+                            4
                     ));
 
                 } catch (Exception e) {

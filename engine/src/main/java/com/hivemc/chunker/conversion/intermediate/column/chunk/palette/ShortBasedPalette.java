@@ -12,22 +12,40 @@ import java.util.function.Predicate;
 
 /**
  * A palette which uses shorts for indexing the palette keys and storing those keys.
+ * <p>
+ * The values are held in a single flat array rather than {@code short[16][16][16]}. The nested form allocated 273
+ * arrays (1 outer + 16 + 256) to hold 8 KB of data, and because Java only keeps the last dimension contiguous a
+ * {@code values[x][y][z]} walk jumped to a different array for every block. The flat form is one object, and
+ * {@code (y << 8) | (z << 4) | x} is the same order the formats write their values in, so the hot loops can simply read
+ * {@code values[i]}. The {@link Palette} contract is unchanged, this is only the internal storage.
  *
  * @param <T> the type held by the palette.
  */
 public class ShortBasedPalette<T> implements WriteablePalette<T> {
     private final List<T> keys;
-    private final short[][][] values;
+    private final short[] values;
+    /**
+     * log2 of the dimension size, so the index can be built with shifts: 4 for a chunk (16), 2 for 4x4x4 biomes.
+     */
+    private final int dimensionShift;
 
     /**
      * Create a short based palette from a pre-indexed list of keys and values.
      *
-     * @param keys   the keys.
-     * @param values the values which point to indexes in the keys.
+     * @param keys          the keys.
+     * @param values        the flat values which point to indexes in the keys, in {@code (y, z, x)} order with x
+     *                      varying fastest.
+     * @param dimensionSize the dimension length, e.g. 16 for a chunk, to be used for the data.
      */
-    public ShortBasedPalette(List<T> keys, short[][][] values) {
+    public ShortBasedPalette(List<T> keys, short[] values, int dimensionSize) {
+        Preconditions.checkArgument(dimensionSize > 0 && (dimensionSize & (dimensionSize - 1)) == 0,
+                "dimensionSize must be a power of two, got %s", dimensionSize);
+        Preconditions.checkArgument(values.length == dimensionSize * dimensionSize * dimensionSize,
+                "expected %s values for a %s sized palette, got %s",
+                dimensionSize * dimensionSize * dimensionSize, dimensionSize, values.length);
         this.keys = keys;
         this.values = values;
+        this.dimensionShift = Integer.numberOfTrailingZeros(dimensionSize);
     }
 
     /**
@@ -37,16 +55,39 @@ public class ShortBasedPalette<T> implements WriteablePalette<T> {
      * @param dimensionSize the dimension length, e.g. 16 for a chunk, to be used for the data.
      */
     public ShortBasedPalette(int keySizeHint, int dimensionSize) {
-        this(new ArrayList<>(keySizeHint), new short[dimensionSize][dimensionSize][dimensionSize]);
+        this(new ArrayList<>(keySizeHint),
+                new short[dimensionSize * dimensionSize * dimensionSize],
+                dimensionSize);
+    }
+
+    /**
+     * Get the dimension length of this palette (16 for a chunk, 4 for a 4x4x4 biome palette).
+     *
+     * @return the dimension length.
+     */
+    public int getDimensionSize() {
+        return 1 << dimensionShift;
     }
 
     /**
      * Get the backing value array which is storing the indexes of the keys.
      *
-     * @return the backing short array.
+     * @return the backing flat short array, in {@code (y, z, x)} order with x varying fastest.
      */
-    public short[][][] getValues() {
+    public short[] getValues() {
         return values;
+    }
+
+    /**
+     * Build the flat index of a position.
+     *
+     * @param x the first dimension.
+     * @param y the second dimension.
+     * @param z the third dimension.
+     * @return the index into the flat value array.
+     */
+    public int index(int x, int y, int z) {
+        return (y << (dimensionShift + dimensionShift)) | (z << dimensionShift) | x;
     }
 
     @Override
@@ -62,7 +103,7 @@ public class ShortBasedPalette<T> implements WriteablePalette<T> {
 
     @Override
     public T get(int x, int y, int z, T defaultValue) {
-        return getKey(values[x][y][z], defaultValue);
+        return getKey(values[index(x, y, z)], defaultValue);
     }
 
     @Override
@@ -78,12 +119,12 @@ public class ShortBasedPalette<T> implements WriteablePalette<T> {
 
     @Override
     public void set(int x, int y, int z, T key) {
-        values[x][y][z] = getOrCreateKey(key);
+        values[index(x, y, z)] = getOrCreateKey(key);
     }
 
     @Override
     public void setPaletteIndex(int x, int y, int z, short paletteIndex) {
-        values[x][y][z] = paletteIndex;
+        values[index(x, y, z)] = paletteIndex;
     }
 
     @Override
@@ -92,7 +133,7 @@ public class ShortBasedPalette<T> implements WriteablePalette<T> {
         for (T key : keys) {
             newKeys.add(mappingFunction.apply(key));
         }
-        return new ShortBasedPalette<>(newKeys, values);
+        return new ShortBasedPalette<>(newKeys, values, getDimensionSize());
     }
 
     @Override
@@ -129,15 +170,11 @@ public class ShortBasedPalette<T> implements WriteablePalette<T> {
             return false;
         }
 
-        for (short[][] yz : values) {
-            for (short[] z : yz) {
-                for (short entry : z) {
-                    if (entry < 0 || entry >= size) continue; // Ignore invalid blocks
+        for (short entry : values) {
+            if (entry < 0 || entry >= size) continue; // Ignore invalid blocks
 
-                    // Return if it's a match
-                    if (matchedIndexes.contains(entry)) return true;
-                }
-            }
+            // Return if it's a match
+            if (matchedIndexes.contains(entry)) return true;
         }
 
         // No matches
@@ -165,7 +202,7 @@ public class ShortBasedPalette<T> implements WriteablePalette<T> {
     @Override
     public Palette<T> compact(T defaultValue) {
         // Quick shortcut for empty palette
-        if (keys.isEmpty()) return EmptyPalette.instance(values.length);
+        if (keys.isEmpty()) return EmptyPalette.instance(getDimensionSize());
 
         // Create a remapping array for old index -> new index for keys
         short[] paletteRemapping = new short[keys.size()];
@@ -175,11 +212,16 @@ public class ShortBasedPalette<T> implements WriteablePalette<T> {
         List<T> oldKeys = new ArrayList<>(keys);
         keys.clear();
 
-        // First collect all the used palette ids
-        for (short[][] yz : values) {
-            for (short[] z : yz) {
-                for (int i = 0; i < z.length; i++) {
-                    short oldKeyIndex = z[i];
+        // Collect all the used palette ids. The walk order matters: new keys are appended in first-use order, so it
+        // decides the index each key ends up with. This keeps the original (x, y, z) traversal with z innermost, which
+        // keeps the output byte identical to the nested array version - the data would mean the same thing either way,
+        // but identical output is worth more than a marginally more cache friendly loop.
+        int dimension = getDimensionSize();
+        for (int x = 0; x < dimension; x++) {
+            for (int y = 0; y < dimension; y++) {
+                for (int z = 0; z < dimension; z++) {
+                    int index = index(x, y, z);
+                    short oldKeyIndex = values[index];
                     boolean validKeyIndex = oldKeyIndex >= 0 && oldKeyIndex < oldKeys.size();
                     short newKeyIndex = validKeyIndex ? paletteRemapping[oldKeyIndex] : -1;
 
@@ -201,13 +243,13 @@ public class ShortBasedPalette<T> implements WriteablePalette<T> {
                     }
 
                     // Update the value
-                    z[i] = newKeyIndex;
+                    values[index] = newKeyIndex;
                 }
             }
         }
 
         // Check if there's an easier way to represent this palette
-        if (keys.size() == 1) return new SingleValuePalette<>(values.length, keys.get(0));
+        if (keys.size() == 1) return new SingleValuePalette<>(getDimensionSize(), keys.get(0));
 
         // Otherwise return this
         return this;
@@ -215,14 +257,6 @@ public class ShortBasedPalette<T> implements WriteablePalette<T> {
 
     @Override
     public ShortBasedPalette<T> copy() {
-        // Loop through and copy each array
-        short[][][] copiedValues = new short[values.length][][];
-        for (int x = 0; x < values.length; x++) {
-            copiedValues[x] = new short[values[x].length][];
-            for (int y = 0; y < values[x].length; y++) {
-                copiedValues[x][y] = values[x][y].clone();
-            }
-        }
-        return new ShortBasedPalette<>(new ArrayList<>(keys), copiedValues);
+        return new ShortBasedPalette<>(new ArrayList<>(keys), values.clone(), getDimensionSize());
     }
 }

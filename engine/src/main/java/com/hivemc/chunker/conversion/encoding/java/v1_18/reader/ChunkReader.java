@@ -52,10 +52,10 @@ public class ChunkReader extends com.hivemc.chunker.conversion.encoding.java.v1_
         }
 
         // Decode the values
-        short[][][] values = PaletteUtil.readPaletteValues(PaletteUtil.MINIMUM_BITS_PER_ENTRY_BLOCKS, 16, keys.size(), encodedValues);
+        short[] values = PaletteUtil.readPaletteValues(PaletteUtil.MINIMUM_BITS_PER_ENTRY_BLOCKS, 16, keys.size(), encodedValues);
 
         // Create the palette and assign it
-        chunk.setPalette(new ShortBasedPalette<>(keys, values));
+        chunk.setPalette(new ShortBasedPalette<>(keys, values, 16));
     }
 
     /**

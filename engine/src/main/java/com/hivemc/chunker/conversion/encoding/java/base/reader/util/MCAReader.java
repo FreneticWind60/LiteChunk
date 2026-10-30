@@ -4,8 +4,6 @@ import com.hivemc.chunker.conversion.encoding.base.Converter;
 import com.hivemc.chunker.conversion.intermediate.column.chunk.ChunkCoordPair;
 import com.hivemc.chunker.nbt.tags.Tag;
 import com.hivemc.chunker.nbt.tags.collection.CompoundTag;
-import com.hivemc.chunker.scheduling.task.Task;
-import com.hivemc.chunker.scheduling.task.TaskWeight;
 
 import java.io.EOFException;
 import java.io.File;
@@ -15,6 +13,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 
 /**
  * Utility for reading Java .mca files.
@@ -30,6 +29,13 @@ public class MCAReader implements AutoCloseable {
      * Per-thread scratch buffer for the shared 5 byte column header (length + compression type).
      */
     private static final ThreadLocal<ByteBuffer> HEADER = ThreadLocal.withInitial(() -> ByteBuffer.allocate(5));
+
+    /**
+     * Per-thread buffer the compressed column payload is read into. A converted region holds ~1000 columns and the
+     * previous code allocated a byte[] of the exact column size for every one of them; this reuses one array per
+     * worker instead, and {@code Inflater.setInput(byte[])} can consume it without another copy.
+     */
+    private static final ThreadLocal<ByteBuffer> COLUMN_BUFFER = ThreadLocal.withInitial(() -> ByteBuffer.allocate(64 * 1024));
 
     private final Converter converter;
     private final File folder;
@@ -92,7 +98,7 @@ public class MCAReader implements AutoCloseable {
      * @return the task which is reading and decompressing the chunk.
      * @throws IOException if it failed to read the .mca file.
      */
-    public Task<CompoundTag> readColumn(ChunkCoordPair columnCoordPair, int offset) throws IOException {
+    public CompoundTag readColumn(ChunkCoordPair columnCoordPair, int offset) throws IOException {
         // Columns are padded to 4096 byte sectors. The record is a 4 byte big endian length (which includes the
         // compression type byte) followed by the compression type and the payload.
         long position = offset * 4096L;
@@ -104,27 +110,27 @@ public class MCAReader implements AutoCloseable {
         byte rawType = header.get(4);
         byte compressionType = (byte) (rawType & ~0x80);
 
-        byte[] compressedColumn;
-        // Check for oversized chunks (external files)
+        // Oversized chunks live in their own file, rare enough to keep the simple path
         if ((rawType & 0x80) != 0) {
-            // Read the external file
             File file = new File(folder, "c." + columnCoordPair.chunkX() + "." + columnCoordPair.chunkZ() + ".mcc");
-            compressedColumn = Files.readAllBytes(file.toPath());
-        } else {
-            if (chunkLength < 0) {
-                throw new IOException("Invalid column length %d for %s".formatted(chunkLength, columnCoordPair));
-            }
-            // Read bytes for later processing
-            compressedColumn = new byte[chunkLength];
-            readFully(ByteBuffer.wrap(compressedColumn), position + 5L);
+            byte[] compressed = Files.readAllBytes(file.toPath());
+            return decompressColumn(columnCoordPair, compressionType, compressed, 0, compressed.length);
         }
 
-        // Make a task to do the decompression, this is allowed async as we don't need to do any more sync operations
-        return Task.async(
-                "Decompressing column data",
-                TaskWeight.HIGH,
-                () -> decompressColumn(columnCoordPair, compressionType, compressedColumn)
-        );
+        if (chunkLength < 0) {
+            throw new IOException("Invalid column length %d for %s".formatted(chunkLength, columnCoordPair));
+        }
+
+        // Read, inflate and parse in one go on the calling worker: the payload lives in a per-thread buffer, so it
+        // can't be handed to another thread (or the next column) while this one is still being decompressed. That is
+        // also what removes the per-chunk byte[]: the bytes go straight from the channel into the buffer the inflater
+        // consumes. The caller is already a per-column task, so this still runs in parallel across columns.
+        ByteBuffer buffer = columnBuffer(chunkLength);
+        buffer.clear();
+        buffer.limit(chunkLength);
+        readFully(buffer, position + 5L);
+        return decompressColumn(columnCoordPair, compressionType,
+                buffer.array(), buffer.arrayOffset(), chunkLength);
     }
 
     /**
@@ -146,23 +152,41 @@ public class MCAReader implements AutoCloseable {
     }
 
     /**
+     * Get the per-thread column buffer, grown if the column is larger than the current one.
+     *
+     * @param required the number of bytes needed.
+     * @return a buffer with at least {@code required} bytes of capacity.
+     */
+    private static ByteBuffer columnBuffer(int required) {
+        ByteBuffer buffer = COLUMN_BUFFER.get();
+        if (buffer.capacity() < required) {
+            buffer = ByteBuffer.allocate(Math.max(required, buffer.capacity() * 2));
+            COLUMN_BUFFER.set(buffer);
+        }
+        return buffer;
+    }
+
+    /**
      * Decompress a column.
      *
-     * @param chunkCoordPair   the co-ordinates of the chunk being decompressed (used for exceptions).
-     * @param compressionType  the compression type.
-     * @param compressedColumn the column to be decompressed.
+     * @param chunkCoordPair  the co-ordinates of the chunk being decompressed (used for exceptions).
+     * @param compressionType the compression type.
+     * @param compressed      the array holding the compressed column.
+     * @param offset          the first byte of the compressed column inside {@code compressed}.
+     * @param length          the number of compressed bytes.
      * @return the decompressed compound tag.
      * @throws IOException if it failed to decompress / read.
      */
-    protected CompoundTag decompressColumn(ChunkCoordPair chunkCoordPair, byte compressionType, byte[] compressedColumn) throws IOException {
+    protected CompoundTag decompressColumn(ChunkCoordPair chunkCoordPair, byte compressionType, byte[] compressed, int offset, int length) throws IOException {
         try {
             // LZ4 was added in 1.20.5, but there is no harm supporting it here
             return switch (compressionType) {
                 case 0 -> null; // Empty
-                case 1 -> Tag.readGZipJavaNBT(compressedColumn); // GZip
-                case 2 -> Tag.readZLibJavaNBT(compressedColumn); // Deflate - Default
-                case 3 -> Tag.readUncompressedJavaNBT(compressedColumn);// Uncompressed
-                case 4 -> Tag.readLZ4JavaNBT(compressedColumn); // LZ4
+                case 1 -> Tag.readGZipJavaNBT(compressed, offset, length); // GZip
+                case 2 -> Tag.readZLibJavaNBT(compressed, offset, length); // Deflate - Default
+                case 3 -> Tag.readUncompressedJavaNBT(compressed, offset, length); // Uncompressed
+                // LZ4 still goes through its own block stream, which wants an exactly sized array
+                case 4 -> Tag.readLZ4JavaNBT(Arrays.copyOfRange(compressed, offset, offset + length));
                 default -> {
                     converter.logNonFatalException(new Exception("Unsupported Chunk Compression Type " + compressionType));
                     yield null;

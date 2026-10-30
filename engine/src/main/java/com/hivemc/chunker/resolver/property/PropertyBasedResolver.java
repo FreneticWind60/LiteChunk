@@ -5,6 +5,7 @@ import it.unimi.dsi.fastutil.Pair;
 import it.unimi.dsi.fastutil.objects.ObjectObjectMutablePair;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayDeque;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -20,6 +21,31 @@ import java.util.Set;
 public abstract class PropertyBasedResolver<R, S, H extends PropertyHolder<? extends H>> implements Resolver<S, H> {
     private final Map<Property<H, ?>, HandlerWrapper<H, S>> propertyHandlers = new LinkedHashMap<>();
     protected final R resolvers;
+
+    /**
+     * Reusable state pairs for the contextual handlers, one small stack per thread.
+     * <p>
+     * A property handler runs once per property per resolved block, and each call used to allocate a pair just to hand
+     * the holder and the input to the handler. A stack is used rather than a single instance because a handler may
+     * resolve something else on the same thread, which would otherwise overwrite the pair out from under it.
+     */
+    private static final ThreadLocal<ArrayDeque<ObjectObjectMutablePair<Object, Object>>> CONTEXT_PAIRS =
+            ThreadLocal.withInitial(ArrayDeque::new);
+
+    @SuppressWarnings("unchecked")
+    private static <H, S> ObjectObjectMutablePair<H, S> contextPair() {
+        ObjectObjectMutablePair<Object, Object> pair = CONTEXT_PAIRS.get().pollLast();
+        if (pair == null) pair = new ObjectObjectMutablePair<>(null, null);
+        return (ObjectObjectMutablePair<H, S>) (ObjectObjectMutablePair<?, ?>) pair;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void releaseContextPair(@Nullable ObjectObjectMutablePair<?, ?> pair) {
+        if (pair == null) return;
+        pair.left(null);
+        pair.right(null);
+        CONTEXT_PAIRS.get().addLast((ObjectObjectMutablePair<Object, Object>) pair);
+    }
 
     /**
      * Create a new property resolver, this registers all the property handlers.
@@ -45,6 +71,21 @@ public abstract class PropertyBasedResolver<R, S, H extends PropertyHolder<? ext
             return Optional.ofNullable(holder);
         }
         return optionalHolder;
+    }
+
+    @Override
+    @Nullable
+    public H toOrNull(S input) {
+        // Same walk as to(), minus the Optional wrapping: this runs for every block state that is resolved
+        H holder = createPropertyHolder(input).orElse(null);
+        if (holder == null) return null;
+
+        // Read properties
+        for (HandlerWrapper<H, S> propertyHandlerWrapper : propertyHandlers.values()) {
+            holder = propertyHandlerWrapper.readProperty(input, holder);
+            if (holder == null) break; // Don't write further properties if the holder is now invalid
+        }
+        return holder;
     }
 
     @Override
@@ -196,35 +237,51 @@ public abstract class PropertyBasedResolver<R, S, H extends PropertyHolder<? ext
             PropertyHandler<Pair<H, S>, V> handler) implements HandlerWrapper<H, S> {
         @Override
         public H readProperty(S input, H holder) {
-            Pair<H, S> state = new ObjectObjectMutablePair<>(holder, input);
+            ObjectObjectMutablePair<H, S> state = contextPair();
+            H result;
+            try {
+                state.left(holder);
+                state.right(input);
 
-            // Read the value
-            Optional<V> value = handler().read(state);
-            if (state.left() != null) {
-                value.ifPresent(v -> state.left().put(property, v));
+                // Read the value
+                Optional<V> value = handler().read(state);
+                if (state.left() != null) {
+                    value.ifPresent(v -> state.left().put(property, v));
+                }
+
+                // Return the new state
+                result = state.left();
+            } finally {
+                releaseContextPair(state);
             }
-
-            // Return the new state
-            return state.left();
+            return result;
         }
 
         @Override
         public S writeProperty(H holder, S output) {
-            Pair<H, S> state = new ObjectObjectMutablePair<>(holder, output);
-            V value = holder.get(property());
+            ObjectObjectMutablePair<H, S> state = contextPair();
+            S result;
+            try {
+                state.left(holder);
+                state.right(output);
+                V value = holder.get(property());
 
-            // Apply default write value
-            if (value == null) {
-                value = handler.getDefaultValue(state);
+                // Apply default write value
+                if (value == null) {
+                    value = handler.getDefaultValue(state);
+                }
+
+                // Call the handler if the value wasn't null and the state is set
+                if (value != null && state.right() != null) {
+                    handler().write(state, value);
+                }
+
+                // Return the new state
+                result = state.right();
+            } finally {
+                releaseContextPair(state);
             }
-
-            // Call the handler if the value wasn't null and the state is set
-            if (value != null && state.right() != null) {
-                handler().write(state, value);
-            }
-
-            // Return the new state
-            return state.right();
+            return result;
         }
     }
 }
