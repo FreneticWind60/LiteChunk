@@ -656,6 +656,23 @@
     .dl__note a { color: var(--accent-ink); text-decoration: underline; text-decoration-color: var(--line-2); text-underline-offset: 3px; }
     .dl__note a:hover { text-decoration-color: var(--accent); }
 
+    /* 本版变化与校验和：纯文本两行，不占规格表的位置 */
+    .dl__meta {
+      margin-top: 10px;
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--muted);
+    }
+
+    .dl__meta b { color: var(--ink-2); font-weight: 650; }
+
+    .dl__meta code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 11.5px;
+      color: var(--ink-2);
+      word-break: break-all;
+    }
+
     /* 规格表：两列，手机上也保持紧凑 */
     .dl__specs {
       display: grid;
@@ -1106,6 +1123,11 @@
             <p class="dl__note">
               安装时需要允许「安装未知来源应用」。后续版本签名一致，可以直接覆盖升级，不会丢数据。
               也可以在 <a href="https://github.com/FreneticWind60/LiteChunk/releases">Releases 页面</a> 查看全部版本。
+            </p>
+
+            <p class="dl__meta">
+              <b>本版变化：</b>一列存档的 20 多次数据库写入合并成 1 次，进度统计换成原子计数，光照数组从 273 个小数组摊平成一个。2.2 GB 存档实测转换时间 −25%，内存峰值不升。<br>
+              <b>SHA-256：</b><code>712ee30d0fa94b8288c7f8a68c43dc1df876fa72b8dbc49b18a9d0b9c300b49a</code>
             </p>
           </div>
 
