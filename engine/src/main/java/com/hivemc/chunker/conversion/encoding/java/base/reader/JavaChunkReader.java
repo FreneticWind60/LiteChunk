@@ -106,34 +106,31 @@ public class JavaChunkReader {
         byte[] skyLight = nbt.getByteArray("SkyLight", null);
 
         // Set up the values if they were found
-        if (blockLight != null) {
-            chunk.setBlockLight(new byte[16][16][16]);
+        byte[] targetBlockLight = blockLight == null ? null : new byte[ChunkerChunk.LIGHT_ARRAY_LENGTH];
+        byte[] targetSkyLight = skyLight == null ? null : new byte[ChunkerChunk.LIGHT_ARRAY_LENGTH];
+        if (targetBlockLight != null) {
+            chunk.setBlockLight(targetBlockLight);
         }
-        if (skyLight != null) {
-            chunk.setSkyLight(new byte[16][16][16]);
+        if (targetSkyLight != null) {
+            chunk.setSkyLight(targetSkyLight);
         }
 
-        // Read the values out of both arrays
-        if (blockLight != null || skyLight != null) {
-            for (int i = 0; i < 4096; i++) {
-                // Co-ords
-                int x = i & 0xF;
-                int z = (i >> 4) & 0xF;
-                int y = (i >> 8) & 0xF;
+        // Read the values out of both arrays. The nibble arrays are already in (y, z, x) order with x varying
+        // fastest, which is exactly the index of the flat light arrays, so this loop has no coordinate math and no
+        // third level of indirection to chase.
+        for (int i = 0; i < ChunkerChunk.LIGHT_ARRAY_LENGTH; i++) {
+            // Nibble (half-byte arrays)
+            int nibbleIndex = i >> 1;
+            boolean lowestBits = (i & 1) == 0;
 
-                // Nibble (half-byte arrays)
-                int nibbleIndex = i >> 1;
-                boolean lowestBits = (i & 1) == 0;
+            // If the blockLight is present convert it from the nibble array to a normal array
+            if (targetBlockLight != null) {
+                targetBlockLight[i] = ByteUtil.getNibbleFromByte(blockLight[nibbleIndex], lowestBits);
+            }
 
-                // If the blockLight is present convert it from the nibble array to a normal array
-                if (blockLight != null) {
-                    chunk.getBlockLight()[x][y][z] = ByteUtil.getNibbleFromByte(blockLight[nibbleIndex], lowestBits);
-                }
-
-                // If the skyLight is present convert it from the nibble array to a normal array
-                if (skyLight != null) {
-                    chunk.getSkyLight()[x][y][z] = ByteUtil.getNibbleFromByte(skyLight[nibbleIndex], lowestBits);
-                }
+            // If the skyLight is present convert it from the nibble array to a normal array
+            if (targetSkyLight != null) {
+                targetSkyLight[i] = ByteUtil.getNibbleFromByte(skyLight[nibbleIndex], lowestBits);
             }
         }
     }

@@ -9,10 +9,32 @@ import org.jetbrains.annotations.Nullable;
  * A chunk which is part of a ChunkerColumn.
  */
 public class ChunkerChunk {
+    /**
+     * Length of a light array: 16x16x16 values, one byte each.
+     */
+    public static final int LIGHT_ARRAY_LENGTH = 16 * 16 * 16;
+
     private byte y;
     private Palette<ChunkerBlockIdentifier> palette = SingleValuePalette.chunk(ChunkerBlockIdentifier.AIR);
-    private byte[][] @Nullable [] blockLight;
-    private byte[][] @Nullable [] skyLight;
+    private byte @Nullable [] blockLight;
+    private byte @Nullable [] skyLight;
+
+    /**
+     * Build the index used by the flat light arrays.
+     * <p>
+     * The light of a chunk used to be {@code byte[16][16][16]}, which is 273 arrays (1 outer + 16 + 256) to hold
+     * 4096 bytes: the object headers alone doubled the cost of the data, and a {@code [x][y][z]} walk jumped to a
+     * different array per block. It is now a single flat array in {@code (y, z, x)} order with x varying fastest,
+     * the same order the formats read and write it in.
+     *
+     * @param x the x position (0-15).
+     * @param y the y position (0-15).
+     * @param z the z position (0-15).
+     * @return the index into the flat light array.
+     */
+    public static int lightIndex(int x, int y, int z) {
+        return (y << 8) | (z << 4) | x;
+    }
 
     /**
      * Create a new chunk.
@@ -62,36 +84,40 @@ public class ChunkerChunk {
     /**
      * Get the block light for the chunk.
      *
-     * @return a 16x16x16 array or null if not present.
+     * @return a flat {@link #LIGHT_ARRAY_LENGTH} byte array indexed by {@link #lightIndex(int, int, int)}, or null if
+     * not present.
      */
-    public byte[][] @Nullable [] getBlockLight() {
+    public byte @Nullable [] getBlockLight() {
         return blockLight;
     }
 
     /**
      * Set the block light for the chunk.
      *
-     * @param blockLight a 16x16x16 array or null if not present.
+     * @param blockLight a flat {@link #LIGHT_ARRAY_LENGTH} byte array indexed by
+     *                   {@link #lightIndex(int, int, int)}, or null if not present.
      */
-    public void setBlockLight(byte[][] @Nullable [] blockLight) {
+    public void setBlockLight(byte @Nullable [] blockLight) {
         this.blockLight = blockLight;
     }
 
     /**
      * Get the skylight for the chunk.
      *
-     * @return a 16x16x16 array or null if not present.
+     * @return a flat {@link #LIGHT_ARRAY_LENGTH} byte array indexed by {@link #lightIndex(int, int, int)}, or null if
+     * not present.
      */
-    public byte[][] @Nullable [] getSkyLight() {
+    public byte @Nullable [] getSkyLight() {
         return skyLight;
     }
 
     /**
      * Set the skylight for the chunk.
      *
-     * @param skyLight a 16x16x16 array or null if not present.
+     * @param skyLight a flat {@link #LIGHT_ARRAY_LENGTH} byte array indexed by
+     *                 {@link #lightIndex(int, int, int)}, or null if not present.
      */
-    public void setSkyLight(byte[][] @Nullable [] skyLight) {
+    public void setSkyLight(byte @Nullable [] skyLight) {
         this.skyLight = skyLight;
     }
 
