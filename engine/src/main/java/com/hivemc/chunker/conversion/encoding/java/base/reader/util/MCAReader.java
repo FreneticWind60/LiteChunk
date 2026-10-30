@@ -2,26 +2,38 @@ package com.hivemc.chunker.conversion.encoding.java.base.reader.util;
 
 import com.hivemc.chunker.conversion.encoding.base.Converter;
 import com.hivemc.chunker.conversion.intermediate.column.chunk.ChunkCoordPair;
-import com.hivemc.chunker.nbt.io.Reader;
 import com.hivemc.chunker.nbt.tags.Tag;
 import com.hivemc.chunker.nbt.tags.collection.CompoundTag;
 import com.hivemc.chunker.scheduling.task.Task;
 import com.hivemc.chunker.scheduling.task.TaskWeight;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
 
 /**
  * Utility for reading Java .mca files.
+ * <p>
+ * Reads are done with positional {@link FileChannel#read(ByteBuffer, long)} calls rather than a
+ * {@link java.io.RandomAccessFile}. A RandomAccessFile owns a single file pointer, so every seek/read pair has to be
+ * serialised with a lock - and since a region file holds 1024 columns, that lock serialised an entire region and left
+ * most of the worker threads waiting instead of reading. A positional read carries its own offset and can be issued
+ * from any number of threads at once.
  */
 public class MCAReader implements AutoCloseable {
+    /**
+     * Per-thread scratch buffer for the shared 5 byte column header (length + compression type).
+     */
+    private static final ThreadLocal<ByteBuffer> HEADER = ThreadLocal.withInitial(() -> ByteBuffer.allocate(5));
+
     private final Converter converter;
     private final File folder;
-    private final RandomAccessFile randomAccessFile;
-    private final Reader reader;
+    private final FileChannel channel;
 
     /**
      * Create a new MCAReader (must be closed after).
@@ -33,8 +45,13 @@ public class MCAReader implements AutoCloseable {
     public MCAReader(Converter converter, File file) throws FileNotFoundException {
         this.converter = converter;
         folder = file.getParentFile();
-        randomAccessFile = new RandomAccessFile(file, "r");
-        reader = Reader.toJavaReader(randomAccessFile);
+        try {
+            channel = FileChannel.open(file.toPath(), StandardOpenOption.READ);
+        } catch (IOException e) {
+            FileNotFoundException notFound = new FileNotFoundException(file.getPath());
+            notFound.initCause(e);
+            throw notFound;
+        }
     }
 
     /**
@@ -48,7 +65,7 @@ public class MCAReader implements AutoCloseable {
 
         // Read into temporary buffer
         byte[] temp = new byte[4096];
-        reader.readBytes(temp);
+        readFully(ByteBuffer.wrap(temp), 0L);
 
         // Read the header which contains the chunk offsets
         for (int i = 0; i < 1024; i++) {
@@ -76,13 +93,15 @@ public class MCAReader implements AutoCloseable {
      * @throws IOException if it failed to read the .mca file.
      */
     public Task<CompoundTag> readColumn(ChunkCoordPair columnCoordPair, int offset) throws IOException {
-        // Seek to the location of the column (4096 sized chunks)
-        randomAccessFile.seek(offset * 4096L);
+        // Columns are padded to 4096 byte sectors. The record is a 4 byte big endian length (which includes the
+        // compression type byte) followed by the compression type and the payload.
+        long position = offset * 4096L;
+        ByteBuffer header = HEADER.get();
+        header.clear();
+        readFully(header, position);
 
-        int chunkLength = reader.readInt() - 1; // Minus 1 as it includes compression type
-
-        // Check compression type
-        byte rawType = reader.readByte();
+        int chunkLength = header.getInt(0) - 1; // Minus 1 as it includes compression type
+        byte rawType = header.get(4);
         byte compressionType = (byte) (rawType & ~0x80);
 
         byte[] compressedColumn;
@@ -92,9 +111,12 @@ public class MCAReader implements AutoCloseable {
             File file = new File(folder, "c." + columnCoordPair.chunkX() + "." + columnCoordPair.chunkZ() + ".mcc");
             compressedColumn = Files.readAllBytes(file.toPath());
         } else {
+            if (chunkLength < 0) {
+                throw new IOException("Invalid column length %d for %s".formatted(chunkLength, columnCoordPair));
+            }
             // Read bytes for later processing
             compressedColumn = new byte[chunkLength];
-            reader.readBytes(compressedColumn);
+            readFully(ByteBuffer.wrap(compressedColumn), position + 5L);
         }
 
         // Make a task to do the decompression, this is allowed async as we don't need to do any more sync operations
@@ -103,6 +125,24 @@ public class MCAReader implements AutoCloseable {
                 TaskWeight.HIGH,
                 () -> decompressColumn(columnCoordPair, compressionType, compressedColumn)
         );
+    }
+
+    /**
+     * Read exactly buffer.remaining() bytes starting at a file position.
+     *
+     * @param buffer   the destination buffer.
+     * @param position the absolute file position to read from.
+     * @throws IOException if the file could not be read or ended early.
+     */
+    private void readFully(ByteBuffer buffer, long position) throws IOException {
+        while (buffer.hasRemaining()) {
+            // The offset has to advance with the buffer, otherwise a short read (which a channel is allowed to do)
+            // would re-read the same bytes forever.
+            int read = channel.read(buffer, position + buffer.position());
+            if (read < 0) {
+                throw new EOFException("Unexpected end of file after " + buffer.position() + " bytes");
+            }
+        }
     }
 
     /**
@@ -135,6 +175,6 @@ public class MCAReader implements AutoCloseable {
 
     @Override
     public void close() throws IOException {
-        randomAccessFile.close();
+        channel.close();
     }
 }

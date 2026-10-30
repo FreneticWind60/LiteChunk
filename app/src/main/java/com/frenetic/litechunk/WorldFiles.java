@@ -154,12 +154,9 @@ final class WorldFiles {
     /**
      * Pack a converted world into a {@code .zip} / {@code .mcworld}.
      * <p>
-     * The obvious optimisation here - "everything in a world is already compressed, so deflate is wasted CPU, store
-     * it" - was measured and is false. A converted Bedrock output (80 MB of {@code db/*.ldb} and {@code .log} for a
-     * 278 MB Java world) still deflates to 38%, because the writer leaves most of the LevelDB payload as palette
-     * runs and zero padding. Storing it verbatim multiplies the archive 2.6x for a saving of ~2% of the pipeline.
-     * <p>
-     * What <em>is</em> free is a cheaper level for Java region files, see {@link #levelFor(String)}.
+     * There is no single right deflate level for a converted world: the archive mixes already compressed LevelDB
+     * tables, uncompressed LevelDB logs and Java region files, and each wants a different answer. See
+     * {@link #levelFor(String)} for the measured numbers behind the split.
      */
     static void zip(File directory, File zipFile) throws IOException {
         File parent = zipFile.getParentFile();
@@ -205,14 +202,21 @@ final class WorldFiles {
     /**
      * Deflate level for a single entry.
      * <p>
-     * Java region files are the one case where a cheaper level is free, because two thirds of a converted
-     * {@code .mca} is 4 KB sector padding and repeated zlib headers, which even the fast level catches:
+     * The rule has to be per file type, because a converted world is two very different kinds of bytes:
      * <ul>
-     *   <li>converted 278 MB world, 80 MB output: level 1 = 38.7% of source, level 6 = 38.0%, 1.4x faster;</li>
-     *   <li>converted 25 MB world, 11 MB output: both 38%, 3x faster.</li>
+     *   <li>{@code db/*.ldb} are LevelDB tables that the engine already zlib compressed block by block
+     *       ({@code CompressionType.ZLIB_RAW}). Deflating them again is pure waste: measured on a 257 MB world,
+     *       66.1 MB of {@code .ldb} shrinks to 64.0 MB (96%) and costs 3.7 s. Storing them costs 0.1 s and makes the
+     *       archive 4% bigger - the only case where level 0 is the right answer.</li>
+     *   <li>{@code db/*.log} is the LevelDB write ahead log, which is <em>not</em> compressed: 103.3 MB deflates to
+     *       11.0 MB (10%). This is where the archive actually gets small, so these keep the default level.</li>
+     *   <li>Java region files are the case where a cheaper level is free, because two thirds of a converted
+     *       {@code .mca} is 4 KB sector padding and repeated zlib headers, which even the fast level catches:
+     *       converted 278 MB world, 80 MB output: level 1 = 38.7% of source, level 6 = 38.0%, 1.4x faster.</li>
      * </ul>
-     * Level 0 was rejected everywhere: 20x faster, but it stores the bytes verbatim, so an 80 MB folder becomes an
-     * 80 MB archive instead of 30 MB. LevelDB files keep the default level for the same reason.
+     * An earlier version of this comment claimed the whole {@code db/} folder "still deflates to 38%". That was
+     * measured on a world small enough that almost everything was still in {@code .log}, and it does not hold for a
+     * large world where the tables dominate - which is exactly the case this optimisation is for.
      *
      * @param entryName the path inside the archive.
      * @return the deflate level to use for this entry.
@@ -223,6 +227,9 @@ final class WorldFiles {
         String extension = dot == -1 ? "" : lower.substring(dot + 1);
         if ("mca".equals(extension) || "mcr".equals(extension)) {
             return Deflater.BEST_SPEED;
+        }
+        if ("ldb".equals(extension) || "sst".equals(extension)) {
+            return Deflater.NO_COMPRESSION;
         }
         return Deflater.DEFAULT_COMPRESSION;
     }

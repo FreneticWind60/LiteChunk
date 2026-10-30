@@ -16,6 +16,8 @@ import com.hivemc.chunker.conversion.intermediate.column.chunk.identifier.type.b
 import com.hivemc.chunker.conversion.intermediate.column.chunk.palette.Palette;
 import com.hivemc.chunker.conversion.intermediate.column.chunk.palette.ShortBasedPalette;
 import com.hivemc.chunker.conversion.intermediate.world.Dimension;
+import com.google.common.io.ByteArrayDataOutput;
+import com.google.common.io.ByteStreams;
 import com.hivemc.chunker.nbt.io.Writer;
 import com.hivemc.chunker.nbt.tags.Tag;
 import com.hivemc.chunker.scheduling.function.ThrowableConsumer;
@@ -24,8 +26,6 @@ import com.hivemc.chunker.scheduling.task.TaskWeight;
 import org.iq80.leveldb.DB;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +39,12 @@ public class BedrockChunkWriter {
     protected final Converter converter;
     protected final Dimension dimension;
     protected final ChunkerColumn chunkerColumn;
+
+    /**
+     * Starting size for a serialised section: one palette layer is 4096 entries of at most 16 bits plus a palette of
+     * block states, 16 KB covers the common cases without a single reallocation.
+     */
+    protected static final int PALETTE_OUTPUT_SIZE = 16 * 1024;
 
     /**
      * Create a new Bedrock Chunk Writer.
@@ -100,28 +106,29 @@ public class BedrockChunkWriter {
      * @throws Exception if it failed to write the palette.
      */
     protected void writeBlockPalette(ChunkerChunk chunk) throws Exception {
-        byte[] bytes;
-        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-             DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)) {
-            Writer writer = Writer.toBedrockWriter(dataOutputStream);
+        // A ByteArrayDataOutput rather than a ByteArrayOutputStream: every writeByte/writeInt of a palette used to
+        // go through the synchronised, bounds checked ByteArrayOutputStream.write(int) one byte at a time (and grew
+        // its 32 byte buffer over and over). Writing 1024 words per section that was the single hottest method in a
+        // profile of a 257 MB world. This one writes straight into a presized array.
+        ByteArrayDataOutput dataOutput = ByteStreams.newDataOutput(PALETTE_OUTPUT_SIZE);
+        Writer writer = Writer.toBedrockWriter(dataOutput);
 
-            writer.writeByte((byte) 8); // Version 8 chunks, palette
+        writer.writeByte((byte) 8); // Version 8 chunks, palette
 
-            Palette<BedrockBlockCompoundTag> blockPalette = chunk.getPalette().map(resolvers::writeBlock);
+        Palette<BedrockBlockCompoundTag> blockPalette = chunk.getPalette().map(resolvers::writeBlock);
 
-            // Calculate waterlogged states
-            boolean containsWaterlogged = blockPalette.containsValue(BedrockBlockCompoundTag::waterlogged);
+        // Calculate waterlogged states
+        boolean containsWaterlogged = blockPalette.containsValue(BedrockBlockCompoundTag::waterlogged);
 
-            // Write size
-            int layers = containsWaterlogged ? 2 : 1;
-            writer.writeByte((byte) layers); // Size
+        // Write size
+        int layers = containsWaterlogged ? 2 : 1;
+        writer.writeByte((byte) layers); // Size
 
-            // Write each layer
-            writeLayers(writer, layers, blockPalette);
+        // Write each layer
+        writeLayers(writer, layers, blockPalette);
 
-            // Collect the byte array for leveldb
-            bytes = byteArrayOutputStream.toByteArray();
-        }
+        // Collect the byte array for leveldb
+        byte[] bytes = dataOutput.toByteArray();
 
         writeChunkBytes(chunk, bytes);
     }

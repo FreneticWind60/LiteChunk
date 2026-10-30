@@ -14,11 +14,11 @@ import com.hivemc.chunker.conversion.intermediate.column.chunk.palette.Palette;
 import com.hivemc.chunker.conversion.intermediate.column.chunk.palette.SingleValuePalette;
 import com.hivemc.chunker.conversion.intermediate.column.heightmap.BedrockHeightMap;
 import com.hivemc.chunker.conversion.intermediate.world.Dimension;
+import com.google.common.io.ByteArrayDataOutput;
+import com.google.common.io.ByteStreams;
 import com.hivemc.chunker.nbt.io.Writer;
 import org.iq80.leveldb.DB;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.util.Collections;
 import java.util.List;
 
@@ -38,10 +38,10 @@ public class ColumnWriter extends com.hivemc.chunker.conversion.encoding.bedrock
         }
 
         // Write Data3D (3d biomes)
+        ByteArrayDataOutput dataOutput = ByteStreams.newDataOutput(16 * 1024);
         byte[] bytes;
-        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024);
-             DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)) {
-            Writer writer = Writer.toBedrockWriter(dataOutputStream);
+        {
+            Writer writer = Writer.toBedrockWriter(dataOutput);
             short[][] heightMapValues = heightMap.getHeightMap();
 
             // Write height map (LE Short)
@@ -102,7 +102,7 @@ public class ColumnWriter extends com.hivemc.chunker.conversion.encoding.bedrock
                 }
             }
 
-            bytes = byteArrayOutputStream.toByteArray();
+            bytes = dataOutput.toByteArray();
         }
 
         // Save Data3D (0x2B) - Heightmap / Biome

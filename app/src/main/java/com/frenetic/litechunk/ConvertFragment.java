@@ -32,7 +32,6 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.android.material.snackbar.Snackbar;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -69,10 +68,6 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
     private String shownQuote = "";
     /** One scroll per run, see {@link #renderInternal()}. */
     private boolean autoScrolled;
-    /** Whether the whack-a-mole grid is currently unfolded; the run ending closes it. */
-    private boolean gameOpen;
-    /** The message on screen, so rapid hits replace it instead of queueing a backlog behind the grid. */
-    private Snackbar gameToast;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -115,8 +110,6 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         binding.btnAdd.setOnClickListener(this::showSourceSheet);
         binding.btnConvert.setOnClickListener(this::startConversion);
         binding.btnCancel.setOnClickListener(v -> controller.cancel());
-        binding.tvGameEntry.setOnClickListener(v -> toggleGame());
-        binding.moleGrid.setListener(this::onMoleHit);
         quotes = getResources().getStringArray(R.array.quote_lines);
         binding.tvGoFiles.setOnClickListener(v -> {
             if (requireActivity() instanceof MainActivity activity) {
@@ -763,11 +756,9 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
                 shownQuote = quote;
                 binding.tvQuote.setText(quote);
             }
-            binding.tvGameEntry.setVisibility(View.VISIBLE);
-            binding.moleGrid.setVisibility(gameOpen ? View.VISIBLE : View.GONE);
             if (!autoScrolled) {
-                // The cancel / game row is the last thing in the card, and on a tall phone the card grows past the
-                // fold the moment it appears: the row would land under the gesture area, where taps never arrive.
+                // The cancel row is the last thing in the card, and on a tall phone the card grows past the fold the
+                // moment it appears: the row would land under the gesture area, where taps never arrive.
                 // Scrolling to the end once, at the start of a run, is also what a user would do by hand.
                 autoScrolled = true;
                 binding.getRoot().post(() -> binding.getRoot()
@@ -775,8 +766,6 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             }
         } else {
             autoScrolled = false;
-            // The grid only exists while a conversion does: there is nothing left to wait for once it ends.
-            closeGame();
             binding.cardProgress.setVisibility(View.GONE);
         }
 
@@ -820,54 +809,6 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         }
         int index = (int) ((elapsedSeconds / QUOTE_SECONDS) % quotes.length);
         return quotes[index];
-    }
-
-    /**
-     * Unfold or fold the whack-a-mole grid under the progress bar.
-     * <p>
-     * In place rather than in a sheet: the reason to play at all is that the conversion is still running, and a sheet
-     * covers the timer, the percentage and the cancel button — the things the user is actually watching. Everything
-     * stops when it is folded away, so a card that is only glanced at costs nothing while eight threads convert.
-     */
-    private void toggleGame() {
-        if (gameOpen) {
-            closeGame();
-            return;
-        }
-        gameOpen = true;
-        binding.moleGrid.setVisibility(View.VISIBLE);
-        binding.moleGrid.start();
-        binding.tvGameEntry.setText("收起游戏");
-        // The card just grew by about a third of the screen. Without a second scroll the cancel row ends up below the
-        // gesture bar again, which is the exact problem the first scroll exists to avoid.
-        binding.getRoot().post(() -> binding.getRoot()
-                .smoothScrollTo(0, binding.getRoot().getChildAt(0).getHeight()));
-    }
-
-    private void closeGame() {
-        if (!gameOpen) {
-            return;
-        }
-        gameOpen = false;
-        binding.moleGrid.stop();
-        binding.moleGrid.setVisibility(View.GONE);
-        binding.tvGameEntry.setText("等待时玩点游戏？");
-    }
-
-    /**
-     * One hit of the grid.
-     * <p>
-     * The percentage in the message is a joke, not a setting: the bar above keeps showing the real number, because a
-     * progress indicator that lies is worse than no game at all.
-     */
-    private void onMoleHit(boolean luck) {
-        if (gameToast != null) {
-            gameToast.dismiss();
-        }
-        gameToast = Snackbar.make(binding.getRoot(),
-                luck ? "抓到一只 LiteChunk！转换速度+3%" : "苦力怕爆炸啦！转换速度-3%",
-                Snackbar.LENGTH_SHORT);
-        gameToast.show();
     }
 
     private String queueSignature(Store store, boolean running) {

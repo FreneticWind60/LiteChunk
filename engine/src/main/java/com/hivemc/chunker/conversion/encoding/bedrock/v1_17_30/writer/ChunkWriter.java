@@ -9,11 +9,10 @@ import com.hivemc.chunker.conversion.intermediate.column.ChunkerColumn;
 import com.hivemc.chunker.conversion.intermediate.column.chunk.ChunkerChunk;
 import com.hivemc.chunker.conversion.intermediate.column.chunk.palette.Palette;
 import com.hivemc.chunker.conversion.intermediate.world.Dimension;
+import com.google.common.io.ByteArrayDataOutput;
+import com.google.common.io.ByteStreams;
 import com.hivemc.chunker.nbt.io.Writer;
 import org.iq80.leveldb.DB;
-
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 
 public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.bedrock.v1_17.writer.ChunkWriter {
     public ChunkWriter(Converter converter, BedrockResolvers resolvers, DB database, Dimension dimension, ChunkerColumn chunkerColumn) {
@@ -22,31 +21,30 @@ public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.bedrock.
 
     @Override
     protected void writeBlockPalette(ChunkerChunk chunk) throws Exception {
-        byte[] bytes;
-        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-             DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)) {
-            Writer writer = Writer.toBedrockWriter(dataOutputStream);
+        // Presized ByteArrayDataOutput, see BedrockChunkWriter#writeBlockPalette: the stream based version spent a
+        // fifth of the whole conversion growing and synchronising a 32 byte buffer one byte at a time.
+        ByteArrayDataOutput dataOutput = ByteStreams.newDataOutput(PALETTE_OUTPUT_SIZE);
+        Writer writer = Writer.toBedrockWriter(dataOutput);
 
-            writer.writeByte((byte) 9); // Version 9 palette with extra index
+        writer.writeByte((byte) 9); // Version 9 palette with extra index
 
-            Palette<BedrockBlockCompoundTag> blockPalette = chunk.getPalette().map(resolvers::writeBlock);
+        Palette<BedrockBlockCompoundTag> blockPalette = chunk.getPalette().map(resolvers::writeBlock);
 
-            // Calculate waterlogged states
-            boolean containsWaterlogged = blockPalette.containsValue(BedrockBlockCompoundTag::waterlogged);
+        // Calculate waterlogged states
+        boolean containsWaterlogged = blockPalette.containsValue(BedrockBlockCompoundTag::waterlogged);
 
-            // Write size
-            int layers = containsWaterlogged ? 2 : 1;
-            writer.writeByte((byte) layers); // Size
+        // Write size
+        int layers = containsWaterlogged ? 2 : 1;
+        writer.writeByte((byte) layers); // Size
 
-            // Write index
-            writer.writeByte(chunk.getY());
+        // Write index
+        writer.writeByte(chunk.getY());
 
-            // Write each layer
-            writeLayers(writer, layers, blockPalette);
+        // Write each layer
+        writeLayers(writer, layers, blockPalette);
 
-            // Collect the byte array for leveldb
-            bytes = byteArrayOutputStream.toByteArray();
-        }
+        // Collect the byte array for leveldb
+        byte[] bytes = dataOutput.toByteArray();
 
         // Write the entry
         writeChunkBytes(chunk, bytes);

@@ -24,7 +24,7 @@ android {
         applicationId = "com.frenetic.litechunk"
         minSdk = 27
         targetSdk = 37
-        // 1.21.0 build3 pr5
+        // 1.21.0 build3 pr6
         // versionCode = major*10^8 + minor*10^6 + patch*10^4 + build*100 + stage,
         //   stage = 1..49 for a preview ("prN"), 50 for the released build.
         //   -> 1.21.0 build1 = 121_000_150, 1.21.0 build2 = 121_000_250, 1.21.0 build3 = 121_000_350.
@@ -33,8 +33,8 @@ android {
         // The 10^8 scale (rather than 10^7) is deliberate: the first two previews shipped as
         // 12_100_501 / 12_100_502 under an older encoding, and a release has to be installable over
         // them on any device that still has one.
-        versionCode = 121_000_305
-        versionName = "1.21.0 build3 pr5"
+        versionCode = 121_000_306
+        versionName = "1.21.0 build3 pr6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

@@ -348,10 +348,9 @@ public class JavaWorldReader implements WorldReader {
                     if (offset <= 0) continue; // Skip if it's 0 or less as that indicates it's not used in this file
 
                     try {
-                        // Schedule the decompression of the column, we need to do the read sync as this is run in parallel
-                        synchronized (mcaReader) {
-                            decompressingTasks.add(mcaReader.readColumn(columnsCoords, offset));
-                        }
+                        // Safe to call from several workers at once: MCAReader reads with positional IO and has no
+                        // shared file pointer, so this no longer has to be serialised with a lock.
+                        decompressingTasks.add(mcaReader.readColumn(columnsCoords, offset));
 
                         // Add to the indexes, so we know this file was found
                         decompressingTasksIndexes.add(regionFileIndex);

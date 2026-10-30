@@ -16,6 +16,8 @@ import com.hivemc.chunker.conversion.intermediate.column.entity.Entity;
 import com.hivemc.chunker.conversion.intermediate.column.heightmap.BedrockHeightMap;
 import com.hivemc.chunker.conversion.intermediate.world.Dimension;
 import com.hivemc.chunker.mapping.identifier.Identifier;
+import com.google.common.io.ByteArrayDataOutput;
+import com.google.common.io.ByteStreams;
 import com.hivemc.chunker.nbt.io.Writer;
 import com.hivemc.chunker.nbt.tags.Tag;
 import com.hivemc.chunker.nbt.tags.collection.CompoundTag;
@@ -25,9 +27,6 @@ import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 import org.jetbrains.annotations.Nullable;
 
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataOutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -227,11 +226,11 @@ public class BedrockColumnWriter implements ColumnWriter {
             heightMap = bedrockHeightMap;
         }
 
-        // Write Data2D
+        // Write Data2D into a presized array: 512 bytes of height map plus at most 256 bytes of biome ids.
+        ByteArrayDataOutput dataOutput = ByteStreams.newDataOutput(1024);
         byte[] bytes;
-        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024);
-             DataOutputStream dataOutputStream = new DataOutputStream(byteArrayOutputStream)) {
-            Writer writer = Writer.toBedrockWriter(dataOutputStream);
+        {
+            Writer writer = Writer.toBedrockWriter(dataOutput);
             short[][] heightMapValues = heightMap.getHeightMap();
 
             // Write height map (LE Short)
@@ -255,7 +254,7 @@ public class BedrockColumnWriter implements ColumnWriter {
                 }
             }
 
-            bytes = byteArrayOutputStream.toByteArray();
+            bytes = dataOutput.toByteArray();
         }
 
         // Save Data2D (0x2D) - Heightmap / Biome
@@ -270,27 +269,24 @@ public class BedrockColumnWriter implements ColumnWriter {
      */
     protected void writeEntities(ChunkerColumn column) throws Exception {
         // Write entities
-        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024)) {
-            try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(byteArrayOutputStream);
-                 DataOutputStream writerStream = new DataOutputStream(bufferedOutputStream)) {
-                // Write each entity as a separate tag
-                for (Entity entity : column.getEntities()) {
-                    try {
-                        // Process the tag
-                        CompoundTag tag = writeEntity(column, entity);
-                        if (tag != null) {
-                            // Encode
-                            Tag.encodeNamed(Writer.toBedrockWriter(writerStream), "", tag);
-                        }
-                    } catch (Exception e) {
-                        converter.logNonFatalException(new Exception("Failed to process Entity " + entity, e));
-                    }
+        ByteArrayDataOutput dataOutput = ByteStreams.newDataOutput(4 * 1024);
+        Writer entityWriter = Writer.toBedrockWriter(dataOutput);
+        // Write each entity as a separate tag
+        for (Entity entity : column.getEntities()) {
+            try {
+                // Process the tag
+                CompoundTag tag = writeEntity(column, entity);
+                if (tag != null) {
+                    // Encode
+                    Tag.encodeNamed(entityWriter, "", tag);
                 }
+            } catch (Exception e) {
+                converter.logNonFatalException(new Exception("Failed to process Entity " + entity, e));
             }
-
-            // Write the byte array to the key
-            database.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.ENTITY), byteArrayOutputStream.toByteArray());
         }
+
+        // Write the byte array to the key
+        database.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.ENTITY), dataOutput.toByteArray());
     }
 
     /**
@@ -320,27 +316,24 @@ public class BedrockColumnWriter implements ColumnWriter {
      */
     protected void writeBlockEntities(ChunkerColumn column) throws Exception {
         // Write block entities
-        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024)) {
-            try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(byteArrayOutputStream);
-                 DataOutputStream writerStream = new DataOutputStream(bufferedOutputStream)) {
-                // Write each block entity as a separate tag
-                for (BlockEntity blockEntity : column.getBlockEntities()) {
-                    try {
-                        // Process the tag
-                        CompoundTag tag = writeBlockEntity(column, blockEntity);
-                        if (tag != null) {
-                            // Encode
-                            Tag.encodeNamed(Writer.toBedrockWriter(writerStream), "", tag);
-                        }
-                    } catch (Exception e) {
-                        converter.logNonFatalException(new Exception("Failed to process BlockEntity " + blockEntity, e));
-                    }
+        ByteArrayDataOutput dataOutput = ByteStreams.newDataOutput(4 * 1024);
+        Writer blockEntityWriter = Writer.toBedrockWriter(dataOutput);
+        // Write each block entity as a separate tag
+        for (BlockEntity blockEntity : column.getBlockEntities()) {
+            try {
+                // Process the tag
+                CompoundTag tag = writeBlockEntity(column, blockEntity);
+                if (tag != null) {
+                    // Encode
+                    Tag.encodeNamed(blockEntityWriter, "", tag);
                 }
+            } catch (Exception e) {
+                converter.logNonFatalException(new Exception("Failed to process BlockEntity " + blockEntity, e));
             }
-
-            // Write the byte array to the key
-            database.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.BLOCK_ENTITY), byteArrayOutputStream.toByteArray());
         }
+
+        // Write the byte array to the key
+        database.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.BLOCK_ENTITY), dataOutput.toByteArray());
     }
 
     /**
