@@ -21,22 +21,17 @@ public class ColumnWriter extends com.hivemc.chunker.conversion.encoding.bedrock
     }
 
     @Override
-    protected void writeMetadata(ChunkerColumn chunkerColumn) throws Exception {
-        try (WriteBatch writeBatch = database.createWriteBatch()) {
-            if (isWriteBlendingData()) {
-                // Save Caves and Cliffs Blending (0x3d) (legacy)
-                writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.GENERATED_PRE_CAVES_AND_CLIFFS_BLENDING), new byte[]{0});
+    protected void writeMetadata(ChunkerColumn chunkerColumn, WriteBatch writeBatch) throws Exception {
+        if (isWriteBlendingData()) {
+            // Save Caves and Cliffs Blending (0x3d) (legacy)
+            writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.GENERATED_PRE_CAVES_AND_CLIFFS_BLENDING), new byte[]{0});
 
-                // Save new version (37)
-                writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.VERSION), new byte[]{37});
-            }
-
-            // Save legacy version (0x76)
-            writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.LEGACY_VERSION), new byte[]{7});
-
-            // Write the batch
-            database.write(writeBatch);
+            // Save new version (37)
+            writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.VERSION), new byte[]{37});
         }
+
+        // Save legacy version (0x76)
+        writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.LEGACY_VERSION), new byte[]{7});
     }
 
     @Override

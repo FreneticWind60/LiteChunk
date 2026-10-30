@@ -21,19 +21,29 @@ import com.google.common.io.ByteStreams;
 import com.hivemc.chunker.nbt.io.Writer;
 import com.hivemc.chunker.nbt.tags.Tag;
 import com.hivemc.chunker.nbt.tags.collection.CompoundTag;
-import com.hivemc.chunker.scheduling.task.Task;
-import com.hivemc.chunker.scheduling.task.TaskWeight;
 import org.iq80.leveldb.DB;
 import org.iq80.leveldb.WriteBatch;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 
 /**
  * A writer for Bedrock columns.
+ *
+ * <p>Everything a column produces is written synchronously, by the thread that was handed the column, into a single
+ * {@link WriteBatch}. Two separate problems are fixed by that shape:</p>
+ *
+ * <ul>
+ *   <li>LevelDB has one writer. One {@code put} per section meant ~24 round trips through the database mutex and the
+ *   write-ahead log for every column - several million for a large world - and every one of them blocked the other
+ *   workers. A column is now one {@code write()}.</li>
+ *   <li>The work used to be split into five async tasks plus one async task per chunk plus one per chunk palette, all
+ *   joined back together. Each of those tasks costs a queue insertion, two futures and three or four
+ *   {@code synchronized} blocks in {@code TrackedTask}, while the useful work inside it is tens of microseconds. The
+ *   overhead scales with the number of sections, and there are millions of sections.</li>
+ * </ul>
  */
 public class BedrockColumnWriter implements ColumnWriter {
     protected final BedrockWorldWriter parent;
@@ -69,16 +79,35 @@ public class BedrockColumnWriter implements ColumnWriter {
             chunk.setPalette(chunk.getPalette().compact(ChunkerBlockIdentifier.AIR));
         });
 
-        // Write the chunk to NBT
-        ArrayList<Task<Void>> processing = new ArrayList<>(5);
-        processing.add(Task.asyncConsume("Writing Metadata", TaskWeight.LOW, this::writeMetadata, chunkerColumn));
-        processing.add(Task.asyncConsume("Writing HeightMap/Biomes", TaskWeight.NORMAL, this::writeHeightMapBiomes, chunkerColumn));
-        processing.add(Task.asyncConsume("Writing Entities", TaskWeight.HIGH, this::writeEntities, chunkerColumn));
-        processing.add(Task.asyncConsume("Writing Block Entities", TaskWeight.HIGH, this::writeBlockEntities, chunkerColumn));
-        processing.add(Task.asyncConsume("Writing Chunks", TaskWeight.HIGHER, this::writeChunks, chunkerColumn));
+        // One batch per column: one database lock, one WAL record, one memtable insert.
+        try (WriteBatch writeBatch = database.createWriteBatch()) {
+            // Each part is isolated the way the old per-part tasks were: a failure in one of them does not take the
+            // rest of the column down with it.
+            writeSection("Metadata", () -> writeMetadata(chunkerColumn, writeBatch));
+            writeSection("HeightMap/Biomes", () -> writeHeightMapBiomes(chunkerColumn, writeBatch));
+            writeSection("Entities", () -> writeEntities(chunkerColumn, writeBatch));
+            writeSection("Block Entities", () -> writeBlockEntities(chunkerColumn, writeBatch));
+            writeSection("Chunks", () -> writeChunks(chunkerColumn, writeBatch));
 
-        // When they're done apply post-processing
-        Task.join(processing).then("Post-processing column", TaskWeight.HIGH, () -> postProcessColumn(chunkerColumn));
+            database.write(writeBatch);
+        }
+
+        // Called after the column has been written
+        postProcessColumn(chunkerColumn);
+    }
+
+    /**
+     * Run one part of a column write, logging rather than propagating a failure.
+     *
+     * @param name  the name of the part, used in the log message.
+     * @param write the work to run.
+     */
+    private void writeSection(String name, ThrowingRunnable write) {
+        try {
+            write.run();
+        } catch (Exception e) {
+            converter.logNonFatalException(new Exception("Failed to write " + name + " for column " + dimension, e));
+        }
     }
 
     @Override
@@ -90,16 +119,12 @@ public class BedrockColumnWriter implements ColumnWriter {
      * Write any version metadata for the column.
      *
      * @param chunkerColumn the column being written.
+     * @param writeBatch    the batch to add the entries to.
      * @throws Exception if it failed to write the metadata.
      */
-    protected void writeMetadata(ChunkerColumn chunkerColumn) throws Exception {
-        try (WriteBatch writeBatch = database.createWriteBatch()) {
-            // Save Version (0x76)
-            writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.LEGACY_VERSION), new byte[]{7});
-
-            // Write the batch
-            database.write(writeBatch);
-        }
+    protected void writeMetadata(ChunkerColumn chunkerColumn, WriteBatch writeBatch) throws Exception {
+        // Save Version (0x76)
+        writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.LEGACY_VERSION), new byte[]{7});
     }
 
     /**
@@ -214,10 +239,11 @@ public class BedrockColumnWriter implements ColumnWriter {
     /**
      * Write the height map and biomes for the column.
      *
-     * @param column the column being written.
+     * @param column     the column being written.
+     * @param writeBatch the batch to add the entries to.
      * @throws Exception if it failed to write the height map and biomes.
      */
-    protected void writeHeightMapBiomes(ChunkerColumn column) throws Exception {
+    protected void writeHeightMapBiomes(ChunkerColumn column, WriteBatch writeBatch) throws Exception {
         // If the heightmap isn't bedrock specific, we need to regenerate it
         BedrockHeightMap heightMap;
         if (!(column.getHeightMap() instanceof BedrockHeightMap bedrockHeightMap)) {
@@ -258,16 +284,17 @@ public class BedrockColumnWriter implements ColumnWriter {
         }
 
         // Save Data2D (0x2D) - Heightmap / Biome
-        database.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.DATA_2D), bytes);
+        writeBatch.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.DATA_2D), bytes);
     }
 
     /**
      * Write the entities to LevelDB.
      *
-     * @param column the column being written.
+     * @param column     the column being written.
+     * @param writeBatch the batch to add the entries to.
      * @throws Exception if it failed to write the entities.
      */
-    protected void writeEntities(ChunkerColumn column) throws Exception {
+    protected void writeEntities(ChunkerColumn column, WriteBatch writeBatch) throws Exception {
         // Write entities
         ByteArrayDataOutput dataOutput = ByteStreams.newDataOutput(4 * 1024);
         Writer entityWriter = Writer.toBedrockWriter(dataOutput);
@@ -286,7 +313,7 @@ public class BedrockColumnWriter implements ColumnWriter {
         }
 
         // Write the byte array to the key
-        database.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.ENTITY), dataOutput.toByteArray());
+        writeBatch.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.ENTITY), dataOutput.toByteArray());
     }
 
     /**
@@ -311,10 +338,11 @@ public class BedrockColumnWriter implements ColumnWriter {
     /**
      * Write the block entities to LevelDB.
      *
-     * @param column the column being written.
+     * @param column     the column being written.
+     * @param writeBatch the batch to add the entries to.
      * @throws Exception if it failed to write the block entities.
      */
-    protected void writeBlockEntities(ChunkerColumn column) throws Exception {
+    protected void writeBlockEntities(ChunkerColumn column, WriteBatch writeBatch) throws Exception {
         // Write block entities
         ByteArrayDataOutput dataOutput = ByteStreams.newDataOutput(4 * 1024);
         Writer blockEntityWriter = Writer.toBedrockWriter(dataOutput);
@@ -333,7 +361,7 @@ public class BedrockColumnWriter implements ColumnWriter {
         }
 
         // Write the byte array to the key
-        database.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.BLOCK_ENTITY), dataOutput.toByteArray());
+        writeBatch.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.BLOCK_ENTITY), dataOutput.toByteArray());
     }
 
     /**
@@ -358,14 +386,18 @@ public class BedrockColumnWriter implements ColumnWriter {
     /**
      * Write all the chunks inside the column.
      *
-     * @param column the column being written.
+     * @param column     the column being written.
+     * @param writeBatch the batch to add the entries to.
+     * @throws Exception if it failed to write a chunk.
      */
-    protected void writeChunks(ChunkerColumn column) {
+    protected void writeChunks(ChunkerColumn column, WriteBatch writeBatch) throws Exception {
         // Create the writer for the chunks
         BedrockChunkWriter chunkWriter = createChunkWriter(column);
 
-        // Schedule each chunk to be written
-        Task.asyncConsumeForEach("Writing Chunk", TaskWeight.NORMAL, chunkWriter::writeChunk, column.getChunks().values());
+        // Write each chunk, in this thread, into the same batch
+        for (ChunkerChunk chunk : column.getChunks().values()) {
+            chunkWriter.writeChunk(chunk, writeBatch);
+        }
     }
 
     /**
@@ -376,5 +408,13 @@ public class BedrockColumnWriter implements ColumnWriter {
      */
     public BedrockChunkWriter createChunkWriter(ChunkerColumn column) {
         return new BedrockChunkWriter(converter, resolvers, database, dimension, column);
+    }
+
+    /**
+     * A runnable which can throw, so the section wrappers do not need a checked exception of their own.
+     */
+    @FunctionalInterface
+    protected interface ThrowingRunnable {
+        void run() throws Exception;
     }
 }

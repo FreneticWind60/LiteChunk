@@ -18,6 +18,7 @@ import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import com.hivemc.chunker.nbt.io.Writer;
 import org.iq80.leveldb.DB;
+import org.iq80.leveldb.WriteBatch;
 
 import java.util.Collections;
 import java.util.List;
@@ -28,7 +29,7 @@ public class ColumnWriter extends com.hivemc.chunker.conversion.encoding.bedrock
     }
 
     @Override
-    protected void writeHeightMapBiomes(ChunkerColumn column) throws Exception {
+    protected void writeHeightMapBiomes(ChunkerColumn column, WriteBatch writeBatch) throws Exception {
         // If the heightmap isn't bedrock specific, we need to regenerate it
         BedrockHeightMap heightMap;
         if (!(column.getHeightMap() instanceof BedrockHeightMap bedrockHeightMap)) {
@@ -106,7 +107,7 @@ public class ColumnWriter extends com.hivemc.chunker.conversion.encoding.bedrock
         }
 
         // Save Data3D (0x2B) - Heightmap / Biome
-        database.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.DATA_3D), bytes);
+        writeBatch.put(LevelDBKey.key(dimension, column.getPosition(), LevelDBChunkType.DATA_3D), bytes);
     }
 
     @Override

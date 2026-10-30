@@ -39,7 +39,7 @@ public class ColumnWriter extends com.hivemc.chunker.conversion.encoding.bedrock
     }
 
     @Override
-    protected void writeEntities(ChunkerColumn column) throws Exception {
+    protected void writeEntities(ChunkerColumn column, WriteBatch writeBatch) throws Exception {
         // Write modern entities
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024)) {
             try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(byteArrayOutputStream);
@@ -48,7 +48,7 @@ public class ColumnWriter extends com.hivemc.chunker.conversion.encoding.bedrock
                 for (Entity entity : column.getEntities()) {
                     try {
                         // Write the entity
-                        byte[] key = writeKeyedEntity(column, entity);
+                        byte[] key = writeKeyedEntity(column, entity, writeBatch);
 
                         // Write the key
                         if (key != null) {
@@ -61,11 +61,11 @@ public class ColumnWriter extends com.hivemc.chunker.conversion.encoding.bedrock
             }
 
             // Write the byte array to the key
-            database.put(LevelDBKey.key(LevelDBKey.DIGP_PREFIX, dimension, column.getPosition()), byteArrayOutputStream.toByteArray());
+            writeBatch.put(LevelDBKey.key(LevelDBKey.DIGP_PREFIX, dimension, column.getPosition()), byteArrayOutputStream.toByteArray());
         }
     }
 
-    protected byte @Nullable [] writeKeyedEntity(ChunkerColumn column, Entity entity) throws Exception {
+    protected byte @Nullable [] writeKeyedEntity(ChunkerColumn column, Entity entity, WriteBatch writeBatch) throws Exception {
         byte[] key = null;
         try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream(1024)) {
             try (BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(byteArrayOutputStream);
@@ -92,7 +92,7 @@ public class ColumnWriter extends com.hivemc.chunker.conversion.encoding.bedrock
 
             // Write the byte array to the actor prefix + key
             if (key != null) {
-                database.put(LevelDBKey.key(LevelDBKey.ACTOR_PREFIX, key), byteArrayOutputStream.toByteArray());
+                writeBatch.put(LevelDBKey.key(LevelDBKey.ACTOR_PREFIX, key), byteArrayOutputStream.toByteArray());
             }
 
             return key;
@@ -108,25 +108,20 @@ public class ColumnWriter extends com.hivemc.chunker.conversion.encoding.bedrock
     }
 
     @Override
-    protected void writeMetadata(ChunkerColumn chunkerColumn) throws Exception {
-        try (WriteBatch writeBatch = database.createWriteBatch()) {
-            if (isWriteBlendingData()) {
-                // Save Caves and Cliffs Blending (0x3d) (legacy)
-                writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.GENERATED_PRE_CAVES_AND_CLIFFS_BLENDING), new byte[]{0});
+    protected void writeMetadata(ChunkerColumn chunkerColumn, WriteBatch writeBatch) throws Exception {
+        if (isWriteBlendingData()) {
+            // Save Caves and Cliffs Blending (0x3d) (legacy)
+            writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.GENERATED_PRE_CAVES_AND_CLIFFS_BLENDING), new byte[]{0});
 
-                // Save new version (40) - New entity storage
-                writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.VERSION), new byte[]{getChunkVersion()});
+            // Save new version (40) - New entity storage
+            writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.VERSION), new byte[]{getChunkVersion()});
 
-                // Save BlendingVersion (0x40) - If not correctly versioned, this will cause the map to generate badly made edges
-                writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.BLENDING_DATA), new byte[]{0, getBlendingVersion()});
-            }
-
-            // Save legacy version
-            writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.LEGACY_VERSION), new byte[]{7});
-
-            // Write the batch
-            database.write(writeBatch);
+            // Save BlendingVersion (0x40) - If not correctly versioned, this will cause the map to generate badly made edges
+            writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.BLENDING_DATA), new byte[]{0, getBlendingVersion()});
         }
+
+        // Save legacy version
+        writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), LevelDBChunkType.LEGACY_VERSION), new byte[]{7});
     }
 
     @Override
