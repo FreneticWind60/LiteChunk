@@ -66,7 +66,7 @@ versionCode = major*10^8 + minor*10^6 + patch*10^4 + build*100 + stage
 ### 发布
 
 GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build1`）。
-Release 正文直接取仓库根目录的 `RELEASE_NOTES.md`（每次发版前重写，只放当前版本的说明）。
+Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（仓库里曾经有一个 `RELEASE_NOTES.md`，因为会把测试存档的路径写进公开历史，已弃用）。
 关于页的「检查更新」把 tag 与 `BuildConfig.VERSION_NAME` 去掉所有非字母数字字符后比对，
 所以这两种写法都认作同一个版本 —— tag 里不能有空格，git 也不允许。
 仓库地址写死在 `AboutActivity.REPO`，fork 之后要改那一行。
