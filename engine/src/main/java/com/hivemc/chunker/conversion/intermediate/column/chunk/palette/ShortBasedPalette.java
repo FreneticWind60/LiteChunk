@@ -150,7 +150,39 @@ public class ShortBasedPalette<T> implements WriteablePalette<T> {
             return predicate.test(keys.get(0));
         }
 
-        // Otherwise loop through the keys and identify indexes
+        // Otherwise loop through the keys and identify indexes. The matching key indexes are held in two longs rather
+        // than a set: a chunk palette almost never has more than 128 keys, and this is called once per section while
+        // writing (to decide whether a liquid layer is needed), so an allocation here is per section per column.
+        if (size <= 128) {
+            long matchedLow = 0L;
+            long matchedHigh = 0L;
+            for (int i = 0; i < size; i++) {
+                if (!predicate.test(keys.get(i))) continue;
+                if (i < 64) {
+                    matchedLow |= 1L << i;
+                } else {
+                    matchedHigh |= 1L << (i - 64);
+                }
+            }
+
+            // Exit early if no matching identifiers
+            if ((matchedLow | matchedHigh) == 0L) {
+                return false;
+            }
+
+            for (short entry : values) {
+                if (entry < 0 || entry >= size) continue; // Ignore invalid blocks
+
+                // Return if it's a match
+                if (entry < 64 ? (matchedLow & (1L << entry)) != 0L : (matchedHigh & (1L << (entry - 64))) != 0L) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Fallback for palettes with more than 128 keys, which are rare
         ShortSet matchedIndexes = null;
         for (short i = 0; i < size; i++) {
             T identifier = keys.get(i);

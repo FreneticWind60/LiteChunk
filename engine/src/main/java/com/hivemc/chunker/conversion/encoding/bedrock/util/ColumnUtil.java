@@ -32,14 +32,18 @@ public class ColumnUtil {
         while (iterator.hasPrevious()) {
             ChunkerChunk chunk = iterator.previous().getValue();
             if (!chunk.isEmpty()) {
-                byte[][][] blockLight = chunk.getBlockLight();
-                byte[][][] skyLight = chunk.getSkyLight();
+                byte[] blockLight = chunk.getBlockLight();
+                byte[] skyLight = chunk.getSkyLight();
+                // The light arrays are flat in (y, z, x) order, so only the y part of the index changes as the
+                // column is walked downwards.
+                int lightIndexBase = (z << 4) | x;
                 int y = 15;
                 while (y >= 0) {
                     ChunkerBlockIdentifier identifier = chunk.getPalette().get(x, y, z, ChunkerBlockIdentifier.AIR);
                     if (!identifier.isAir()) {
                         // Fetch the light or if it's a slab
-                        int light = (blockLight == null ? 0 : blockLight[x][y][z]) + (skyLight == null ? 0 : skyLight[x][y][z]);
+                        int lightIndex = (y << 8) | lightIndexBase;
+                        int light = (blockLight == null ? 0 : blockLight[lightIndex]) + (skyLight == null ? 0 : skyLight[lightIndex]);
                         boolean litOrSlab = (light != 0 || identifier.getType().getStates().contains(VanillaBlockStates.SLAB_TYPE));
                         if (litOrSlab) {
                             // Return this height

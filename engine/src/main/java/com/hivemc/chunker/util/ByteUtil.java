@@ -33,23 +33,22 @@ public class ByteUtil {
     }
 
     /**
-     * Convert a 3D array into a 2048-bit nibble array.
+     * Convert a flat light array into a 2048-bit nibble array.
+     * <p>
+     * The input is already in (y, z, x) order with x varying fastest, which is the order the nibble array uses, so
+     * the index can be used directly instead of being decomposed into coordinates.
      *
-     * @param input the input 3D array.
+     * @param input the flat input array, length 4096.
      * @return an output array containing the compacted data with 2048 bytes length.
      */
-    public static byte[] convertToNibbleArray(byte[][][] input) {
+    public static byte[] convertToNibbleArray(byte[] input) {
         byte[] output = new byte[2048];
-        for (int i = 0; i < 4096; i++) {
-            int x = i & 0xF;
-            int z = (i >> 4) & 0xF;
-            int y = (i >> 8) & 0xF;
+        for (int i = 0; i < input.length; i++) {
             boolean lowestBits = (i & 1) == 0;
             int nibbleIndex = i >> 1;
-            byte inputValue = input[x][y][z];
 
             // Update the relevant nibble with the new value
-            output[nibbleIndex] = ByteUtil.updateNibble(output[nibbleIndex], inputValue, lowestBits);
+            output[nibbleIndex] = ByteUtil.updateNibble(output[nibbleIndex], input[i], lowestBits);
         }
         return output;
     }
