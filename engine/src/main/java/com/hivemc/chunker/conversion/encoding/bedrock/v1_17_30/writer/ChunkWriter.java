@@ -13,6 +13,7 @@ import com.google.common.io.ByteArrayDataOutput;
 import com.google.common.io.ByteStreams;
 import com.hivemc.chunker.nbt.io.Writer;
 import org.iq80.leveldb.DB;
+import org.iq80.leveldb.WriteBatch;
 
 public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.bedrock.v1_17.writer.ChunkWriter {
     public ChunkWriter(Converter converter, BedrockResolvers resolvers, DB database, Dimension dimension, ChunkerColumn chunkerColumn) {
@@ -20,7 +21,7 @@ public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.bedrock.
     }
 
     @Override
-    protected void writeBlockPalette(ChunkerChunk chunk) throws Exception {
+    protected void writeBlockPalette(ChunkerChunk chunk, WriteBatch writeBatch) throws Exception {
         // Presized ByteArrayDataOutput, see BedrockChunkWriter#writeBlockPalette: the stream based version spent a
         // fifth of the whole conversion growing and synchronising a 32 byte buffer one byte at a time.
         ByteArrayDataOutput dataOutput = ByteStreams.newDataOutput(PALETTE_OUTPUT_SIZE);
@@ -47,12 +48,12 @@ public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.bedrock.
         byte[] bytes = dataOutput.toByteArray();
 
         // Write the entry
-        writeChunkBytes(chunk, bytes);
+        writeChunkBytes(chunk, bytes, writeBatch);
     }
 
     @Override
-    protected void writeChunkBytes(ChunkerChunk chunk, byte[] bytes) {
+    protected void writeChunkBytes(ChunkerChunk chunk, byte[] bytes, WriteBatch writeBatch) {
         byte subChunkY = chunk.getY();
-        database.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), subChunkY, LevelDBChunkType.SUB_CHUNK_PREFIX), bytes);
+        writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), subChunkY, LevelDBChunkType.SUB_CHUNK_PREFIX), bytes);
     }
 }

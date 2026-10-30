@@ -9,6 +9,7 @@ import com.hivemc.chunker.conversion.intermediate.column.chunk.ChunkerChunk;
 import com.hivemc.chunker.conversion.intermediate.level.ChunkerGeneratorType;
 import com.hivemc.chunker.conversion.intermediate.world.Dimension;
 import org.iq80.leveldb.DB;
+import org.iq80.leveldb.WriteBatch;
 
 public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.bedrock.v1_16.writer.ChunkWriter {
     public ChunkWriter(Converter converter, BedrockResolvers resolvers, DB database, Dimension dimension, ChunkerColumn chunkerColumn) {
@@ -21,7 +22,7 @@ public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.bedrock.
     }
 
     @Override
-    protected void writeChunkBytes(ChunkerChunk chunk, byte[] bytes) {
+    protected void writeChunkBytes(ChunkerChunk chunk, byte[] bytes, WriteBatch writeBatch) {
         // Write the entry
         byte subChunkY = chunk.getY();
 
@@ -31,6 +32,6 @@ public class ChunkWriter extends com.hivemc.chunker.conversion.encoding.bedrock.
                 && converter.level().map(level -> level.getSettings().GeneratorType).orElse(ChunkerGeneratorType.CUSTOM) == ChunkerGeneratorType.NORMAL) {
             subChunkY += 4; // Move up 4 for Caves & Cliffs in older versions
         }
-        database.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), subChunkY, LevelDBChunkType.SUB_CHUNK_PREFIX), bytes);
+        writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), subChunkY, LevelDBChunkType.SUB_CHUNK_PREFIX), bytes);
     }
 }

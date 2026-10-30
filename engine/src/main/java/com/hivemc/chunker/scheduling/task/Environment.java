@@ -29,6 +29,7 @@ public class Environment extends TrackedTask<Void> implements Closeable {
      */
     public Environment(String name, int threads, Consumer<Throwable> exceptionHandler, @Nullable BiConsumer<String, Object> signalConsumer) {
         super(name, TaskWeight.NONE);
+        TrackedTask.resetProgress();
         executor = new TaskExecutor(threads, exceptionHandler, signalConsumer);
     }
 

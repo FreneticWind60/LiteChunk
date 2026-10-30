@@ -6,20 +6,41 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Stack;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.LongAdder;
 
 /**
  * TrackedTask is a task which can track its depth and have children. It implements progressive task allowing progress
  * to be reported.
  *
+ * <p>Progress is a pair of process wide counters rather than a walk of the task tree. The tree form required locking
+ * every live task in order: {@code getProgress()} on the root held the root's monitor while recursing, and every node
+ * it touched took that node's monitor - the same monitors the workers take in {@code setupParent}/{@code free}. A
+ * monitor thread sampling every 50 ms therefore fought the pool over thousands of objects. Counting the weight of
+ * tasks as they start and finish is O(1) and touches no task object.</p>
+ *
  * @param <O> the type returned from the task.
  */
 public abstract class TrackedTask<O> implements ProgressiveTask<O> {
     private static final ThreadLocal<Stack<TrackedTask<?>>> currentTaskStack = ThreadLocal.withInitial(Stack::new);
+    /**
+     * Weight of every task that has started, and of every task that has finished.
+     */
+    private static final LongAdder PROGRESS_TOTAL = new LongAdder();
+    private static final LongAdder PROGRESS_DONE = new LongAdder();
     private final String name;
     private final int weight;
     private Task.TaskStatus status;
     private List<ProgressiveTask<?>> children;
     private int depth;
+
+    /**
+     * Reset the progress counters, called when a new environment is created.
+     */
+    public static void resetProgress() {
+        PROGRESS_TOTAL.reset();
+        PROGRESS_DONE.reset();
+    }
+
 
     /**
      * Create a new TrackedTask.
@@ -48,6 +69,7 @@ public abstract class TrackedTask<O> implements ProgressiveTask<O> {
 
             // Mark this start as started
             status = TaskStatus.STARTED;
+            PROGRESS_TOTAL.add(weight);
         }
     }
 
@@ -98,6 +120,7 @@ public abstract class TrackedTask<O> implements ProgressiveTask<O> {
 
             // Mark this task as stopped
             status = TaskStatus.DONE;
+            PROGRESS_DONE.add(weight);
 
             // To prevent memory leaks we'll clean up internal resources
             children = null;
@@ -162,27 +185,12 @@ public abstract class TrackedTask<O> implements ProgressiveTask<O> {
 
     @Override
     public double getProgress() {
-        synchronized (this) {
-            if (status == TaskStatus.PENDING) {
-                return 0; // No progress
-            } else if (status == TaskStatus.STARTED) {
-                if (children != null) {
-                    int totalWeight = getSelfWeight();
-                    double weightedProgressTotal = 0D;
-                    for (ProgressiveTask<?> task : children) {
-                        weightedProgressTotal += task.getProgress() * task.getWeight();
-                        totalWeight += task.getWeight();
-                    }
-                    return totalWeight == 0 ? 0 : weightedProgressTotal / totalWeight;
-                } else {
-                    return 0D; // There are no children so we can't infer progress
-                }
-            } else if (status == TaskStatus.DONE) {
-                return 1D; // done
-            }
+        if (status == TaskStatus.DONE) return 1D; // done
 
-            throw new IllegalArgumentException("Unknown TaskStatus");
-        }
+        long total = PROGRESS_TOTAL.sum();
+        if (total <= 0) return 0D;
+        double progress = (double) PROGRESS_DONE.sum() / total;
+        return progress > 1D ? 1D : progress;
     }
 
     @Override

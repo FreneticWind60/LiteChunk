@@ -21,12 +21,10 @@ import com.google.common.io.ByteStreams;
 import com.hivemc.chunker.nbt.io.Writer;
 import com.hivemc.chunker.nbt.tags.Tag;
 import com.hivemc.chunker.scheduling.function.ThrowableConsumer;
-import com.hivemc.chunker.scheduling.task.Task;
-import com.hivemc.chunker.scheduling.task.TaskWeight;
 import org.iq80.leveldb.DB;
+import org.iq80.leveldb.WriteBatch;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -67,27 +65,18 @@ public class BedrockChunkWriter {
      * Write the chunk to LevelDB.
      *
      * @param chunkerChunk the chunk being written.
+     * @param writeBatch   the batch of the column being written.
+     * @throws Exception if it failed to write the chunk.
      */
-    public void writeChunk(@Nullable ChunkerChunk chunkerChunk) {
+    public void writeChunk(@Nullable ChunkerChunk chunkerChunk, WriteBatch writeBatch) throws Exception {
         // Don't write if it's empty and discard is enabled
         if (chunkerChunk == null || converter.shouldDiscardEmptyChunks() && chunkerChunk.isEmpty()) return;
         if (!isChunkHeightSupported(chunkerChunk.getY())) return;
 
-        // Create the tasks
-        createChunkTasks(chunkerChunk);
+        // Write the palette straight into the caller's batch, no task boundary in between
+        writeBlockPalette(chunkerChunk, writeBatch);
     }
 
-    /**
-     * Create the tasks used for writing the chunk data.
-     *
-     * @param chunkerChunk the chunk being written.
-     * @return a list of tasks that represent the writing of the chunk.
-     */
-    protected List<Task<Void>> createChunkTasks(ChunkerChunk chunkerChunk) {
-        List<Task<Void>> tasks = new ArrayList<>(1);
-        tasks.add(Task.asyncConsume("Writing Block Palette", TaskWeight.HIGH, this::writeBlockPalette, chunkerChunk));
-        return tasks;
-    }
 
     /**
      * Check whether a chunk height is supported.
@@ -102,10 +91,11 @@ public class BedrockChunkWriter {
     /**
      * Write the block palette data to LevelDB.
      *
-     * @param chunk the chunk being written.
+     * @param chunk      the chunk being written.
+     * @param writeBatch the batch of the column being written.
      * @throws Exception if it failed to write the palette.
      */
-    protected void writeBlockPalette(ChunkerChunk chunk) throws Exception {
+    protected void writeBlockPalette(ChunkerChunk chunk, WriteBatch writeBatch) throws Exception {
         // A ByteArrayDataOutput rather than a ByteArrayOutputStream: every writeByte/writeInt of a palette used to
         // go through the synchronised, bounds checked ByteArrayOutputStream.write(int) one byte at a time (and grew
         // its 32 byte buffer over and over). Writing 1024 words per section that was the single hottest method in a
@@ -130,19 +120,20 @@ public class BedrockChunkWriter {
         // Collect the byte array for leveldb
         byte[] bytes = dataOutput.toByteArray();
 
-        writeChunkBytes(chunk, bytes);
+        writeChunkBytes(chunk, bytes, writeBatch);
     }
 
     /**
      * Write the block palette for the chunk.
      *
-     * @param chunk the chunk input.
-     * @param bytes the bytes for the block palette.
+     * @param chunk      the chunk input.
+     * @param bytes      the bytes for the block palette.
+     * @param writeBatch the batch of the column being written.
      */
-    protected void writeChunkBytes(ChunkerChunk chunk, byte[] bytes) {
+    protected void writeChunkBytes(ChunkerChunk chunk, byte[] bytes, WriteBatch writeBatch) {
         // Write the entry
         byte subChunkY = chunk.getY();
-        database.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), subChunkY, LevelDBChunkType.SUB_CHUNK_PREFIX), bytes);
+        writeBatch.put(LevelDBKey.key(dimension, chunkerColumn.getPosition(), subChunkY, LevelDBChunkType.SUB_CHUNK_PREFIX), bytes);
     }
 
     /**
