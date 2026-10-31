@@ -430,8 +430,26 @@ public class ConversionService extends Service {
                     if (input == null) {
                         throw new IllegalStateException("无法读取所选文件");
                     }
-                    requireSupported(input, item.name);
-                    WorldFiles.unzip(input, destination);
+                    WorldFiles.Container container = WorldFiles.sniff(input);
+                    String unsupported = WorldFiles.unsupportedMessage(container, item.name);
+                    if (unsupported != null) {
+                        throw new IllegalStateException(unsupported);
+                    }
+                    if (container == WorldFiles.Container.ZIP) {
+                        WorldFiles.unzip(input, destination);
+                    } else if (Archives.needsFile(container)) {
+                        // RAR / 7z index from the end of the file, so the stream is staged once and read from disk
+                        File staged = new File(destination.getParentFile(), "source.archive");
+                        try {
+                            WorldFiles.copyTo(input, staged);
+                            Archives.extract(staged, destination, container);
+                        } finally {
+                            //noinspection ResultOfMethodCallIgnored
+                            staged.delete();
+                        }
+                    } else {
+                        Archives.extract(input, destination, container);
+                    }
                 }
                 break;
             }
@@ -454,11 +472,16 @@ public class ConversionService extends Service {
                     if (stage != null) {
                         stage.onStage("正在解压存档…");
                     }
-                    String unsupported = WorldFiles.unsupportedMessage(WorldFiles.sniff(source), source.getName());
+                    WorldFiles.Container container = WorldFiles.sniff(source);
+                    String unsupported = WorldFiles.unsupportedMessage(container, source.getName());
                     if (unsupported != null) {
                         throw new IllegalStateException(unsupported);
                     }
-                    WorldFiles.unzip(source, destination);
+                    if (container == WorldFiles.Container.ZIP) {
+                        WorldFiles.unzip(source, destination);
+                    } else {
+                        Archives.extract(source, destination, container);
+                    }
                 }
                 break;
             }
@@ -474,22 +497,6 @@ public class ConversionService extends Service {
                     : "压缩包里没有 level.dat。请确认压缩的是世界目录本身，或改用「世界文件夹」导入已解压的目录。");
         }
         return worldRoot;
-    }
-
-    /**
-     * Refuse a container that cannot be unpacked, before any of it is written to disk.
-     * <p>
-     * The stream is left at its start, so the caller can hand it straight to {@link WorldFiles#unzip}.
-     *
-     * @param input the archive stream, must support marking.
-     * @param name  the display name, used when the header is unreadable.
-     * @throws IllegalStateException carrying the instruction to show the user.
-     */
-    private static void requireSupported(InputStream input, String name) throws Exception {
-        String unsupported = WorldFiles.unsupportedMessage(WorldFiles.sniff(input), name);
-        if (unsupported != null) {
-            throw new IllegalStateException(unsupported);
-        }
     }
 
     /**

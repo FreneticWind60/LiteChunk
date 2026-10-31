@@ -103,31 +103,25 @@ final class WorldFiles {
     /**
      * The instruction to show when a source cannot be opened, or null when it can.
      * <p>
-     * The header is checked first and the name second, so a RAR renamed to {@code .zip} is still caught. The wording
-     * points at the folder picker because that path needs nothing from us: it copies the tree and finds the world
-     * inside it, which is exactly what unpacking the archive would have achieved.
+     * The header is checked first and the name second, so a RAR renamed to {@code .zip} is still caught. Zip, RAR,
+     * 7z, tar and tar.gz are all opened by the importer itself now; what is left here is the long tail (bz2, xz,
+     * lzh, a bare .gz, or something that is not an archive at all), where the only honest answer is "unpack it
+     * yourself and use the folder picker".
      *
      * @param container what {@link #sniff(InputStream)} or {@link #sniff(File)} reported.
      * @param name      the display name, used when the header could not be read.
-     * @return a user facing sentence, or null when the source is a zip we can try.
+     * @return a user facing sentence, or null when the importer should try to open it.
      */
     static String unsupportedMessage(Container container, String name) {
         Container actual = container;
         if (actual == Container.UNKNOWN || actual == Container.OTHER) {
             actual = containerFromName(name);
         }
-        switch (actual) {
-            case RAR:
-                return "这是 RAR 压缩包，本应用只支持 zip / .mcworld。请先用解压工具把它解成文件夹，再用「世界文件夹」导入。";
-            case SEVEN_Z:
-                return "这是 7z 压缩包，本应用只支持 zip / .mcworld。请先用解压工具把它解成文件夹，再用「世界文件夹」导入。";
-            case GZIP:
-                return "这是 tar.gz / gzip 压缩包，本应用只支持 zip / .mcworld。请先用解压工具把它解成文件夹，再用「世界文件夹」导入。";
-            case TAR:
-                return "这是 tar 压缩包，本应用只支持 zip / .mcworld。请先用解压工具把它解成文件夹，再用「世界文件夹」导入。";
-            default:
-                return null;
+        if (Archives.isSupported(actual)) {
+            return null;
         }
+        return "这个压缩格式本应用还打不开（支持 zip / .mcworld / rar / 7z / tar / tar.gz）。"
+                + "请先用解压工具解成文件夹，再用「世界文件夹」导入。";
     }
 
     private static Container containerFromName(String name) {
@@ -557,6 +551,24 @@ final class WorldFiles {
         int read;
         while ((read = in.read(buffer)) > 0) {
             out.write(buffer, 0, read);
+        }
+    }
+
+    /**
+     * Copy a content-resolver stream to a file.
+     * <p>
+     * Needed for RAR and 7z, which read at random offsets and therefore cannot be fed from a stream.
+     *
+     * @param in     the stream to drain.
+     * @param target file to write, replaced if it exists.
+     */
+    static void copyTo(InputStream in, File target) throws IOException {
+        File parent = target.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+            throw new IOException("无法创建临时目录");
+        }
+        try (OutputStream out = new BufferedOutputStream(new FileOutputStream(target), BUFFER)) {
+            copy(in, out);
         }
     }
 }

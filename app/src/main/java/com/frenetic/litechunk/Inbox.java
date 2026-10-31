@@ -38,7 +38,8 @@ final class Inbox {
      * also appears for files it cannot use, which is why this list exists: anything else is rejected before a byte
      * is copied.
      */
-    private static final String[] ARCHIVE_EXTENSIONS = {".zip", ".mcworld", ".mctemplate"};
+    private static final String[] ARCHIVE_EXTENSIONS = {
+            ".zip", ".mcworld", ".mctemplate", ".rar", ".7z", ".tar", ".gz", ".tgz"};
 
     private Inbox() {
     }
@@ -76,11 +77,12 @@ final class Inbox {
             return null;
         }
         String lower = displayName == null ? "" : displayName.toLowerCase(Locale.ROOT);
-        if (lower.endsWith(".rar") || lower.endsWith(".7z") || lower.endsWith(".tar")
-                || lower.endsWith(".gz") || lower.endsWith(".tgz") || lower.endsWith(".bz2")) {
-            return "不支持这个压缩格式，请先用解压工具解成文件夹再导入（本应用只支持 zip / .mcworld）";
+        if (lower.endsWith(".bz2") || lower.endsWith(".xz") || lower.endsWith(".lzh") || lower.endsWith(".lha")
+                || lower.endsWith(".zst") || lower.endsWith(".cab") || lower.endsWith(".iso")) {
+            return "这个压缩格式本应用还打不开，请先用解压工具解成文件夹再导入"
+                    + "（支持 zip / mcworld / rar / 7z / tar / tar.gz）";
         }
-        return "不是存档文件（只支持 zip / .mcworld / .mctemplate）";
+        return "不是存档文件（支持 zip / mcworld / rar / 7z / tar / tar.gz）";
     }
 
     /** Whether an absolute path is one of our own staged imports, i.e. something we may delete after a conversion. */

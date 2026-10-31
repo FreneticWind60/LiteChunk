@@ -74,7 +74,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text=".zip / .mcworld（RAR、7z 请先解压）" />
+                android:text=".zip / .mcworld / .rar / .7z / .tar.gz" />
         </LinearLayout>
     </LinearLayout>
 

@@ -13,6 +13,16 @@ Copyright (c) 2024 Hive Games，MIT 许可。裁剪与改动清单见 README 的
 
 许可证全文：`engine/LICENSE-CHUNKER`。
 
+### Arcana — Apache-2.0
+
+`app/src/main/java/be/stef/arcana/**` 来自 [Arcana](https://github.com/RealBurst/arcana)，
+Copyright 2025 Stephane Bury，Apache License 2.0（全文见 `LICENSE-APACHE-2.0`）。
+
+只裁出了**解压侧**、且只保留四个容器：RAR 4/5、7z、TAR、TAR+GZIP，以及这四种格式必需的解码器
+（自带的 LZMA/LZMA2、PPMd、bzip2、RAR 解码器）。删掉的部分：压缩器、命令行、其余三十来种格式、
+插件系统、识别/修复/拆分、以及逐文件的控制台进度条；另外把并行工作线程从「CPU 核数」改成 2，
+把 RAR 解码器的进度输出默认关掉。改动都在原文件内以注释标出。每个文件的 Apache 头都原样保留。
+
 ### Fluent System Icons — MIT
 
 `app/src/main/res/drawable/` 里的矢量图标取自
