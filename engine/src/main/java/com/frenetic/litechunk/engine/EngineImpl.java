@@ -47,6 +47,12 @@ public final class EngineImpl implements ChunkerEngine {
 
     /** Worker threads for the conversion pipeline, upstream default is 8. */
     private int concurrency = 8;
+    /** Smallest LevelDB write buffer worth using; below this the memtable flushes dominate the run. */
+    private static final int WRITE_BUFFER_MIN_MB = 16;
+    /** Largest useful write buffer: past this the wall clock stops improving and only the heap grows. */
+    private static final int WRITE_BUFFER_MAX_MB = 64;
+    /** Heap granted per MB of write buffer, from the sweep in {@link #applyMemoryBudget}. */
+    private static final int MB_PER_WRITE_BUFFER_MB = 10;
     /** Skip the memory hungry stages (lighting / entities / block entities / height maps / loot tables). */
     private boolean lean;
 
@@ -147,6 +153,11 @@ public final class EngineImpl implements ChunkerEngine {
         converter.setWorkerThreads(concurrency);
         applyProfile(converter);
 
+        // Must come after setWorkerThreads: that call derives the three budgets from the thread count and would
+        // overwrite anything set before it.
+        applyMemoryBudget(converter);
+        applyOverrides(converter);
+
         // Bedrock output ends with a full LevelDB compaction, which for a large world can run for over a minute
         // without any task progress at all. Reporting it as its own stage is the difference between "still working"
         // and "looks hung, let me kill it".
@@ -246,6 +257,85 @@ public final class EngineImpl implements ChunkerEngine {
         converter.setProcessHeightMap(false);
         converter.setProcessColumnPreTransform(false);
         converter.setProcessLootTables(false);
+    }
+
+    /**
+     * Choose the LevelDB write buffer from the heap this process was given.
+     * <p>
+     * {@code setWorkerThreads} derives it as {@code threads * 16 MB} clamped to 16-64, which means a phone running the
+     * two threads the memory plan allows always gets 32 MB - the worst value on the curve. Measured on a 257 MB
+     * world, two threads, {@code -Xmx512m}:
+     * <pre>
+     *   buffer   wall clock      CPU      peak heap
+     *   16 MB    56.5 s         112 s     355 MB
+     *   32 MB    38.3 / 38.7 s  88 / 89   437 / 426 MB   <- what threads*16 gives
+     *   40 MB    41.3 / 41.5 s  95 / 93   471 / 430 MB   <- cliff: one more flush
+     *   44 MB    25.5 / 25.4 s  78 / 77   455 / 450 MB
+     *   48 MB    24.3 / 24.1 s  77 / 75   464 / 476 MB
+     *   64 MB    24.6 / 24.6 s  77 / 78   505 / 479 MB
+     *   256 MB   26.8 s          81 s     973 MB
+     * </pre>
+     * The curve is a staircase, not a slope: LevelDB flushes the memtable to an SST when the buffer fills, and every
+     * flush stalls the single writer thread that all workers queue behind, so what matters is how many flushes the
+     * output needs (40 -> 41 s, 44 -> 25 s on the same world). Past 48 MB the staircase is flat while the heap cost
+     * keeps rising. The budget is therefore {@code heap / 10} clamped to 16-64: 51 MB on a 512 MB heap (what
+     * {@code largeHeap} grants on most phones) and 64 MB on a desktop JVM, where this changes nothing.
+     *
+     * @param converter the converter to apply the budget to.
+     */
+    private void applyMemoryBudget(WorldConverter converter) {
+        // The lean profile is the retry after an out-of-memory failure. It must not hand back a bigger write buffer
+        // than setWorkerThreads derived, or the retry fails in exactly the same place.
+        if (lean) return;
+
+        int heapMb = (int) (Runtime.getRuntime().maxMemory() / (1024 * 1024));
+        int writeBufferMb = Math.max(WRITE_BUFFER_MIN_MB, Math.min(WRITE_BUFFER_MAX_MB, heapMb / MB_PER_WRITE_BUFFER_MB));
+        converter.setLevelDBWriteBufferSize(writeBufferMb * 1024 * 1024);
+    }
+
+    /**
+     * Apply diagnostic overrides for the pipeline budgets, read from system properties.
+     * <p>
+     * {@code WorldConverter.setWorkerThreads} derives {@code inFlightRegions}, {@code inFlightColumns} and the
+     * LevelDB write buffer from the thread count, which makes it impossible to find out whether that coupling is
+     * right: sweeping threads always moves three other dials with it. These properties allow one dial at a time.
+     * <p>
+     * Only active when a property is set, so the shipped path is unchanged: {@code -Dlc.inFlightRegions=N},
+     * {@code -Dlc.inFlightColumns=N}, {@code -Dlc.writeBufferMb=N}.
+     *
+     * @param converter the converter to apply the overrides to.
+     */
+    private static void applyOverrides(WorldConverter converter) {
+        Integer regions = readIntProperty("lc.inFlightRegions");
+        Integer columns = readIntProperty("lc.inFlightColumns");
+        Integer writeBufferMb = readIntProperty("lc.writeBufferMb");
+
+        if (regions == null && columns == null && writeBufferMb == null) return;
+
+        if (regions != null) converter.setInFlightRegions(regions);
+        if (columns != null) converter.setInFlightColumns(columns);
+        if (writeBufferMb != null) converter.setLevelDBWriteBufferSize(writeBufferMb * 1024 * 1024);
+
+        System.out.println("[engine] budgets: threads=" + converter.getWorkerThreads()
+                + ", inFlightRegions=" + converter.getInFlightRegions()
+                + ", inFlightColumns=" + converter.getInFlightColumns()
+                + ", writeBufferMb=" + (converter.getLevelDBWriteBufferSize() / (1024 * 1024)));
+    }
+
+    /**
+     * Read an int from a system property, tolerating a missing or malformed value.
+     *
+     * @param name the property name.
+     * @return the parsed value, or null when it is not set or not a number.
+     */
+    private static Integer readIntProperty(String name) {
+        String raw = System.getProperty(name);
+        if (raw == null || raw.isEmpty()) return null;
+        try {
+            return Integer.valueOf(raw.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static Exception unwrap(ExecutionException failure) {

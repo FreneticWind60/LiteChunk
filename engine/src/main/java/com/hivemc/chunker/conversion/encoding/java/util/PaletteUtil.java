@@ -6,31 +6,7 @@ import org.jetbrains.annotations.Nullable;
  * Util methods for writing various types of Java palettes.
  */
 public class PaletteUtil {
-    /**
-     * Magic values from Java Edition for calculating palette indexes.
-     */
-    public static final int[] MAGIC = {
-            -1, -1, 0, Integer.MIN_VALUE, 0, 0, 1431655765, 1431655765, 0, Integer.MIN_VALUE,
-            0, 1, 858993459, 858993459, 0, 715827882, 715827882, 0, 613566756, 613566756,
-            0, Integer.MIN_VALUE, 0, 2, 477218588, 477218588, 0, 429496729, 429496729, 0,
-            390451572, 390451572, 0, 357913941, 357913941, 0, 330382099, 330382099, 0, 306783378,
-            306783378, 0, 286331153, 286331153, 0, Integer.MIN_VALUE, 0, 3, 252645135, 252645135,
-            0, 238609294, 238609294, 0, 226050910, 226050910, 0, 214748364, 214748364, 0,
-            204522252, 204522252, 0, 195225786, 195225786, 0, 186737708, 186737708, 0, 178956970,
-            178956970, 0, 171798691, 171798691, 0, 165191049, 165191049, 0, 159072862, 159072862,
-            0, 153391689, 153391689, 0, 148102320, 148102320, 0, 143165576, 143165576, 0,
-            138547332, 138547332, 0, Integer.MIN_VALUE, 0, 4, 130150524, 130150524, 0, 126322567,
-            126322567, 0, 122713351, 122713351, 0, 119304647, 119304647, 0, 116080197, 116080197,
-            0, 113025455, 113025455, 0, 110127366, 110127366, 0, 107374182, 107374182, 0,
-            104755299, 104755299, 0, 102261126, 102261126, 0, 99882960, 99882960, 0, 97612893,
-            97612893, 0, 95443717, 95443717, 0, 93368854, 93368854, 0, 91382282, 91382282,
-            0, 89478485, 89478485, 0, 87652393, 87652393, 0, 85899345, 85899345, 0,
-            84215045, 84215045, 0, 82595524, 82595524, 0, 81037118, 81037118, 0, 79536431,
-            79536431, 0, 78090314, 78090314, 0, 76695844, 76695844, 0, 75350303, 75350303,
-            0, 74051160, 74051160, 0, 72796055, 72796055, 0, 71582788, 71582788, 0,
-            70409299, 70409299, 0, 69273666, 69273666, 0, 68174084, 68174084, 0, Integer.MIN_VALUE,
-            0, 5
-    };
+
     /**
      * The minimum amount of bits for a biome palette.
      */
@@ -96,21 +72,22 @@ public class PaletteUtil {
 
         int valuesPerPalette = dimensionSize * dimensionSize * dimensionSize;
 
-        // Calculate magic value (based on Minecraft)
-        char valuesPerLong = (char) (64 / bitsPerEntry);
-        int magicIndex = 3 * (valuesPerLong - 1);
-        long divideMul = Integer.toUnsignedLong(MAGIC[magicIndex]);
-        long divideAdd = Integer.toUnsignedLong(MAGIC[magicIndex + 1]);
-        int divideShift = MAGIC[magicIndex + 2];
+        int valuesPerLong = 64 / bitsPerEntry;
 
         long[] encodedValues = new long[(valuesPerPalette + valuesPerLong - 1) / valuesPerLong];
         if (values != null) {
-            for (int i = 0; i < valuesPerPalette; i++) {
-                // See writePaletteValues1_13: i already walks the flat array in its natural order.
-                short value = values[i];
-                int cellIndex = (int) ((i * divideMul + divideAdd >> 32) >> divideShift);
-                int bitIndex = (i - cellIndex * valuesPerLong) * bitsPerEntry;
-                encodedValues[cellIndex] = (encodedValues[cellIndex] & ~(maxEntryValue << bitIndex)) | ((value & maxEntryValue) << bitIndex);
+            // Fill one long at a time. The cells sharing a long are consecutive in the flat array, so the shift can be
+            // carried; the old shape divided every cell index by valuesPerLong (again through the game's magic
+            // multiply) to find which long it belonged to and at what offset.
+            int valueIndex = 0;
+            for (int longIndex = 0; longIndex < encodedValues.length; longIndex++) {
+                long word = 0;
+                int shift = 0;
+                for (int position = 0; position < valuesPerLong && valueIndex < valuesPerPalette; position++) {
+                    word |= (long) (values[valueIndex++] & maxEntryValue) << shift;
+                    shift += bitsPerEntry;
+                }
+                encodedValues[longIndex] = word;
             }
         }
 
@@ -188,25 +165,23 @@ public class PaletteUtil {
      */
     public static short[] readPaletteValues1_16(int bitsPerEntry, int dimensionSize, long[] encodedValues) {
         short[] output = new short[dimensionSize * dimensionSize * dimensionSize];
-        int valuesPerPalette = dimensionSize * dimensionSize * dimensionSize;
+        int valuesPerPalette = output.length;
 
         // Use maxEntryValue for bitmask
         long maxEntryValue = (1L << bitsPerEntry) - 1;
-        char valuesPerLong = (char) (64 / bitsPerEntry);
+        int valuesPerLong = 64 / bitsPerEntry;
 
-        // Calculate magic value (based on Minecraft)
-        int magicIndex = 3 * (valuesPerLong - 1);
-        long divideMul = Integer.toUnsignedLong(MAGIC[magicIndex]);
-        long divideAdd = Integer.toUnsignedLong(MAGIC[magicIndex + 1]);
-        int divideShift = MAGIC[magicIndex + 2];
-
-        for (int i = 0; i < valuesPerPalette; i++) {
-            int cellIndex = (int) (i * divideMul + divideAdd >> 32 >> divideShift);
-            int bitIndex = (i - cellIndex * valuesPerLong) * bitsPerEntry;
-            short value = (short) ((encodedValues[cellIndex] >>> bitIndex) & maxEntryValue);
-
-            // Set entry - i walks (y, z, x) with x fastest, which is the flat array layout
-            output[i] = value;
+        // Walk the longs and shift each one down in place. The previous shape decoded cell i on its own, which meant
+        // dividing i by valuesPerLong for every cell - done with the same "magic number" multiply the game uses,
+        // because a real division per cell was even slower. Iterating the other way round makes both the division
+        // and the multiply disappear: the long is already in hand, and each cell is one mask and one shift.
+        int outputIndex = 0;
+        for (int longIndex = 0; longIndex < encodedValues.length && outputIndex < valuesPerPalette; longIndex++) {
+            long remaining = encodedValues[longIndex];
+            for (int position = 0; position < valuesPerLong && outputIndex < valuesPerPalette; position++) {
+                output[outputIndex++] = (short) (remaining & maxEntryValue);
+                remaining >>>= bitsPerEntry;
+            }
         }
 
         return output;

@@ -175,8 +175,9 @@ public class MainActivity extends AppCompatActivity {
             List<String> rejected = new ArrayList<>();
             for (Uri uri : uris) {
                 String name = WorldFiles.displayName(this, uri);
-                if (!Inbox.isArchive(name)) {
-                    rejected.add(name);
+                String reason = Inbox.rejectionReason(name);
+                if (reason != null) {
+                    rejected.add(name + "：" + reason);
                     continue;
                 }
                 try {

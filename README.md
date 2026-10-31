@@ -3,7 +3,8 @@
 Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换引擎来自
 [Chunker](https://github.com/HiveGamesOSS/Chunker) 的裁剪版，通过 `DexClassLoader` 在独立进程中加载。
 
-- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build3 pr6`（与引擎 Chunker 的版本同步）
+- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build3 pr7`（与引擎 Chunker 的版本同步）
+- 每个版本的新特性与已知局限见 [`VERSION.md`](VERSION.md)
 - 最低系统 Android 8.1（API 27）—— `java.nio.file` 与基岩版 1.26 的共同下限；目标 API 37
 - 只做一件事：选存档 → 选版本 → 转换 → 保存 / 分享 / 导入
 - MIT 许可，非官方项目，与 Mojang Studios、Microsoft 无关
@@ -287,6 +288,15 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
     每个 section 的光照原来要 273 个数组装 4096 字节，对象头和数据一样大；顺带把读取循环、Java 写出的
     nibble 打包、Bedrock 高度图的三处逐方块访问都变成一次数组索引。同批把
     `ShortBasedPalette.containsValue` 的临时 `ShortOpenHashSet` 换成两个 `long` 位掩码。
+15. 调色板位打包去重算：`bedrock/PaletteUtil` 的打包/解包用一张 4096 项的置换表替掉逐格的
+    `(x<<8)|(z<<4)|y ⇄ (y<<8)|(z<<4)|x` 转置，`shift` 改增量，打包直接写 `byte[]` 小端，不再先填 `int[]`
+    再复制一遍。`java/PaletteUtil` 的 1.16 编解码把「魔数乘法模拟 `i / valuesPerLong`」换成按 long 外层、
+    long 内递增移位，随之失效的 `MAGIC` 表一并删除。
+16. 导入时先认容器：`WorldFiles.sniff` 读文件头判断 zip / RAR / 7z / gzip，`tar` 按扩展名；
+    RAR / 7z / tar 在解压前就直接给出「先解压成文件夹，再用世界文件夹导入」的提示。此前
+    `ZipInputStream` 对非 zip 只返回「没有条目」而不报错，于是用户看到的是「缺少 level.dat」，
+    指向了完全错误的方向。解压后目录为空也会单独报「内容读不出来（可能加密）」，
+    分享进来不支持的格式同样会说明原因，而不是静默忽略。
 
 ## 运行时设计
 
@@ -377,7 +387,7 @@ UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：�
 | 导出菜单 | 基岩版存档弹出 16dp 圆角 PopupWindow（`.zip` / `.mcworld`），存成 `.mcworld` |
 | Java 存档导出 | 不弹菜单，直接进 `documentsui`，存成 `test-java.zip` |
 
-`1.21.0 build3 pr6` 的性能实测（桌面 JDK 25 跑 `:engine:engineCli`，8 线程）：
+`1.21.0 build3 pr6` / `pr7` 的性能实测（桌面 JDK 25 跑 `:engine:engineCli`）：
 
 | 场景 | 结果 |
 | --- | --- |
@@ -423,6 +433,18 @@ UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：�
 
 「每列 3 个任务合成 1 个」也做了、也测了，但墙钟中位 +1.8%、CPU +4.1%，已回退（读与写的重叠被拿掉）。
 
+再一轮把**位打包**的逐格重算拿掉（见补丁 15）。257 MB 存档、交替跑、2 线程：
+
+| 存档 | 变体 | 墙钟 | CPU 总时间 | 备注 |
+| --- | --- | --- | --- | --- |
+| 257 MB `存档 B` | 写侧打包前 / 后（1 GB 堆，4 对） | 中位 −0.8% | **−3.7%（8/8 对更低）** | 墙钟 6/8 对更快 |
+| 257 MB 同上 | 读/写解码前 / 后（1 GB 堆，4 对） | 中位 −1.1% | −2.9% | 4/4 对更快 |
+| 2.2 GB `存档 A` | 前 / 后（单对，2 线程） | 560.8 → **546.0 s（−2.7%）** | 1015.3 → **939.5 s（−7.5%）** | 堆 780 → 765 MB |
+| 基岩 → Java | 前 / 后（同一存档，3 对） | **−5.0 / −5.1 / −6.1%** | −3% | 写 Java 存档走的正是被改的编码 |
+
+同一轮还试了「高度图按 section 预建 air 位图」，实测中性（`containsKey` 归零但函数本身占比反升 1 个点，
+JIT 早已内联 `get`），已回退，源码不留。
+
 仍需人工确认：
 
 1. 把输出的 `.mcworld` 导入真机基岩版，确认生物与画真的出现在世界里 —— `actorDump` 只能证明数据写对了，
@@ -432,6 +454,9 @@ UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：�
 
 ## 已知风险
 
+- **只支持 `zip` / `.mcworld` 与已解压的世界文件夹**（`tar` 也读不了）。RAR / 7z 需要先用解压工具展开
+  再导入；tar 的解析成本很低，可能在后续版本单独支持，RAR / 7z 要引入第三方解析器（预计 +0.3~0.4 MB），
+  是否做取决于实际使用量。
 - 最低系统标称 API 27，实测只在 API 35 / 36 上跑过。
 - 目标版本列表来自引擎枚举，最新 Java 版本用 `dimensions/<namespace>/<dimension>/region` 新目录结构，
   旧客户端打不开，属预期。

@@ -24,6 +24,7 @@ import com.frenetic.litechunk.api.ChunkerEngine;
 import com.frenetic.litechunk.api.Detection;
 import com.frenetic.litechunk.api.LevelInfo;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -424,10 +425,12 @@ public class ConversionService extends Service {
                     stage.onStage("正在解压存档…");
                 }
                 Uri uri = Uri.parse(item.uri);
-                try (InputStream input = context.getContentResolver().openInputStream(uri)) {
+                try (InputStream raw = context.getContentResolver().openInputStream(uri);
+                     InputStream input = raw == null ? null : new BufferedInputStream(raw)) {
                     if (input == null) {
                         throw new IllegalStateException("无法读取所选文件");
                     }
+                    requireSupported(input, item.name);
                     WorldFiles.unzip(input, destination);
                 }
                 break;
@@ -451,12 +454,42 @@ public class ConversionService extends Service {
                     if (stage != null) {
                         stage.onStage("正在解压存档…");
                     }
+                    String unsupported = WorldFiles.unsupportedMessage(WorldFiles.sniff(source), source.getName());
+                    if (unsupported != null) {
+                        throw new IllegalStateException(unsupported);
+                    }
                     WorldFiles.unzip(source, destination);
                 }
                 break;
             }
         }
-        return WorldFiles.locateWorldRoot(destination);
+
+        File worldRoot = WorldFiles.locateWorldRoot(destination);
+        if (worldRoot == null) {
+            // Distinguish "we could not read the archive" from "the archive does not hold a world": the first looked
+            // identical to the second until now, because ZipInputStream reports an empty archive for a RAR instead
+            // of failing, and the old message pointed at level.dat either way.
+            throw new IllegalStateException(WorldFiles.isEmptyTree(destination)
+                    ? "压缩包内容读不出来（可能已加密，或不是有效的 ZIP）。请解压成文件夹后，用「世界文件夹」导入。"
+                    : "压缩包里没有 level.dat。请确认压缩的是世界目录本身，或改用「世界文件夹」导入已解压的目录。");
+        }
+        return worldRoot;
+    }
+
+    /**
+     * Refuse a container that cannot be unpacked, before any of it is written to disk.
+     * <p>
+     * The stream is left at its start, so the caller can hand it straight to {@link WorldFiles#unzip}.
+     *
+     * @param input the archive stream, must support marking.
+     * @param name  the display name, used when the header is unreadable.
+     * @throws IllegalStateException carrying the instruction to show the user.
+     */
+    private static void requireSupported(InputStream input, String name) throws Exception {
+        String unsupported = WorldFiles.unsupportedMessage(WorldFiles.sniff(input), name);
+        if (unsupported != null) {
+            throw new IllegalStateException(unsupported);
+        }
     }
 
     /**

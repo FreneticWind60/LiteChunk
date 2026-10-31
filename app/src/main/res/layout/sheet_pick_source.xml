@@ -74,7 +74,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text=".zip / .mcworld / .mcworld 导出包" />
+                android:text=".zip / .mcworld（RAR、7z 请先解压）" />
         </LinearLayout>
     </LinearLayout>
 
@@ -126,7 +126,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="包含 level.dat 的目录" />
+                android:text="已解压，含 level.dat 的目录" />
         </LinearLayout>
     </LinearLayout>
 

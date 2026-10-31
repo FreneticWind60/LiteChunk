@@ -31,8 +31,137 @@ final class WorldFiles {
 
     private static final int BUFFER = 64 * 1024;
     private static final int MAX_DEPTH = 3;
+    /** Bytes of a header needed to tell the containers apart. */
+    private static final int SNIFF_BYTES = 8;
 
     private WorldFiles() {
+    }
+
+    /**
+     * Archive containers, recognised from the file header rather than the name.
+     * <p>
+     * Only {@link #ZIP} can be read here: the importer uses {@code java.util.zip}, which returns no entries at all for
+     * anything else. Telling the user which container they actually have is the whole point of this enum - a RAR
+     * used to arrive as "no level.dat found", because {@code ZipInputStream} reports an empty archive instead of
+     * failing (see {@link #unsupportedMessage(Container, String)}).
+     */
+    enum Container {ZIP, RAR, SEVEN_Z, GZIP, TAR, OTHER, UNKNOWN}
+
+    /** Recognise a container from an already open stream, leaving it at position 0. */
+    static Container sniff(InputStream input) throws IOException {
+        if (!input.markSupported()) {
+            return Container.UNKNOWN;
+        }
+        input.mark(SNIFF_BYTES);
+        byte[] header = new byte[SNIFF_BYTES];
+        int read = 0;
+        while (read < header.length) {
+            int step = input.read(header, read, header.length - read);
+            if (step <= 0) {
+                break;
+            }
+            read += step;
+        }
+        input.reset();
+        return containerOf(header, read);
+    }
+
+    /** Recognise a container from a file on disk. */
+    static Container sniff(File file) {
+        String name = file.getName().toLowerCase(Locale.ROOT);
+        // tar has no magic at offset 0 ("ustar" sits at 257), so the name is the only cheap way to spot it
+        if (name.endsWith(".tar")) {
+            return Container.TAR;
+        }
+        try (InputStream input = new BufferedInputStream(new FileInputStream(file), SNIFF_BYTES)) {
+            return sniff(input);
+        } catch (IOException unreadable) {
+            return Container.OTHER;
+        }
+    }
+
+    private static Container containerOf(byte[] header, int length) {
+        if (length >= 4 && header[0] == 'P' && header[1] == 'K'
+                && (header[2] == 3 || header[2] == 5 || header[2] == 7)
+                && (header[3] == 4 || header[3] == 6 || header[3] == 8)) {
+            return Container.ZIP; // local file, empty archive, or spanned archive header
+        }
+        if (length >= 6 && header[0] == 'R' && header[1] == 'a' && header[2] == 'r' && header[3] == '!'
+                && header[4] == 0x1A && header[5] == 0x07) {
+            return Container.RAR;
+        }
+        if (length >= 6 && header[0] == 0x37 && header[1] == 0x7A && header[2] == (byte) 0xBC
+                && header[3] == (byte) 0xAF && header[4] == 0x27 && header[5] == 0x1C) {
+            return Container.SEVEN_Z;
+        }
+        if (length >= 2 && header[0] == 0x1F && header[1] == (byte) 0x8B) {
+            return Container.GZIP;
+        }
+        return Container.OTHER;
+    }
+
+    /**
+     * The instruction to show when a source cannot be opened, or null when it can.
+     * <p>
+     * The header is checked first and the name second, so a RAR renamed to {@code .zip} is still caught. The wording
+     * points at the folder picker because that path needs nothing from us: it copies the tree and finds the world
+     * inside it, which is exactly what unpacking the archive would have achieved.
+     *
+     * @param container what {@link #sniff(InputStream)} or {@link #sniff(File)} reported.
+     * @param name      the display name, used when the header could not be read.
+     * @return a user facing sentence, or null when the source is a zip we can try.
+     */
+    static String unsupportedMessage(Container container, String name) {
+        Container actual = container;
+        if (actual == Container.UNKNOWN || actual == Container.OTHER) {
+            actual = containerFromName(name);
+        }
+        switch (actual) {
+            case RAR:
+                return "这是 RAR 压缩包，本应用只支持 zip / .mcworld。请先用解压工具把它解成文件夹，再用「世界文件夹」导入。";
+            case SEVEN_Z:
+                return "这是 7z 压缩包，本应用只支持 zip / .mcworld。请先用解压工具把它解成文件夹，再用「世界文件夹」导入。";
+            case GZIP:
+                return "这是 tar.gz / gzip 压缩包，本应用只支持 zip / .mcworld。请先用解压工具把它解成文件夹，再用「世界文件夹」导入。";
+            case TAR:
+                return "这是 tar 压缩包，本应用只支持 zip / .mcworld。请先用解压工具把它解成文件夹，再用「世界文件夹」导入。";
+            default:
+                return null;
+        }
+    }
+
+    private static Container containerFromName(String name) {
+        if (name == null) {
+            return Container.OTHER;
+        }
+        String lower = name.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".rar")) {
+            return Container.RAR;
+        }
+        if (lower.endsWith(".7z")) {
+            return Container.SEVEN_Z;
+        }
+        if (lower.endsWith(".tar")) {
+            return Container.TAR;
+        }
+        if (lower.endsWith(".gz") || lower.endsWith(".tgz")) {
+            return Container.GZIP;
+        }
+        return Container.OTHER;
+    }
+
+    /** Whether unpacking produced nothing at all, which is how a container we cannot read usually looks. */
+    static boolean isEmptyTree(File directory) {
+        File[] children = directory.listFiles();
+        if (children == null) {
+            return true;
+        }
+        for (File child : children) {
+            if (child.isFile() || !isEmptyTree(child)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     static void unzip(InputStream input, File destination) throws IOException {

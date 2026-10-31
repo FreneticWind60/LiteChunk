@@ -27,6 +27,23 @@ public class PaletteUtil {
     public static final int EMPTY_PALETTE_BITS = 127;
 
     /**
+     * Maps the Bedrock word order, {@code (x << 8) | (z << 4) | y} with y varying fastest, to the palette's flat
+     * order, {@code (y << 8) | (z << 4) | x} with x varying fastest.
+     * <p>
+     * Packing and unpacking a section is a 16x16x16 transpose, so the same permutation of three bit fields shows up on
+     * both paths. A section is 4096 blocks, which makes this table 16 KiB - small enough to stay in L2 while the
+     * sections stream past - and it replaces three masks and two shifts per block. The conversion does that tens of
+     * millions of times, and the write side alone was the largest single item in the profile.
+     */
+    private static final int[] BEDROCK_TO_FLAT = new int[4096];
+
+    static {
+        for (int i = 0; i < BEDROCK_TO_FLAT.length; i++) {
+            BEDROCK_TO_FLAT[i] = ((i & 0xF) << 8) | (i & 0xF0) | ((i >> 8) & 0xF);
+        }
+    }
+
+    /**
      * Read a chunk based palette (16x16x16).
      *
      * @param buffer           the input buffer.
@@ -75,18 +92,19 @@ public class PaletteUtil {
 
         // Read values
         short[] values = new short[4096];
+        int mask = (1 << bitsPerEntry) - 1;
         int i = 0;
         for (int word = 0; word < wordSize; word++) {
             int wordValue = buffer.getInt();
+            int shift = 0;
 
             // Skip if over 4096 (extra padding on bitsPerEntry 3,5,6)
             for (int block = 0; block < valuesPerWord && i < 4096; block++) {
-                // Bedrock packs values as (x << 8) | (z << 4) | y, the flat palette is (y << 8) | (z << 4) | x, so the
-                // three fields are permuted here instead of being read out into three separate variables.
-                int index = ((i & 0xF) << 8) | (i & 0xF0) | ((i >> 8) & 0xF);
-
-                // Set the value
-                values[index] = (short) ((wordValue >>> (i % valuesPerWord * bitsPerEntry)) & ((1 << bitsPerEntry) - 1));
+                // Bedrock packs values as (x << 8) | (z << 4) | y, the flat palette is (y << 8) | (z << 4) | x; the
+                // permutation table does that transpose, and the shift is carried rather than recomputed from a
+                // remainder of the cell index.
+                values[BEDROCK_TO_FLAT[i]] = (short) ((wordValue >>> shift) & mask);
+                shift += bitsPerEntry;
                 i++;
             }
         }
@@ -129,35 +147,38 @@ public class PaletteUtil {
         int blocksPerWord = (int) Math.floor(32.0 / bitsPerBlock); // Word is 4 bytes
         int wordSize = (int) Math.ceil(4096.0 / blocksPerWord);
 
-        int[] buffer = new int[wordSize];
+        // Packed words in the writer's byte order (little endian, matching DataOutputWriterLE), filled while packing so
+        // the data never has to be copied out of an int[] afterwards.
+        byte[] packed = new byte[wordSize * 4];
         int i = 0;
 
         // Only write the palette if it's not empty and the key count is more than 1
         if (!emptyPalette && palette.getKeyCount() > 1 && palette instanceof ShortBasedPalette<T> shortBasedPalette) {
             short[] values = shortBasedPalette.getValues();
-            for (int wordIndex = 0; wordIndex < buffer.length; wordIndex++) {
-                for (int blockIndex = 0; blockIndex < blocksPerWord; blockIndex++) {
-                    if (i >= 4096) {
-                        break;
-                    }
-
-                    // i is (x << 8) | (z << 4) | y for Bedrock, the palette is (y << 8) | (z << 4) | x
-                    int flatIndex = ((i & 0xF) << 8) | (i & 0xF0) | ((i >> 8) & 0xF);
-                    int startBitIndex = bitsPerBlock * blockIndex;
-                    short value = values[flatIndex];
-                    buffer[wordIndex] = (buffer[wordIndex] & ~(maxValue << startBitIndex)) | ((value & maxValue) << startBitIndex);
+            int[] permutation = BEDROCK_TO_FLAT;
+            for (int wordIndex = 0; wordIndex < wordSize; wordIndex++) {
+                // The word starts out empty, so the bits can simply be shifted in: the old shape masked the target
+                // range out first, which is a no-op on a freshly allocated array, and multiplied to find the shift.
+                int word = 0;
+                int shift = 0;
+                for (int blockIndex = 0; blockIndex < blocksPerWord && i < 4096; blockIndex++) {
+                    word |= (values[permutation[i]] & maxValue) << shift;
+                    shift += bitsPerBlock;
                     i++;
                 }
+
+                int offset = wordIndex << 2;
+                packed[offset] = (byte) word;
+                packed[offset + 1] = (byte) (word >>> 8);
+                packed[offset + 2] = (byte) (word >>> 16);
+                packed[offset + 3] = (byte) (word >>> 24);
             }
         }
 
         // Write palette info
         writer.writeByte((byte) ((runtimeEncoding ? (byte) 1 : (byte) 0) | bitsPerBlock << 1));
 
-        // Write the encoded palette entries
-        for (int entry : buffer) {
-            writer.writeInt(entry);
-        }
+        writer.writeBytes(packed);
 
         // Write each palette entry
         int keyCount = palette.getKeyCount();

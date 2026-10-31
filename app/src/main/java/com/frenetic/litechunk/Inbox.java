@@ -61,6 +61,28 @@ final class Inbox {
         return false;
     }
 
+    /**
+     * Why a received file cannot be used, or null when it can.
+     * <p>
+     * A share that is rejected used to be reported by name only, so a {@code .rar} looked like a file this app had
+     * simply refused. Naming the format and the way out costs nothing here, because the alternative - copying a
+     * possibly 1 GB archive into {@code inbox/} only to fail while unpacking - is worse on every axis.
+     *
+     * @param displayName the name the sending app reported.
+     * @return a sentence to show after "已忽略", or null when the file is worth copying in.
+     */
+    static String rejectionReason(String displayName) {
+        if (isArchive(displayName)) {
+            return null;
+        }
+        String lower = displayName == null ? "" : displayName.toLowerCase(Locale.ROOT);
+        if (lower.endsWith(".rar") || lower.endsWith(".7z") || lower.endsWith(".tar")
+                || lower.endsWith(".gz") || lower.endsWith(".tgz") || lower.endsWith(".bz2")) {
+            return "不支持这个压缩格式，请先用解压工具解成文件夹再导入（本应用只支持 zip / .mcworld）";
+        }
+        return "不是存档文件（只支持 zip / .mcworld / .mctemplate）";
+    }
+
     /** Whether an absolute path is one of our own staged imports, i.e. something we may delete after a conversion. */
     static boolean isInside(Context context, String path) {
         if (path == null) {

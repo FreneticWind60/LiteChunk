@@ -156,15 +156,8 @@ public class JavaColumnWriter implements ColumnWriter {
      * @return the generated height map.
      */
     protected JavaLegacyHeightMap generateHeightMap(ChunkerColumn column) {
-        short[][] heightMap = new short[16][16];
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                OptionalInt highest = ColumnUtil.getHighestLitOrSlabBlock(column, x, z);
-                short value = (short) (highest.orElse(-1) + 1);
-                heightMap[x][z] = value;
-            }
-        }
-        return new JavaLegacyHeightMap(heightMap);
+        // Single pass over the column instead of 256 top-down walks, see ColumnUtil#generateHeightMap
+        return new JavaLegacyHeightMap(ColumnUtil.generateHeightMap(column));
     }
 
     /**
