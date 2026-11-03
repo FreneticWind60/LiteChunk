@@ -98,6 +98,6 @@ final class MemoryPlan {
     }
 
     String describe() {
-        return "堆上限 " + heapMb + " MB / " + threads + " 线程" + (lean ? " / 精简模式" : "");
+        return Text.get(R.string.MemoryPlan_01) + heapMb + " MB / " + threads + Text.get(R.string.MemoryPlan_02) + (lean ? Text.get(R.string.MemoryPlan_03) : "");
     }
 }

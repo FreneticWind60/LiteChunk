@@ -254,12 +254,12 @@ final class Job {
      */
     static String describe(Throwable throwable) {
         if (throwable == null) {
-            return "未知错误";
+            return Text.get(R.string.Job_01);
         }
         // An out-of-memory failure ends in a raw "Failed to allocate a 12345678 byte allocation with 4194304 free
         // bytes" message, which tells the user nothing they can act on.
         if (MemoryPlan.isOutOfMemory(throwable)) {
-            return "内存不足，转换未能完成。\n建议：关闭其他后台应用后重试；存档特别大时可以先裁剪一部分区域再转换。";
+            return Text.get(R.string.Job_02);
         }
         Throwable cause = throwable;
         while (cause.getCause() != null && cause.getCause() != cause) {
@@ -273,9 +273,9 @@ final class Job {
         // concrete situation that the user can actually fix: the data directory left over from a previous install
         // still belongs to the old uid, so it cannot be written to.
         if (message.contains("EACCES") || message.contains("Permission denied")) {
-            return "无法写入应用的数据目录。\n"
-                + "建议：到系统设置里清除 LiteChunk 的应用数据后重试（不会删除你的原存档）。\n"
-                + "如果仍然失败，请检查存储空间是否已满、外置存储是否已挂载。";
+            return Text.get(R.string.Job_03)
+                + Text.get(R.string.Job_04)
+                + Text.get(R.string.Job_05);
         }
         StackTraceElement[] trace = cause.getStackTrace();
         if (trace.length > 0) {

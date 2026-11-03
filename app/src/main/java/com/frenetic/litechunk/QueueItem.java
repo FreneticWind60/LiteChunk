@@ -62,7 +62,7 @@ final class QueueItem implements Serializable {
 
     String detectDescription() {
         if (formatLabel == null && formatId == null) {
-            return "未识别版本";
+            return Text.get(R.string.QueueItem_01);
         }
         String label = formatLabel == null ? formatId : formatLabel;
         if (version == null || version.isEmpty()) {
@@ -86,7 +86,7 @@ final class QueueItem implements Serializable {
     }
 
     static QueueItem fromJson(JSONObject json) {
-        QueueItem item = new QueueItem(json.optString("name", "存档"), Kind.valueOf(json.optString("kind", "DOCUMENT")));
+        QueueItem item = new QueueItem(json.optString("name", Text.get(R.string.QueueItem_02)), Kind.valueOf(json.optString("kind", "DOCUMENT")));
         item.uri = json.optString("uri", null);
         item.path = json.optString("path", null);
         item.size = json.optLong("size", 0L);

@@ -162,14 +162,14 @@ public class LevelActivity extends AppCompatActivity {
             } else if (code == Job.CODE_FATAL) {
                 setBusy(false);
                 showFailure(new IllegalStateException(
-                        data == null ? "未知错误" : data.getString(Job.KEY_ERROR, "未知错误")));
+                        data == null ? Text.get(R.string.LevelActivity_01) : data.getString(Job.KEY_ERROR, Text.get(R.string.LevelActivity_02))));
             }
         }
     };
 
     private void render() {
         if (info == null) {
-            showFailure(new IllegalStateException("无法读取 level.dat"));
+            showFailure(new IllegalStateException(Text.get(R.string.LevelActivity_03)));
             return;
         }
 
@@ -180,7 +180,7 @@ public class LevelActivity extends AppCompatActivity {
         }
         summary.append(" · ").append(WorldFiles.humanSize(archive.length()));
         if (!pending.isEmpty()) {
-            summary.append(" · 已改 ").append(pending.size()).append(" 项");
+            summary.append(Text.get(R.string.LevelActivity_04)).append(pending.size()).append(Text.get(R.string.LevelActivity_05));
         }
         binding.tvSummary.setText(summary.toString());
 
@@ -261,13 +261,13 @@ public class LevelActivity extends AppCompatActivity {
     private String display(LevelField field) {
         String current = pending.containsKey(field.id) ? pending.get(field.id) : field.value;
         if (field.kind == LevelField.KIND_BOOL) {
-            return "true".equalsIgnoreCase(current) ? "开 / On" : "关 / Off";
+            return "true".equalsIgnoreCase(current) ? Text.get(R.string.LevelActivity_06) : Text.get(R.string.LevelActivity_07);
         }
         if (field.kind == LevelField.KIND_ENUM) {
             int index = field.optionIndex(current);
             return index < 0 ? current : field.optionLabel(index);
         }
-        return current == null || current.isEmpty() ? "（未设置 / unset）" : current;
+        return current == null || current.isEmpty() ? Text.get(R.string.LevelActivity_08) : current;
     }
 
     private String hint(LevelField field) {
@@ -311,19 +311,19 @@ public class LevelActivity extends AppCompatActivity {
                     dialog.dismiss();
                     render();
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(Text.get(R.string.LevelActivity_09), null)
                 .show();
     }
 
     private void editFlag(LevelField field, String current) {
         boolean on = "true".equalsIgnoreCase(current);
         titled(field.labelZh, field.labelEn)
-                .setSingleChoiceItems(new String[]{"开 / On", "关 / Off"}, on ? 0 : 1, (dialog, which) -> {
+                .setSingleChoiceItems(new String[]{Text.get(R.string.LevelActivity_10), Text.get(R.string.LevelActivity_11)}, on ? 0 : 1, (dialog, which) -> {
                     pending.put(field.id, which == 0 ? "true" : "false");
                     dialog.dismiss();
                     render();
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(Text.get(R.string.LevelActivity_12), null)
                 .show();
     }
 
@@ -355,8 +355,8 @@ public class LevelActivity extends AppCompatActivity {
 
         AlertDialog dialog = new MaterialAlertDialogBuilder(this)
                 .setView(editor.getRoot())
-                .setNegativeButton("取消", null)
-                .setPositiveButton("确定", null)
+                .setNegativeButton(Text.get(R.string.LevelActivity_13), null)
+                .setPositiveButton(Text.get(R.string.LevelActivity_14), null)
                 .create();
         dialog.show();
         // Wired after show() so the button can reject an empty value without closing the dialog.
@@ -395,13 +395,13 @@ public class LevelActivity extends AppCompatActivity {
         if (busy || pending.isEmpty()) {
             return;
         }
-        titled("覆盖原存档", "Overwrite")
-                .setMessage("将修改 " + pending.size() + " 项并直接写入「" + archive.getName() + "」，"
-                        + "原文件不会保留副本，覆盖后不可找回。\n\n"
-                        + "若想保留原档，请用「另存为」。")
-                .setNeutralButton("取消", null)
-                .setNegativeButton("另存为", (dialog, which) -> startSave(true))
-                .setPositiveButton("覆盖", (dialog, which) -> startSave(false))
+        titled(Text.get(R.string.LevelActivity_15), "Overwrite")
+                .setMessage(Text.get(R.string.LevelActivity_16) + pending.size() + Text.get(R.string.LevelActivity_17) + archive.getName() + "」，"
+                        + Text.get(R.string.LevelActivity_18)
+                        + Text.get(R.string.LevelActivity_19))
+                .setNeutralButton(Text.get(R.string.LevelActivity_20), null)
+                .setNegativeButton(Text.get(R.string.LevelActivity_21), (dialog, which) -> startSave(true))
+                .setPositiveButton(Text.get(R.string.LevelActivity_22), (dialog, which) -> startSave(false))
                 .show();
     }
 
@@ -416,12 +416,12 @@ public class LevelActivity extends AppCompatActivity {
         long free = Space.free(this);
         if (free > 0L && free < needed) {
             new MaterialAlertDialogBuilder(this)
-                    .setTitle("空间可能不足")
-                    .setMessage((asCopy ? "另存为要写出" : "保存要先写出")
-                            + "一份约 " + WorldFiles.humanSize(needed) + " 的新文件再替换，当前只剩 "
-                            + WorldFiles.humanSize(free) + "。\n\n写入失败时原档不会损坏，但这次修改也不会生效。")
-                    .setNegativeButton("取消", null)
-                    .setPositiveButton("仍然继续", (dialog, which) -> performSave(asCopy))
+                    .setTitle(Text.get(R.string.LevelActivity_23))
+                    .setMessage((asCopy ? Text.get(R.string.LevelActivity_24) : Text.get(R.string.LevelActivity_25))
+                            + Text.get(R.string.LevelActivity_26) + WorldFiles.humanSize(needed) + Text.get(R.string.LevelActivity_27)
+                            + WorldFiles.humanSize(free) + Text.get(R.string.LevelActivity_28))
+                    .setNegativeButton(Text.get(R.string.LevelActivity_29), null)
+                    .setPositiveButton(Text.get(R.string.LevelActivity_30), (dialog, which) -> performSave(asCopy))
                     .show();
             return;
         }
@@ -453,8 +453,8 @@ public class LevelActivity extends AppCompatActivity {
                     pending.clear();
                     Store.get(this).refreshOutputs();
                     String message = asCopy
-                            ? "已另存为 " + target.getName()
-                            : "已覆盖保存到 " + archive.getName() + "（不可找回）";
+                            ? Text.get(R.string.LevelActivity_31) + target.getName()
+                            : Text.get(R.string.LevelActivity_32) + archive.getName() + Text.get(R.string.LevelActivity_33);
                     Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                     leave();
                 });
@@ -521,7 +521,7 @@ public class LevelActivity extends AppCompatActivity {
         }
         pending.clear();
         render();
-        Toast.makeText(this, "已恢复为打开时的值", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, Text.get(R.string.LevelActivity_34), Toast.LENGTH_SHORT).show();
     }
 
     /**
@@ -542,11 +542,11 @@ public class LevelActivity extends AppCompatActivity {
             leave();
             return;
         }
-        titled("有未保存的修改", "Unsaved changes")
-                .setMessage("你改了 " + pending.size() + " 项，还没有写入存档。")
-                .setNegativeButton("直接退出", (dialog, which) -> leave())
-                .setNeutralButton("另存为", (dialog, which) -> startSave(true))
-                .setPositiveButton("保存", (dialog, which) -> startSave(false))
+        titled(Text.get(R.string.LevelActivity_35), "Unsaved changes")
+                .setMessage(Text.get(R.string.LevelActivity_36) + pending.size() + Text.get(R.string.LevelActivity_37))
+                .setNegativeButton(Text.get(R.string.LevelActivity_38), (dialog, which) -> leave())
+                .setNeutralButton(Text.get(R.string.LevelActivity_39), (dialog, which) -> startSave(true))
+                .setPositiveButton(Text.get(R.string.LevelActivity_40), (dialog, which) -> startSave(false))
                 .show();
     }
 
@@ -593,9 +593,9 @@ public class LevelActivity extends AppCompatActivity {
         // The only way out of a failure is the button below; an unsaved-changes prompt on top of it would trap
         // the user in a loop they cannot answer.
         leaving = true;
-        titled("操作失败", "Failed")
+        titled(Text.get(R.string.LevelActivity_41), "Failed")
                 .setMessage(Job.describe(failure))
-                .setPositiveButton("返回", (dialog, which) -> finish())
+                .setPositiveButton(Text.get(R.string.LevelActivity_42), (dialog, which) -> finish())
                 .setCancelable(false)
                 .show();
     }

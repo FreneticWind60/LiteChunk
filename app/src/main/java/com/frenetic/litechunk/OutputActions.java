@@ -75,7 +75,7 @@ final class OutputActions {
     static void enqueue(FragmentActivity activity, Store.OutputFile file) {
         boolean added = Store.get(activity).enqueue(file.file, file.bedrock);
         android.widget.Toast.makeText(activity,
-                added ? "已放入转化列表" : "该存档已在转化列表中", android.widget.Toast.LENGTH_SHORT).show();
+                added ? Text.get(R.string.OutputActions_01) : Text.get(R.string.OutputActions_02), android.widget.Toast.LENGTH_SHORT).show();
         if (added) {
             ((MainActivity) activity).showConvertPage();
         }
@@ -100,13 +100,13 @@ final class OutputActions {
             return;
         }
         String message = files.size() == 1
-                ? "确定删除「" + files.get(0).name + "」？此操作无法撤销。"
-                : "确定删除选中的 " + files.size() + " 个存档？此操作无法撤销。";
+                ? Text.get(R.string.OutputActions_03) + files.get(0).name + Text.get(R.string.OutputActions_04)
+                : Text.get(R.string.OutputActions_05) + files.size() + Text.get(R.string.OutputActions_06);
         new MaterialAlertDialogBuilder(activity)
-                .setTitle("删除存档")
+                .setTitle(Text.get(R.string.OutputActions_07))
                 .setMessage(message)
-                .setNegativeButton("取消", null)
-                .setPositiveButton("删除", (dialog, which) -> {
+                .setNegativeButton(Text.get(R.string.OutputActions_08), null)
+                .setPositiveButton(Text.get(R.string.OutputActions_09), (dialog, which) -> {
                     Store.get(activity).deleteOutputs(files);
                     if (callback != null) {
                         callback.onDeleted();

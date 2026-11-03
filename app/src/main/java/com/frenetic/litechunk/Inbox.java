@@ -70,7 +70,7 @@ final class Inbox {
      * possibly 1 GB archive into {@code inbox/} only to fail while unpacking - is worse on every axis.
      *
      * @param displayName the name the sending app reported.
-     * @return a sentence to show after "已忽略", or null when the file is worth copying in.
+     * @return a sentence to show after Text.get(R.string.Inbox_01), or null when the file is worth copying in.
      */
     static String rejectionReason(String displayName) {
         if (isArchive(displayName)) {
@@ -79,10 +79,10 @@ final class Inbox {
         String lower = displayName == null ? "" : displayName.toLowerCase(Locale.ROOT);
         if (lower.endsWith(".bz2") || lower.endsWith(".xz") || lower.endsWith(".lzh") || lower.endsWith(".lha")
                 || lower.endsWith(".zst") || lower.endsWith(".cab") || lower.endsWith(".iso")) {
-            return "这个压缩格式本应用还打不开，请先用解压工具解成文件夹再导入"
-                    + "（支持 zip / mcworld / rar / 7z / tar / tar.gz）";
+            return Text.get(R.string.Inbox_02)
+                    + Text.get(R.string.Inbox_03);
         }
-        return "不是存档文件（支持 zip / mcworld / rar / 7z / tar / tar.gz）";
+        return Text.get(R.string.Inbox_04);
     }
 
     /** Whether an absolute path is one of our own staged imports, i.e. something we may delete after a conversion. */
@@ -121,7 +121,7 @@ final class Inbox {
         } else {
             try (InputStream input = context.getContentResolver().openInputStream(uri)) {
                 if (input == null) {
-                    throw new IOException("无法读取所选文件");
+                    throw new IOException(Text.get(R.string.Inbox_05));
                 }
                 try (OutputStream output = new FileOutputStream(target)) {
                     copy(input, output);
@@ -166,14 +166,14 @@ final class Inbox {
         }
         long available = new StatFs(directory.getAbsolutePath()).getAvailableBytes();
         if (available < size + size / 8L) {
-            throw new IOException("存储空间不足，需要 " + WorldFiles.humanSize(size)
-                    + "，可用 " + WorldFiles.humanSize(available));
+            throw new IOException(Text.get(R.string.Inbox_06) + WorldFiles.humanSize(size)
+                    + Text.get(R.string.Inbox_07) + WorldFiles.humanSize(available));
         }
     }
 
     private static void copyFile(File source, File target) throws IOException {
         if (!source.isFile()) {
-            throw new IOException("无法读取所选文件");
+            throw new IOException(Text.get(R.string.Inbox_08));
         }
         try (InputStream input = new FileInputStream(source);
              OutputStream output = new FileOutputStream(target)) {

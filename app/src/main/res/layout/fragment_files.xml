@@ -22,7 +22,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:singleLine="true"
-            android:text="左滑展开操作，右滑进入多选"
+            android:text="@string/fragment_files_01"
             android:textAppearance="@style/Text.LiteChunk.Caption" />
 
         <ImageButton
@@ -30,7 +30,7 @@
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="多选"
+            android:contentDescription="@string/fragment_files_07"
             android:src="@drawable/ic_multiselect" />
     </LinearLayout>
 
@@ -71,7 +71,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:gravity="center"
-                android:text="还没有输出文件\n转换完成的存档会出现在这里"
+                android:text="@string/fragment_files_02"
                 android:textAppearance="@style/Text.LiteChunk.Caption" />
         </LinearLayout>
     </FrameLayout>
@@ -109,7 +109,7 @@
             android:minWidth="0dp"
             android:paddingLeft="10dp"
             android:paddingRight="10dp"
-            android:text="删除"
+            android:text="@string/fragment_files_03"
             android:textColor="@color/danger" />
 
         <com.google.android.material.button.MaterialButton
@@ -120,7 +120,7 @@
             android:minWidth="0dp"
             android:paddingLeft="10dp"
             android:paddingRight="10dp"
-            android:text="导出" />
+            android:text="@string/fragment_files_04" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSelectShare"
@@ -130,7 +130,7 @@
             android:minWidth="0dp"
             android:paddingLeft="10dp"
             android:paddingRight="10dp"
-            android:text="分享" />
+            android:text="@string/fragment_files_05" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSelectCancel"
@@ -140,7 +140,7 @@
             android:minWidth="0dp"
             android:paddingLeft="10dp"
             android:paddingRight="10dp"
-            android:text="取消" />
+            android:text="@string/fragment_files_06" />
     </LinearLayout>
 
 </LinearLayout>

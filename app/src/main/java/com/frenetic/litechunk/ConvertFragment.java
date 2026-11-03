@@ -186,7 +186,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             }
         }
         if (added.isEmpty()) {
-            Toast.makeText(requireContext(), "这些存档已经在列表里了", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), Text.get(R.string.ConvertFragment_01), Toast.LENGTH_SHORT).show();
         }
         for (QueueItem item : added) {
             Controller.get(requireContext()).detect(requireContext(), item);
@@ -207,7 +207,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         }
         QueueItem item = QueueItem.fromTree(requireContext(), uri);
         if (!Store.get(requireContext()).add(item)) {
-            Toast.makeText(requireContext(), "该存档已经在列表里了", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), Text.get(R.string.ConvertFragment_02), Toast.LENGTH_SHORT).show();
             return;
         }
         Controller.get(requireContext()).detect(requireContext(), item);
@@ -216,7 +216,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
 
     private void removeQueueItem(int position) {
         if (Controller.get(requireContext()).isRunning()) {
-            Toast.makeText(requireContext(), "转换进行中，先取消再修改列表", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), Text.get(R.string.ConvertFragment_03), Toast.LENGTH_SHORT).show();
             return;
         }
         Store.get(requireContext()).removeAt(position);
@@ -262,25 +262,25 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
 
     private void showVersionPicker() {
         if (Controller.get(requireContext()).isRunning()) {
-            Toast.makeText(requireContext(), "转换进行中，先取消再修改目标版本", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), Text.get(R.string.ConvertFragment_04), Toast.LENGTH_SHORT).show();
             return;
         }
         Formats.Group group = formats == null ? null : formats.group(edition);
         if (group == null) {
-            Toast.makeText(requireContext(), "引擎还在加载，请稍候", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), Text.get(R.string.ConvertFragment_05), Toast.LENGTH_SHORT).show();
             return;
         }
         String[] labels = group.versions;
         String current = currentFormatId();
         int checked = current == null ? 0 : group.indexOf(current);
         new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(formats.editionLabel(edition) + " 目标版本")
+                .setTitle(formats.editionLabel(edition) + Text.get(R.string.ConvertFragment_06))
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                     formatId = group.formatIds[which];
                     dialog.dismiss();
                     render();
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(Text.get(R.string.ConvertFragment_07), null)
                 .show();
     }
 
@@ -315,12 +315,12 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
     /** A real name to preview the template with, so the row shows something meaningful before any conversion. */
     private String namingSampleName() {
         List<QueueItem> queue = Store.get(requireContext()).queue;
-        return queue.isEmpty() ? "存档名" : queue.get(0).name;
+        return queue.isEmpty() ? Text.get(R.string.ConvertFragment_08) : queue.get(0).name;
     }
 
     private String namingPreview(boolean bedrock) {
         String name = Naming.preview(requireContext(), namingSampleName(), bedrock);
-        // The extension is part of what the user is choosing: turning off "打包为 .mcworld" changes it.
+        // The extension is part of what the user is choosing: turning off Text.get(R.string.ConvertFragment_09) changes it.
         String extension = bedrock && Naming.mcworld(requireContext()) ? ".mcworld" : ".zip";
         return name + extension;
     }
@@ -334,7 +334,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
     private void showNamingSheet() {
         Controller controller = Controller.get(requireContext());
         if (controller.isRunning()) {
-            Toast.makeText(requireContext(), "转换进行中，先取消再修改命名", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), Text.get(R.string.ConvertFragment_10), Toast.LENGTH_SHORT).show();
             return;
         }
         Context context = requireContext();
@@ -362,8 +362,8 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             String extension = bedrock && Naming.mcworld(context) ? ".mcworld" : ".zip";
             preview.setText(rendered + extension);
             note.setText(enabled.isEmpty()
-                    ? "一个都没勾选时会退回 world，同名文件自动加序号。"
-                    : "分隔符 " + Naming.describeSeparator(separator[0]) + "，同名文件自动加序号，不会覆盖。");
+                    ? Text.get(R.string.ConvertFragment_11)
+                    : Text.get(R.string.ConvertFragment_12) + Naming.describeSeparator(separator[0]) + Text.get(R.string.ConvertFragment_13));
         };
 
         rows.setLayoutManager(new LinearLayoutManager(context));
@@ -485,7 +485,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             handle.setColorFilter(ContextCompat.getColor(context, R.color.text_faint));
             handle.setPadding(dp(8), dp(8), dp(8), dp(8));
             handle.setLayoutParams(new LinearLayout.LayoutParams(dp(40), dp(40)));
-            handle.setContentDescription("拖动排序");
+            handle.setContentDescription(Text.get(R.string.ConvertFragment_14));
 
             row.addView(check);
             row.addView(handle);
@@ -565,11 +565,11 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         }
         String id = currentFormatId();
         if (id == null) {
-            Toast.makeText(requireContext(), "目标版本还没准备好", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), Text.get(R.string.ConvertFragment_15), Toast.LENGTH_SHORT).show();
             return;
         }
         if (store.queue.isEmpty()) {
-            Toast.makeText(requireContext(), "转化列表是空的", Toast.LENGTH_SHORT).show();
+            Toast.makeText(requireContext(), Text.get(R.string.ConvertFragment_16), Toast.LENGTH_SHORT).show();
             return;
         }
         boolean bedrock = edition.equals("BEDROCK");
@@ -583,13 +583,13 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         long free = Space.free(requireContext());
         if (needed > 0L && free > 0L && free < needed) {
             new MaterialAlertDialogBuilder(requireContext())
-                    .setTitle("空间可能不足")
-                    .setMessage("按两倍余量估算，这批存档需要约 " + WorldFiles.humanSize(needed)
-                            + " 可用空间，当前只剩 " + WorldFiles.humanSize(free) + "。\n\n"
-                            + "转换中途写满会失败，已经完成的存档不受影响，但正在转换的这一项要重来。"
-                            + "可以先到文件页删掉 output/ 里不再需要的成品。")
-                    .setNegativeButton("取消", null)
-                    .setPositiveButton("仍然继续", (dialog, which) -> {
+                    .setTitle(Text.get(R.string.ConvertFragment_17))
+                    .setMessage(Text.get(R.string.ConvertFragment_18) + WorldFiles.humanSize(needed)
+                            + Text.get(R.string.ConvertFragment_19) + WorldFiles.humanSize(free) + "。\n\n"
+                            + Text.get(R.string.ConvertFragment_20)
+                            + Text.get(R.string.ConvertFragment_21))
+                    .setNegativeButton(Text.get(R.string.ConvertFragment_22), null)
+                    .setPositiveButton(Text.get(R.string.ConvertFragment_23), (dialog, which) -> {
                         announceBackgroundLimits(() -> begin(controller, store, id, packMcworld, deleteSource));
                     })
                     .show();
@@ -615,15 +615,15 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             return;
         }
         new MaterialAlertDialogBuilder(context)
-                .setCustomTitle(dialogTitle("让转换安静地跑完", "Background limits"))
-                .setMessage("转换期间屏幕会一直亮着，不会中途睡过去。\n\n"
-                        + "如果切到别的应用，系统仍可能暂停转换（MIUI、ColorOS、OriginOS 都会）。"
-                        + "把 LiteChunk 加入电池优化白名单可以避免，这里改完就不用再管了。")
-                .setNegativeButton("直接开始", (dialog, which) -> {
+                .setCustomTitle(dialogTitle(Text.get(R.string.ConvertFragment_24), "Background limits"))
+                .setMessage(Text.get(R.string.ConvertFragment_25)
+                        + Text.get(R.string.ConvertFragment_26)
+                        + Text.get(R.string.ConvertFragment_27))
+                .setNegativeButton(Text.get(R.string.ConvertFragment_28), (dialog, which) -> {
                     LiteChunkApp.markBackgroundHintSeen(context);
                     start.run();
                 })
-                .setPositiveButton("去设置", (dialog, which) -> {
+                .setPositiveButton(Text.get(R.string.ConvertFragment_29), (dialog, which) -> {
                     LiteChunkApp.markBackgroundHintSeen(context);
                     openBatterySettings(context);
                     start.run();
@@ -665,7 +665,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
     @Override
     public void onQueueChanged() {
         render();
-        // An entry can arrive from the file page too ("装填"), and a Bedrock-only list should still default to Java.
+        // An entry can arrive from the file page too (Text.get(R.string.ConvertFragment_30)), and a Bedrock-only list should still default to Java.
         // pickDefaultTarget() itself backs off once the user has picked a target explicitly.
         pickDefaultTarget();
     }
@@ -703,7 +703,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         binding.tvNamingPreview.setText(namingPreview(bedrock));
 
         int count = store.queue.size();
-        binding.tvQueueCount.setText(count == 0 ? "" : count + " 个");
+        binding.tvQueueCount.setText(count == 0 ? "" : count + Text.get(R.string.ConvertFragment_31));
         binding.tvQueueEmpty.setVisibility(count == 0 ? View.VISIBLE : View.GONE);
         binding.tvQueueHint.setVisibility(count == 0 ? View.GONE : View.VISIBLE);
         // Re-binding the whole list on every progress tick would fight the swipe animation for nothing, so the
@@ -719,20 +719,20 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         boolean formatsReady = formats != null && currentFormatId() != null;
         boolean canConvert = formatsReady && count > 0 && !running;
         binding.btnConvert.setEnabled(canConvert);
-        // A Material button with a custom backgroundTint does not visibly dim when disabled, and "开始转换" looking
+        // A Material button with a custom backgroundTint does not visibly dim when disabled, and Text.get(R.string.ConvertFragment_32) looking
         // active on an empty list is the first thing a new user taps.
         binding.btnConvert.setAlpha(canConvert ? 1F : 0.4F);
-        binding.btnConvert.setText(running ? "转换中…" : "开始转换");
+        binding.btnConvert.setText(running ? Text.get(R.string.ConvertFragment_33) : Text.get(R.string.ConvertFragment_34));
         binding.btnAdd.setEnabled(!running);
         binding.cbDeleteSource.setEnabled(!running);
         binding.rowVersion.setEnabled(!running);
         binding.rowNaming.setEnabled(!running);
 
         if (formats == null) {
-            binding.tvEngine.setText("正在加载转换引擎…");
+            binding.tvEngine.setText(Text.get(R.string.ConvertFragment_35));
         } else {
-            binding.tvEngine.setText("引擎 " + formats.engineVersion + " · 支持 "
-                    + formats.groups.length + " 个平台");
+            binding.tvEngine.setText(Text.get(R.string.ConvertFragment_36) + formats.engineVersion + Text.get(R.string.ConvertFragment_37)
+                    + formats.groups.length + Text.get(R.string.ConvertFragment_38));
         }
 
         // Progress
@@ -747,8 +747,8 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             binding.progress.setProgressCompat(percent, true);
             String stage = controller.stage();
             binding.tvStage.setText(stage == null || stage.isEmpty()
-                    ? "已用时 " + controller.elapsedSeconds() + " 秒"
-                    : stage + " · " + controller.elapsedSeconds() + " 秒");
+                    ? Text.get(R.string.ConvertFragment_39) + controller.elapsedSeconds() + Text.get(R.string.ConvertFragment_40)
+                    : stage + " · " + controller.elapsedSeconds() + Text.get(R.string.ConvertFragment_41));
             // Indexed off the elapsed time rather than a counter: this method runs on every progress tick (five
             // times a second), so any "advance to the next line" state would burn the whole list in 12 seconds.
             String quote = quoteFor(controller.elapsedSeconds());
@@ -891,7 +891,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             }
             if (Controller.get(requireContext()).isRunning()) {
                 queueAdapter.notifyItemChanged(position);
-                Toast.makeText(requireContext(), "转换进行中，先取消再修改列表", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), Text.get(R.string.ConvertFragment_42), Toast.LENGTH_SHORT).show();
                 return;
             }
             Store.get(requireContext()).removeAt(position);

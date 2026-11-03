@@ -35,6 +35,7 @@
     </queries>
 
     <application
+        android:localeConfig="@xml/locales_config"
         android:name=".LiteChunkApp"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"

@@ -95,7 +95,7 @@ final class Archives {
                 break;
             }
             default:
-                throw new IOException("这个格式需要随机读取，必须先存成文件");
+                throw new IOException(Text.get(R.string.Archives_01));
         }
     }
 
@@ -128,7 +128,7 @@ final class Archives {
                 break;
             }
             default:
-                throw new IOException("不支持的压缩格式");
+                throw new IOException(Text.get(R.string.Archives_02));
         }
     }
 }

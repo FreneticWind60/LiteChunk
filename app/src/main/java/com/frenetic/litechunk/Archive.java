@@ -44,11 +44,11 @@ final class Archive {
         try (ZipFile zip = new ZipFile(archive)) {
             ZipEntry entry = findLevelDat(zip);
             if (entry == null) {
-                throw new IOException("存档里找不到 level.dat");
+                throw new IOException(Text.get(R.string.Archive_01));
             }
             File parent = target.getParentFile();
             if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-                throw new IOException("无法创建临时目录");
+                throw new IOException(Text.get(R.string.Archive_02));
             }
             try (InputStream in = new BufferedInputStream(zip.getInputStream(entry));
                  OutputStream out = new BufferedOutputStream(new FileOutputStream(target))) {
@@ -87,7 +87,7 @@ final class Archive {
     static void rewrite(File source, File target, String entryName, File replacement) throws IOException {
         File parent = target.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-            throw new IOException("无法创建输出目录");
+            throw new IOException(Text.get(R.string.Archive_03));
         }
         File temporary = new File(parent, target.getName() + ".tmp");
         boolean replaced = false;
@@ -138,7 +138,7 @@ final class Archive {
             if (!temporary.renameTo(target)) {
                 //noinspection ResultOfMethodCallIgnored
                 temporary.delete();
-                throw new IOException("无法写入存档文件");
+                throw new IOException(Text.get(R.string.Archive_04));
             }
         }
     }

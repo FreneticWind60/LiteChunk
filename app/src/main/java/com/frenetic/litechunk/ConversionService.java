@@ -57,7 +57,7 @@ public class ConversionService extends Service {
      * A plain "is a worker alive?" check used to reject the newcomer, and that lost work: the conversion page asks
      * for the format list ({@code INFO}) the moment it is created, which on a cold start lands within the same
      * millisecond as a detection ({@code DETECT}) triggered by a shared archive — the detection was then refused and
-     * the entry stayed "未识别版本" forever. Serialising instead keeps the engine single-threaded (it has per-instance
+     * the entry stayed Text.get(R.string.ConversionService_01) forever. Serialising instead keeps the engine single-threaded (it has per-instance
      * state) without ever dropping a request.
      */
     private final java.util.concurrent.ExecutorService jobs =
@@ -93,8 +93,8 @@ public class ConversionService extends Service {
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null && manager.getNotificationChannel(CHANNEL_ID) == null) {
             NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "存档转换", NotificationManager.IMPORTANCE_LOW);
-            channel.setDescription("显示转换进度");
+                    CHANNEL_ID, Text.get(R.string.ConversionService_02), NotificationManager.IMPORTANCE_LOW);
+            channel.setDescription(Text.get(R.string.ConversionService_03));
             channel.setShowBadge(false);
             manager.createNotificationChannel(channel);
         }
@@ -132,12 +132,12 @@ public class ConversionService extends Service {
         if (Job.ACTION_CONVERT.equals(action)) {
             if (converting) {
                 Log.w(TAG, "refused a second conversion");
-                sendError(receiver, Job.CODE_FATAL, "已有转换任务正在进行");
+                sendError(receiver, Job.CODE_FATAL, Text.get(R.string.ConversionService_04));
                 stopSelfResult(startId);
                 return START_NOT_STICKY;
             }
             converting = true;
-            startForeground(NOTIFICATION_ID, buildNotification("准备转换…", 0F, true));
+            startForeground(NOTIFICATION_ID, buildNotification(Text.get(R.string.ConversionService_05), 0F, true));
             foreground = true;
             acquireWakeLock();
         }
@@ -337,11 +337,11 @@ public class ConversionService extends Service {
             lastFraction = 0F;
             try {
                 if (!staged) {
-                    notifyStage("正在读取存档…");
+                    notifyStage(Text.get(R.string.ConversionService_06));
                     File incoming = new File(flush, "in");
                     worldRoot = materialize(this, item, incoming, this::notifyStage);
                     if (worldRoot == null) {
-                        throw new IllegalStateException("没有找到世界数据（缺少 level.dat），请确认选中的是世界根目录");
+                        throw new IllegalStateException(Text.get(R.string.ConversionService_07));
                     }
                     readMs = SystemClock.elapsedRealtime() - mark;
                     mark += readMs;
@@ -349,12 +349,12 @@ public class ConversionService extends Service {
                 inputBytes = WorldFiles.size(worldRoot);
 
                 File output = new File(flush, "out");
-                notifyStage("已读取存档，正在启动引擎…");
+                notifyStage(Text.get(R.string.ConversionService_08));
                 convert(receiver, worldRoot, output, format);
                 convertMs = SystemClock.elapsedRealtime() - mark;
                 mark += convertMs;
 
-                notifyStage("正在打包…");
+                notifyStage(Text.get(R.string.ConversionService_09));
                 File archive = pack(output, item, bedrockTarget, packMcworld, naming);
                 packMs = SystemClock.elapsedRealtime() - mark;
 
@@ -417,18 +417,18 @@ public class ConversionService extends Service {
      */
     static File materialize(Context context, QueueItem item, File destination, StageListener stage) throws Exception {
         if (!destination.isDirectory() && !destination.mkdirs()) {
-            throw new IllegalStateException("无法创建临时目录");
+            throw new IllegalStateException(Text.get(R.string.ConversionService_10));
         }
         switch (item.kind) {
             case DOCUMENT: {
                 if (stage != null) {
-                    stage.onStage("正在解压存档…");
+                    stage.onStage(Text.get(R.string.ConversionService_11));
                 }
                 Uri uri = Uri.parse(item.uri);
                 try (InputStream raw = context.getContentResolver().openInputStream(uri);
                      InputStream input = raw == null ? null : new BufferedInputStream(raw)) {
                     if (input == null) {
-                        throw new IllegalStateException("无法读取所选文件");
+                        throw new IllegalStateException(Text.get(R.string.ConversionService_12));
                     }
                     WorldFiles.Container container = WorldFiles.sniff(input);
                     String unsupported = WorldFiles.unsupportedMessage(container, item.name);
@@ -455,7 +455,7 @@ public class ConversionService extends Service {
             }
             case TREE: {
                 if (stage != null) {
-                    stage.onStage("正在复制世界文件夹…");
+                    stage.onStage(Text.get(R.string.ConversionService_13));
                 }
                 WorldFiles.copyTree(context, Uri.parse(item.uri), destination);
                 break;
@@ -465,12 +465,12 @@ public class ConversionService extends Service {
                 File source = new File(item.path);
                 if (source.isDirectory()) {
                     if (stage != null) {
-                        stage.onStage("正在复制世界文件夹…");
+                        stage.onStage(Text.get(R.string.ConversionService_14));
                     }
                     WorldFiles.copyTree(source, destination);
                 } else {
                     if (stage != null) {
-                        stage.onStage("正在解压存档…");
+                        stage.onStage(Text.get(R.string.ConversionService_15));
                     }
                     WorldFiles.Container container = WorldFiles.sniff(source);
                     String unsupported = WorldFiles.unsupportedMessage(container, source.getName());
@@ -493,8 +493,8 @@ public class ConversionService extends Service {
             // identical to the second until now, because ZipInputStream reports an empty archive for a RAR instead
             // of failing, and the old message pointed at level.dat either way.
             throw new IllegalStateException(WorldFiles.isEmptyTree(destination)
-                    ? "压缩包内容读不出来（可能已加密，或不是有效的 ZIP）。请解压成文件夹后，用「世界文件夹」导入。"
-                    : "压缩包里没有 level.dat。请确认压缩的是世界目录本身，或改用「世界文件夹」导入已解压的目录。");
+                    ? Text.get(R.string.ConversionService_16)
+                    : Text.get(R.string.ConversionService_17));
         }
         return worldRoot;
     }
@@ -514,7 +514,7 @@ public class ConversionService extends Service {
         String base = Naming.render(naming.order, naming.enabled, naming.separator,
                 item.name, bedrockTarget, System.currentTimeMillis());
         // Already sanitised and extension-free by Naming.render(): running baseName() again would cut the name at the
-        // last dot, and a world called "我的世界 v1.2" would lose everything after it.
+        // last dot, and a world called Text.get(R.string.ConversionService_18) would lose everything after it.
         File target = WorldFiles.unique(directory, base + extension);
         WorldFiles.zip(outputDirectory, target);
         return target;
@@ -600,13 +600,13 @@ public class ConversionService extends Service {
 
             Log.w(TAG, "out of memory at " + plan.describe() + ", retrying lean", failure);
             MemoryPlan lean = plan.leanRetry();
-            notifyStage("内存不足，正在降低画质重试（" + lean.threads + " 线程 / 精简模式）");
+            notifyStage(Text.get(R.string.ConversionService_19) + lean.threads + Text.get(R.string.ConversionService_20));
 
             // The failed run left a partial world behind; clear it and give the heap a chance to compact before the
             // retry, otherwise the retry starts from an already fragmented heap.
             WorldFiles.delete(outputDirectory);
             if (!outputDirectory.isDirectory() && !outputDirectory.mkdirs()) {
-                throw new IllegalStateException("无法创建输出目录");
+                throw new IllegalStateException(Text.get(R.string.ConversionService_21));
             }
             System.gc();
             convert(chunker, receiver, inputDirectory, outputDirectory, format, lean);
@@ -624,7 +624,7 @@ public class ConversionService extends Service {
         chunker.setLeanMode(plan.lean);
 
         if (!outputDirectory.isDirectory() && !outputDirectory.mkdirs()) {
-            throw new IllegalStateException("无法创建输出目录");
+            throw new IllegalStateException(Text.get(R.string.ConversionService_22));
         }
 
         final long[] lastEmit = {0L};
@@ -721,7 +721,7 @@ public class ConversionService extends Service {
 
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat)
-                .setContentTitle("LiteChunk 正在转换")
+                .setContentTitle(Text.get(R.string.ConversionService_23))
                 .setContentText(text)
                 .setContentIntent(contentIntent)
                 .setOngoing(true)

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Same rules as the Chinese list: short enough for two lines, no emoji, never reads as progress. -->
+    <string-array name="quote_lines">
+        <item>Moving 16×16 blocks across, one at a time.</item>
+        <item>Every chunk accounted for. All of them.</item>
+        <item>Your world is crossing a version boundary.</item>
+        <item>LevelDB is having a moment. Bear with it.</item>
+        <item>Java to Bedrock is one translation away.</item>
+        <item>We do not make blocks, we just move house.</item>
+        <item>One chunk is home to 16×16×384 blocks.</item>
+        <item>The CPU is working hard. The fan knows.</item>
+        <item>If the bar is still, it is tidying the database.</item>
+        <item>Bedrock likes it quiet. Give it a minute.</item>
+        <item>Past a thousand chunks, time stops being counted in seconds.</item>
+        <item>The bigger the world, the more it is worth the wait.</item>
+        <item>Even the mobs are queuing up to move.</item>
+        <item>Your cat will recognise you in the new world.</item>
+        <item>The redstone clock starts ticking again over there.</item>
+        <item>Halfway is still a place. Keep going.</item>
+        <item>Somewhere, a chest is being unpacked.</item>
+    </string-array>
+</resources>

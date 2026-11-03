@@ -53,7 +53,7 @@ public class FilesFragment extends Fragment implements Store.Listener, FileAdapt
         binding.btnSelectExport.setOnClickListener(v -> {
             List<Store.OutputFile> selected = adapter.selectedFiles();
             if (selected.size() != 1) {
-                Toast.makeText(requireContext(), "导出一次只能选一个存档", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), Text.get(R.string.FilesFragment_01), Toast.LENGTH_SHORT).show();
                 return;
             }
             export(selected.get(0), !selected.get(0).bedrock);
@@ -61,7 +61,7 @@ public class FilesFragment extends Fragment implements Store.Listener, FileAdapt
         binding.btnSelectShare.setOnClickListener(v -> {
             List<Store.OutputFile> selected = adapter.selectedFiles();
             if (selected.size() != 1) {
-                Toast.makeText(requireContext(), "分享一次只能选一个存档", Toast.LENGTH_SHORT).show();
+                Toast.makeText(requireContext(), Text.get(R.string.FilesFragment_02), Toast.LENGTH_SHORT).show();
                 return;
             }
             Importers.share(requireActivity(), selected.get(0).file, selected.get(0).bedrock);
@@ -114,7 +114,7 @@ public class FilesFragment extends Fragment implements Store.Listener, FileAdapt
     public void onEnqueue(Store.OutputFile file) {
         boolean added = Store.get(requireContext()).enqueue(file.file, file.bedrock);
         Toast.makeText(requireContext(),
-                added ? "已放入转化列表" : "该存档已在转化列表中", Toast.LENGTH_SHORT).show();
+                added ? Text.get(R.string.FilesFragment_03) : Text.get(R.string.FilesFragment_04), Toast.LENGTH_SHORT).show();
         // Jump to the conversion page when something actually landed: the button's whole point is the list on the
         // other page, and staying put makes it look like nothing happened.
         if (added && requireActivity() instanceof MainActivity activity) {
@@ -167,18 +167,18 @@ public class FilesFragment extends Fragment implements Store.Listener, FileAdapt
         }
         boolean selecting = adapter.isSelectionMode();
         binding.selectionBar.setVisibility(selecting ? View.VISIBLE : View.GONE);
-        binding.tvSelectionCount.setText(selecting ? "已选 " + adapter.selectedCount() + " 项" : "");
+        binding.tvSelectionCount.setText(selecting ? Text.get(R.string.FilesFragment_05) + adapter.selectedCount() + Text.get(R.string.FilesFragment_06) : "");
         binding.btnSelectExport.setEnabled(adapter.selectedCount() == 1);
         binding.btnSelectShare.setEnabled(adapter.selectedCount() == 1);
         binding.btnSelectDelete.setEnabled(adapter.selectedCount() > 0);
         // The header doubles as the gesture legend, so it has to change with the mode instead of leaving the user to
         // work out why swiping stopped opening the strip.
         binding.tvHint.setText(selecting
-                ? "点行选择，再点右上角退出多选"
-                : "左滑展开操作，右滑进入多选");
+                ? Text.get(R.string.FilesFragment_07)
+                : Text.get(R.string.FilesFragment_08));
         binding.btnMultiselect.setColorFilter(selecting
                 ? ContextCompat.getColor(requireContext(), R.color.accent)
                 : ContextCompat.getColor(requireContext(), R.color.text_dim));
-        binding.btnMultiselect.setContentDescription(selecting ? "退出多选" : "多选");
+        binding.btnMultiselect.setContentDescription(selecting ? Text.get(R.string.FilesFragment_09) : Text.get(R.string.FilesFragment_10));
     }
 }

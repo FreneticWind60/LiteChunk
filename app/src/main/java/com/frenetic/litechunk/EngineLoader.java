@@ -58,7 +58,7 @@ final class EngineLoader {
     private static File syncDex(Context context) throws IOException {
         File directory = new File(context.getCodeCacheDir(), "engine");
         if (!directory.isDirectory() && !directory.mkdirs()) {
-            throw new IOException("无法创建引擎缓存目录");
+            throw new IOException(Text.get(R.string.EngineLoader_01));
         }
 
         long size = assetSize(context, DEX_ASSET);
@@ -73,7 +73,7 @@ final class EngineLoader {
                 //noinspection ResultOfMethodCallIgnored
                 target.delete();
                 if (!temp.renameTo(target)) {
-                    throw new IOException("无法写入引擎文件");
+                    throw new IOException(Text.get(R.string.EngineLoader_02));
                 }
             }
         }
@@ -90,7 +90,7 @@ final class EngineLoader {
 
         // Required since Android 14: dynamically loaded code must not come from a writable file.
         if (target.canWrite() && !target.setReadOnly()) {
-            throw new IOException("无法将引擎设为只读");
+            throw new IOException(Text.get(R.string.EngineLoader_03));
         }
         return target;
     }
@@ -106,7 +106,7 @@ final class EngineLoader {
 
         WorldFiles.delete(root);
         if (!root.isDirectory() && !root.mkdirs()) {
-            throw new IOException("无法创建引擎资源目录");
+            throw new IOException(Text.get(R.string.EngineLoader_04));
         }
         copyAssetTree(context.getAssets(), RESOURCE_ASSET, root);
         try (OutputStream out = new FileOutputStream(stamp)) {
@@ -120,7 +120,7 @@ final class EngineLoader {
         if (children == null || children.length == 0) {
             File parent = destination.getParentFile();
             if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-                throw new IOException("无法创建目录：" + parent.getName());
+                throw new IOException(Text.get(R.string.EngineLoader_05) + parent.getName());
             }
             try (InputStream in = assets.open(path);
                  OutputStream out = new FileOutputStream(destination)) {
@@ -129,7 +129,7 @@ final class EngineLoader {
             return;
         }
         if (!destination.isDirectory() && !destination.mkdirs()) {
-            throw new IOException("无法创建目录：" + destination.getName());
+            throw new IOException(Text.get(R.string.EngineLoader_06) + destination.getName());
         }
         for (String child : children) {
             copyAssetTree(assets, path + "/" + child, new File(destination, child));

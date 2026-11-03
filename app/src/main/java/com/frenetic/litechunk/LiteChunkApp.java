@@ -20,6 +20,9 @@ public class LiteChunkApp extends Application {
     public void onCreate() {
         super.onCreate();
         AppCompatDelegate.setDefaultNightMode(readNightMode(this));
+        // Language before anything can read a string: installs the per-process lookup used by the file plumbing and
+        // the error mapper, and hands the saved choice to AppCompat so activities come up in the right locale.
+        Language.apply(this);
         Store.get(this).start();
         Paths.output(this);
         Paths.clearFlash(this);
@@ -65,11 +68,11 @@ public class LiteChunkApp extends Application {
     static String describeNightMode(int mode) {
         switch (normalise(mode)) {
             case AppCompatDelegate.MODE_NIGHT_NO:
-                return "浅色模式";
+                return Text.get(R.string.LiteChunkApp_01);
             case AppCompatDelegate.MODE_NIGHT_YES:
-                return "深色模式";
+                return Text.get(R.string.LiteChunkApp_02);
             default:
-                return "跟随系统";
+                return Text.get(R.string.LiteChunkApp_03);
         }
     }
 

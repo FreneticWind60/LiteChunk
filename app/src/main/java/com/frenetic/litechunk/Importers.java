@@ -72,8 +72,8 @@ final class Importers {
         Target target = findTarget(activity, bedrockArchive);
         if (target == Target.NONE) {
             Toast.makeText(activity, bedrockArchive
-                    ? "未检测到基岩版，已改为分享"
-                    : "未检测到 Java 版启动器，已改为分享", Toast.LENGTH_SHORT).show();
+                    ? Text.get(R.string.Importers_01)
+                    : Text.get(R.string.Importers_02), Toast.LENGTH_SHORT).show();
             share(activity, archive, bedrockArchive);
             return false;
         }
@@ -89,10 +89,10 @@ final class Importers {
         }
 
         try {
-            activity.startActivity(Intent.createChooser(intent, "导入到游戏"));
+            activity.startActivity(Intent.createChooser(intent, Text.get(R.string.Importers_03)));
             return true;
         } catch (RuntimeException failure) {
-            Toast.makeText(activity, "导入失败：" + Job.describe(failure), Toast.LENGTH_LONG).show();
+            Toast.makeText(activity, Text.get(R.string.Importers_04) + Job.describe(failure), Toast.LENGTH_LONG).show();
             return false;
         }
     }
@@ -105,9 +105,9 @@ final class Importers {
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         send.setClipData(ClipData.newRawUri(archive.getName(), uri));
         try {
-            activity.startActivity(Intent.createChooser(send, "分享存档"));
+            activity.startActivity(Intent.createChooser(send, Text.get(R.string.Importers_05)));
         } catch (RuntimeException failure) {
-            Toast.makeText(activity, "分享失败：" + Job.describe(failure), Toast.LENGTH_LONG).show();
+            Toast.makeText(activity, Text.get(R.string.Importers_06) + Job.describe(failure), Toast.LENGTH_LONG).show();
         }
     }
 }

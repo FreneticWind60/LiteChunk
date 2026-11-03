@@ -76,64 +76,64 @@
         <LinearLayout
             android:id="@+id/actionEnqueue"
             style="@style/Widget.LiteChunk.RowAction"
-            android:contentDescription="放入转化列表">
+            android:contentDescription="@string/row_file_07">
 
             <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_queue_add" />
 
-            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="装填" />
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="@string/row_file_01" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/actionLevel"
             style="@style/Widget.LiteChunk.RowAction"
-            android:contentDescription="存档详情">
+            android:contentDescription="@string/row_file_08">
 
             <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_info" />
 
-            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="详情" />
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="@string/row_file_02" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/actionExport"
             style="@style/Widget.LiteChunk.RowAction"
-            android:contentDescription="导出">
+            android:contentDescription="@string/row_file_09">
 
             <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_export" />
 
-            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="导出" />
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="@string/row_file_03" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/actionShare"
             style="@style/Widget.LiteChunk.RowAction"
-            android:contentDescription="分享">
+            android:contentDescription="@string/row_file_10">
 
             <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_share" />
 
-            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="分享" />
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="@string/row_file_04" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/actionGame"
             style="@style/Widget.LiteChunk.RowAction"
-            android:contentDescription="导入游戏">
+            android:contentDescription="@string/row_file_11">
 
             <ImageView style="@style/Widget.LiteChunk.RowActionIcon" android:src="@drawable/ic_game" />
 
-            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="导入" />
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="@string/row_file_05" />
         </LinearLayout>
 
         <LinearLayout
             android:id="@+id/actionDelete"
             style="@style/Widget.LiteChunk.RowAction"
-            android:contentDescription="删除">
+            android:contentDescription="@string/row_file_12">
 
             <ImageView
                 style="@style/Widget.LiteChunk.RowActionIcon"
                 android:src="@drawable/ic_delete"
                 app:tint="@color/danger" />
 
-            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="删除" />
+            <TextView style="@style/Widget.LiteChunk.RowActionLabel" android:text="@string/row_file_06" />
         </LinearLayout>
     </LinearLayout>
 

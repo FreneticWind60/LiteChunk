@@ -3,6 +3,8 @@ package com.frenetic.litechunk;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.View;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
@@ -63,17 +65,52 @@ public class AboutActivity extends AppCompatActivity {
             return WindowInsetsCompat.CONSUMED;
         });
 
-        binding.tvVersion.setText("版本 " + BuildConfig.VERSION_NAME);
+        binding.tvVersion.setText(Text.get(R.string.AboutActivity_01) + BuildConfig.VERSION_NAME);
         binding.btnBack.setOnClickListener(view -> finish());
         binding.btnCheckUpdate.setOnClickListener(view -> checkForUpdates());
         binding.rowGithub.setOnClickListener(view -> openLink(GITHUB_PROFILE));
         binding.rowBilibili.setOnClickListener(view -> openLink(BILIBILI_PROFILE));
+        binding.rowLanguage.setOnClickListener(view -> chooseLanguage());
+        updateLanguageLabel();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         io.shutdown();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Language
+    // ---------------------------------------------------------------------------------------------
+
+    /** The current choice sits on the row itself, so it does not take a dialog to find out. */
+    private void updateLanguageLabel() {
+        binding.tvLanguage.setText(Language.label(Language.index(this)) + " \u203A");
+    }
+
+    /**
+     * "Follow the system" plus the two translations. Changing it recreates the activity stack through
+     * {@link androidx.appcompat.app.AppCompatDelegate#setApplicationLocales}, so nothing has to be refreshed by hand.
+     */
+    private void chooseLanguage() {
+        View header = getLayoutInflater().inflate(R.layout.dialog_header, null);
+        ((TextView) header.findViewById(R.id.tvTitle)).setText(R.string.language_title);
+        ((TextView) header.findViewById(R.id.tvSubtitle)).setText(R.string.language_subtitle);
+
+        String[] labels = new String[Language.TAGS.length];
+        for (int i = 0; i < labels.length; i++) {
+            labels[i] = Language.label(i);
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setCustomTitle(header)
+                .setSingleChoiceItems(labels, Language.index(this), (dialog, which) -> {
+                    dialog.dismiss();
+                    Language.save(this, which);
+                })
+                .setNegativeButton(R.string.action_cancel, null)
+                .show();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -94,7 +131,7 @@ public class AboutActivity extends AppCompatActivity {
 
     private void checkForUpdates() {
         binding.btnCheckUpdate.setEnabled(false);
-        binding.tvUpdateStatus.setText("正在检查…");
+        binding.tvUpdateStatus.setText(Text.get(R.string.AboutActivity_02));
         io.execute(() -> {
             try {
                 String json = fetch(RELEASE_API);
@@ -121,20 +158,20 @@ public class AboutActivity extends AppCompatActivity {
             return;
         }
         binding.btnCheckUpdate.setEnabled(true);
-        binding.tvUpdateStatus.setText(upToDate ? "已是最新版本" : "发现新版本 " + published);
+        binding.tvUpdateStatus.setText(upToDate ? Text.get(R.string.AboutActivity_03) : Text.get(R.string.AboutActivity_04) + published);
         if (upToDate) {
             new MaterialAlertDialogBuilder(this)
-                    .setTitle("已是最新版本")
-                    .setMessage("当前版本 " + BuildConfig.VERSION_NAME + " 就是 GitHub 上最新的发布。")
-                    .setPositiveButton("好的", null)
+                    .setTitle(Text.get(R.string.AboutActivity_05))
+                    .setMessage(Text.get(R.string.AboutActivity_06) + BuildConfig.VERSION_NAME + Text.get(R.string.AboutActivity_07))
+                    .setPositiveButton(Text.get(R.string.AboutActivity_08), null)
                     .show();
             return;
         }
         new MaterialAlertDialogBuilder(this)
-                .setTitle("发现新版本")
-                .setMessage("最新发布：" + published + "\n当前版本：" + BuildConfig.VERSION_NAME)
-                .setNegativeButton("稍后", null)
-                .setPositiveButton("前往下载", (dialog, which) -> openLink(url))
+                .setTitle(Text.get(R.string.AboutActivity_09))
+                .setMessage(Text.get(R.string.AboutActivity_10) + published + Text.get(R.string.AboutActivity_11) + BuildConfig.VERSION_NAME)
+                .setNegativeButton(Text.get(R.string.AboutActivity_12), null)
+                .setPositiveButton(Text.get(R.string.AboutActivity_13), (dialog, which) -> openLink(url))
                 .show();
     }
 
@@ -143,12 +180,12 @@ public class AboutActivity extends AppCompatActivity {
             return;
         }
         binding.btnCheckUpdate.setEnabled(true);
-        binding.tvUpdateStatus.setText("无法获取更新信息");
+        binding.tvUpdateStatus.setText(Text.get(R.string.AboutActivity_14));
         new MaterialAlertDialogBuilder(this)
-                .setTitle("暂时无法检查更新")
-                .setMessage("可能是网络不通，或者 GitHub 上还没有发布版本。可以手动到主页查看。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("打开 GitHub", (dialog, which) -> openLink(GITHUB_PROFILE))
+                .setTitle(Text.get(R.string.AboutActivity_15))
+                .setMessage(Text.get(R.string.AboutActivity_16))
+                .setNegativeButton(Text.get(R.string.AboutActivity_17), null)
+                .setPositiveButton(Text.get(R.string.AboutActivity_18), (dialog, which) -> openLink(GITHUB_PROFILE))
                 .show();
     }
 

@@ -169,7 +169,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         android.util.Log.i("MainActivity", "importing " + uris.size() + " uri(s)");
-        Toast.makeText(this, "正在导入存档…", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, Text.get(R.string.MainActivity_01), Toast.LENGTH_SHORT).show();
         io.execute(() -> {
             List<File> accepted = new ArrayList<>();
             List<String> rejected = new ArrayList<>();
@@ -211,14 +211,14 @@ public class MainActivity extends AppCompatActivity {
             // The list is the whole point of accepting a share, so show it instead of leaving the user on a page
             // where nothing appears to have happened.
             showConvertPage();
-            Toast.makeText(this, added == 1 ? "已加入转化列表" : "已加入 " + added + " 个存档",
+            Toast.makeText(this, added == 1 ? Text.get(R.string.MainActivity_02) : Text.get(R.string.MainActivity_03) + added + Text.get(R.string.MainActivity_04),
                     Toast.LENGTH_SHORT).show();
         }
         if (!rejected.isEmpty()) {
             String detail = rejected.size() == 1
                     ? rejected.get(0)
-                    : rejected.get(0) + " 等 " + rejected.size() + " 个";
-            Toast.makeText(this, "已忽略 " + detail, Toast.LENGTH_LONG).show();
+                    : rejected.get(0) + Text.get(R.string.MainActivity_05) + rejected.size() + Text.get(R.string.MainActivity_06);
+            Toast.makeText(this, Text.get(R.string.MainActivity_07) + detail, Toast.LENGTH_LONG).show();
         }
     }
 
@@ -294,7 +294,7 @@ public class MainActivity extends AppCompatActivity {
      */
     void startExport(File source, String suggestedName) {
         if (source == null || !source.isFile()) {
-            Toast.makeText(this, "文件已不存在", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, Text.get(R.string.MainActivity_08), Toast.LENGTH_SHORT).show();
             return;
         }
         pendingExport = source;
@@ -307,21 +307,21 @@ public class MainActivity extends AppCompatActivity {
         if (target == null || source == null) {
             return;
         }
-        Toast.makeText(this, "正在导出…", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, Text.get(R.string.MainActivity_09), Toast.LENGTH_SHORT).show();
         io.execute(() -> {
             try (InputStream in = new FileInputStream(source);
                  OutputStream out = getContentResolver().openOutputStream(target, "wt")) {
                 if (out == null) {
-                    throw new IOException("无法写入所选位置");
+                    throw new IOException(Text.get(R.string.MainActivity_10));
                 }
                 byte[] buffer = new byte[128 * 1024];
                 int read;
                 while ((read = in.read(buffer)) > 0) {
                     out.write(buffer, 0, read);
                 }
-                runOnUiThread(() -> Toast.makeText(this, "已导出", Toast.LENGTH_SHORT).show());
+                runOnUiThread(() -> Toast.makeText(this, Text.get(R.string.MainActivity_11), Toast.LENGTH_SHORT).show());
             } catch (Throwable failure) {
-                runOnUiThread(() -> Toast.makeText(this, "导出失败：" + Job.describe(failure), Toast.LENGTH_LONG).show());
+                runOnUiThread(() -> Toast.makeText(this, Text.get(R.string.MainActivity_12) + Job.describe(failure), Toast.LENGTH_LONG).show());
             }
         });
     }

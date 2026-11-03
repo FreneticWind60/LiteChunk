@@ -13,7 +13,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="添加存档"
+        android:text="@string/sheet_pick_source_01"
         android:textColor="@color/text"
         android:textSize="17sp"
         android:textStyle="bold" />
@@ -22,7 +22,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="选择压缩包，或直接选择已解压的世界文件夹"
+        android:text="@string/sheet_pick_source_02"
         android:textColor="@color/text_dim"
         android:textSize="12sp" />
 
@@ -65,7 +65,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="压缩包"
+                android:text="@string/sheet_pick_source_03"
                 android:textColor="@color/text"
                 android:textSize="14sp" />
 
@@ -117,7 +117,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="世界文件夹"
+                android:text="@string/sheet_pick_source_04"
                 android:textColor="@color/text"
                 android:textSize="14sp" />
 
@@ -126,7 +126,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="已解压，含 level.dat 的目录" />
+                android:text="@string/sheet_pick_source_05" />
         </LinearLayout>
     </LinearLayout>
 
@@ -136,5 +136,5 @@
         android:layout_width="match_parent"
         android:layout_height="46dp"
         android:layout_marginTop="10dp"
-        android:text="取消" />
+        android:text="@string/sheet_pick_source_06" />
 </LinearLayout>

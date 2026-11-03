@@ -160,11 +160,11 @@ final class Naming {
     static String label(String token) {
         switch (token) {
             case TOKEN_NAME:
-                return "存档原名";
+                return Text.get(R.string.Naming_01);
             case TOKEN_EDITION:
-                return "版本标记（BE/JE）";
+                return Text.get(R.string.Naming_02);
             case TOKEN_TIME:
-                return "时间戳";
+                return Text.get(R.string.Naming_03);
             default:
                 return token;
         }
@@ -172,7 +172,7 @@ final class Naming {
 
     static String describeSeparator(String separator) {
         if (separator == null || separator.isEmpty()) {
-            return "无分隔";
+            return Text.get(R.string.Naming_04);
         }
         return "「" + separator + "」";
     }

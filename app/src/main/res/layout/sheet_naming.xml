@@ -13,7 +13,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="输出命名"
+        android:text="@string/sheet_naming_01"
         android:textColor="@color/text"
         android:textSize="17sp"
         android:textStyle="bold" />
@@ -22,7 +22,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="4dp"
-        android:text="勾选要用的部分，按住右侧把手拖动排先后"
+        android:text="@string/sheet_naming_02"
         android:textColor="@color/text_dim"
         android:textSize="12sp" />
 
@@ -65,7 +65,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:checked="true"
-            android:text="打包为 .mcworld"
+            android:text="@string/sheet_naming_03"
             android:textColor="@color/text"
             android:textSize="14sp" />
 
@@ -75,7 +75,7 @@
             android:layout_height="wrap_content"
             android:paddingStart="2dp"
             android:paddingEnd="2dp"
-            android:text="关掉后输出 .zip，内容完全相同，只是扩展名不同。"
+            android:text="@string/sheet_naming_04"
             android:textAppearance="@style/Text.LiteChunk.Caption" />
     </LinearLayout>
 
@@ -83,7 +83,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:text="分隔符"
+        android:text="@string/sheet_naming_05"
         android:textAppearance="@style/Text.LiteChunk.Caption" />
 
     <com.google.android.material.button.MaterialButtonToggleGroup
@@ -120,7 +120,7 @@
             android:layout_width="0dp"
             android:layout_height="42dp"
             android:layout_weight="1"
-            android:text="无"
+            android:text="@string/sheet_naming_06"
             android:textSize="14sp"
             app:cornerRadius="12dp" />
     </com.google.android.material.button.MaterialButtonToggleGroup>
@@ -144,7 +144,7 @@
             style="@style/Widget.LiteChunk.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="46dp"
-            android:text="恢复默认" />
+            android:text="@string/sheet_naming_07" />
 
         <View
             android:layout_width="0dp"
@@ -157,6 +157,6 @@
             android:layout_width="wrap_content"
             android:layout_height="46dp"
             android:minWidth="96dp"
-            android:text="完成" />
+            android:text="@string/sheet_naming_08" />
     </LinearLayout>
 </LinearLayout>

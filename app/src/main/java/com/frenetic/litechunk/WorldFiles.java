@@ -120,8 +120,8 @@ final class WorldFiles {
         if (Archives.isSupported(actual)) {
             return null;
         }
-        return "这个压缩格式本应用还打不开（支持 zip / .mcworld / rar / 7z / tar / tar.gz）。"
-                + "请先用解压工具解成文件夹，再用「世界文件夹」导入。";
+        return Text.get(R.string.WorldFiles_01)
+                + Text.get(R.string.WorldFiles_02);
     }
 
     private static Container containerFromName(String name) {
@@ -160,7 +160,7 @@ final class WorldFiles {
 
     static void unzip(InputStream input, File destination) throws IOException {
         if (!destination.isDirectory() && !destination.mkdirs()) {
-            throw new IOException("无法创建解压目录");
+            throw new IOException(Text.get(R.string.WorldFiles_03));
         }
         String rootPath = destination.getCanonicalPath();
 
@@ -175,7 +175,7 @@ final class WorldFiles {
                 File target = new File(destination, name);
                 String path = target.getCanonicalPath();
                 if (!path.equals(rootPath) && !path.startsWith(rootPath + File.separator)) {
-                    throw new IOException("压缩包包含非法路径：" + name);
+                    throw new IOException(Text.get(R.string.WorldFiles_04) + name);
                 }
                 if (entry.isDirectory()) {
                     //noinspection ResultOfMethodCallIgnored
@@ -184,7 +184,7 @@ final class WorldFiles {
                 }
                 File parent = target.getParentFile();
                 if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-                    throw new IOException("无法创建目录：" + parent.getName());
+                    throw new IOException(Text.get(R.string.WorldFiles_05) + parent.getName());
                 }
                 try (OutputStream out = new FileOutputStream(target)) {
                     int read;
@@ -245,7 +245,7 @@ final class WorldFiles {
     static void copyTree(Context context, Uri treeUri, File destination) throws IOException {
         DocumentFile root = DocumentFile.fromTreeUri(context, treeUri);
         if (root == null || !root.exists()) {
-            throw new IOException("无法访问所选文件夹");
+            throw new IOException(Text.get(R.string.WorldFiles_06));
         }
         copyDocument(context, root, destination);
     }
@@ -253,7 +253,7 @@ final class WorldFiles {
     private static void copyDocument(Context context, DocumentFile source, File destination) throws IOException {
         if (source.isDirectory()) {
             if (!destination.isDirectory() && !destination.mkdirs()) {
-                throw new IOException("无法创建目录：" + destination.getName());
+                throw new IOException(Text.get(R.string.WorldFiles_07) + destination.getName());
             }
             for (DocumentFile child : source.listFiles()) {
                 String name = child.getName();
@@ -268,7 +268,7 @@ final class WorldFiles {
         try (InputStream in = context.getContentResolver().openInputStream(source.getUri());
              OutputStream out = new FileOutputStream(destination)) {
             if (in == null) {
-                throw new IOException("无法读取：" + source.getName());
+                throw new IOException(Text.get(R.string.WorldFiles_08) + source.getName());
             }
             copy(in, out);
         }
@@ -284,7 +284,7 @@ final class WorldFiles {
     static void zip(File directory, File zipFile) throws IOException {
         File parent = zipFile.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-            throw new IOException("无法创建输出目录");
+            throw new IOException(Text.get(R.string.WorldFiles_09));
         }
         try (ZipOutputStream zip = new ZipOutputStream(
                 new BufferedOutputStream(new FileOutputStream(zipFile), BUFFER))) {
@@ -419,7 +419,7 @@ final class WorldFiles {
             // Fall back to the last path segment.
         }
         String segment = uri.getLastPathSegment();
-        return segment == null ? "存档" : segment;
+        return segment == null ? Text.get(R.string.WorldFiles_10) : segment;
     }
 
     static String suggestName(String sourceName, boolean javaTarget) {
@@ -441,7 +441,7 @@ final class WorldFiles {
      * Drop only a known archive extension, keeping dots that belong to the world's own name.
      * <p>
      * {@link #baseName} cuts at the last dot, which is right for a file picked from disk and wrong for a name we
-     * produced ourselves: "我的世界 v1.2-BE-20261027" would come back as "我的世界 v1".
+     * produced ourselves: Text.get(R.string.WorldFiles_11) would come back as Text.get(R.string.WorldFiles_12).
      */
     static String stripArchiveExtension(String name) {
         if (name == null) {
@@ -503,11 +503,11 @@ final class WorldFiles {
 
     static void copyTree(File source, File destination) throws IOException {
         if (source == null || !source.exists()) {
-            throw new IOException("源文件不存在");
+            throw new IOException(Text.get(R.string.WorldFiles_13));
         }
         if (source.isDirectory()) {
             if (!destination.isDirectory() && !destination.mkdirs()) {
-                throw new IOException("无法创建目录：" + destination.getName());
+                throw new IOException(Text.get(R.string.WorldFiles_14) + destination.getName());
             }
             File[] children = source.listFiles();
             if (children != null) {
@@ -519,7 +519,7 @@ final class WorldFiles {
         }
         File parent = destination.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-            throw new IOException("无法创建目录：" + parent.getName());
+            throw new IOException(Text.get(R.string.WorldFiles_15) + parent.getName());
         }
         try (InputStream in = new BufferedInputStream(new FileInputStream(source));
              OutputStream out = new BufferedOutputStream(new FileOutputStream(destination))) {
@@ -565,7 +565,7 @@ final class WorldFiles {
     static void copyTo(InputStream in, File target) throws IOException {
         File parent = target.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
-            throw new IOException("无法创建临时目录");
+            throw new IOException(Text.get(R.string.WorldFiles_16));
         }
         try (OutputStream out = new BufferedOutputStream(new FileOutputStream(target), BUFFER)) {
             copy(in, out);

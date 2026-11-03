@@ -14,7 +14,7 @@ import java.io.File;
 import java.util.List;
 
 /**
- * "本轮输出" rows on the conversion page. Each row opens the same action sheet as the file manager, so a finished
+ * Text.get(R.string.OutputAdapter_01) rows on the conversion page. Each row opens the same action sheet as the file manager, so a finished
  * archive can be exported, shared or handed to the game without switching pages.
  */
 final class OutputAdapter extends RecyclerView.Adapter<OutputAdapter.Holder> {

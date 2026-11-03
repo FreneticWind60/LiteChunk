@@ -187,7 +187,7 @@ final class Controller {
     void detect(Context context, QueueItem item) {
         if (isRunning()) {
             // The service runs one job thread at a time and refuses a second one, which would surface as
-            // "已有转换任务正在进行" in the middle of a conversion. Leave the entry undetected: detectPending()
+            // Text.get(R.string.Controller_01) in the middle of a conversion. Leave the entry undetected: detectPending()
             // catches it up as soon as the batch ends.
             return;
         }
@@ -205,7 +205,7 @@ final class Controller {
                     }
                 }
                 if (root == null) {
-                    throw new IllegalStateException("没有找到世界数据（缺少 level.dat）");
+                    throw new IllegalStateException(Text.get(R.string.Controller_02));
                 }
                 // The service owns the scratch directory from here: it keeps it for the conversion and deletes it
                 // once that item is done. Deleting it here would race the detection that was just dispatched.
@@ -282,7 +282,7 @@ final class Controller {
         index = 0;
         total = items.size();
         currentName = items.get(0).name;
-        stage = "正在准备…";
+        stage = Text.get(R.string.Controller_03);
         progress = 0D;
         succeeded = 0;
         failed = 0;
@@ -348,7 +348,7 @@ final class Controller {
                     index = data.getInt(Job.KEY_INDEX, index);
                     total = data.getInt(Job.KEY_COUNT, total);
                     currentName = data.getString(Job.KEY_NAME, currentName);
-                    stage = "正在准备存档…";
+                    stage = Text.get(R.string.Controller_04);
                     progress = 0D;
                     notifyChanged();
                     break;
@@ -375,7 +375,7 @@ final class Controller {
                     break;
                 case Job.CODE_ITEM_ERROR:
                     failed++;
-                    lastError = data.getString(Job.KEY_ERROR, "未知错误");
+                    lastError = data.getString(Job.KEY_ERROR, Text.get(R.string.Controller_05));
                     notifyChanged();
                     break;
                 case Job.CODE_QUEUE_DONE:
@@ -391,7 +391,7 @@ final class Controller {
                 case Job.CODE_FATAL:
                     state = State.IDLE;
                     startedAt = 0L;
-                    lastError = data.getString(Job.KEY_ERROR, "未知错误");
+                    lastError = data.getString(Job.KEY_ERROR, Text.get(R.string.Controller_06));
                     notifyChanged();
                     break;
                 default:
@@ -414,7 +414,7 @@ final class Controller {
      * Catch up on entries that arrived while a batch was running.
      * <p>
      * The service runs one job thread at a time, so a detection requested mid batch is refused — which used to leave
-     * anything shared in from another app sitting in the list as "未识别版本" until it was removed and added again.
+     * anything shared in from another app sitting in the list as Text.get(R.string.Controller_07) until it was removed and added again.
      */
     private void detectPending() {
         for (QueueItem item : new ArrayList<>(Store.get(app).queue)) {

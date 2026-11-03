@@ -49,7 +49,7 @@ final class Store {
         }
 
         String editionLabel() {
-            return bedrock ? "基岩版" : "Java 版";
+            return bedrock ? Text.get(R.string.Store_01) : Text.get(R.string.Store_02);
         }
     }
 
@@ -220,14 +220,14 @@ final class Store {
     /**
      * Move an output archive back into the conversion list.
      * <p>
-     * {@code bedrock} comes from the output scan, so the row can show "基岩版" straight away instead of "未识别版本"
+     * {@code bedrock} comes from the output scan, so the row can show Text.get(R.string.Store_03) straight away instead of Text.get(R.string.Store_04)
      * — the exact version is not known without reading the world, and re-reading a 100MB archive just to fill in a
      * label would make the button feel broken. The converter detects the real source format on its own.
      */
     boolean enqueue(File archive, boolean bedrock) {
         QueueItem item = QueueItem.fromLocal(archive);
         item.formatId = bedrock ? "BEDROCK" : "JAVA";
-        item.formatLabel = bedrock ? "基岩版" : "Java 版";
+        item.formatLabel = bedrock ? Text.get(R.string.Store_05) : Text.get(R.string.Store_06);
         return add(item);
     }
 
@@ -236,7 +236,7 @@ final class Store {
      * <p>
      * Saved immediately: detection runs in a second process and its result only lived in memory, so a process
      * restart (or the system reclaiming the app while the user is elsewhere) turned a freshly detected row back
-     * into "未识别版本" and made the conversion look like it had lost its input.
+     * into Text.get(R.string.Store_07) and made the conversion look like it had lost its input.
      */
     void markDetected(String itemId, String formatId, String formatLabel, String version) {
         if (itemId == null) {

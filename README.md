@@ -3,7 +3,7 @@
 Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换引擎来自
 [Chunker](https://github.com/HiveGamesOSS/Chunker) 的裁剪版，通过 `DexClassLoader` 在独立进程中加载。
 
-- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build3 pr8`（与引擎 Chunker 的版本同步）
+- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build3`（build3 线的正式版，与引擎 Chunker 的版本同步）
 - 每个版本的新特性与已知局限见 [`VERSION.md`](VERSION.md)
 - 最低系统 Android 8.1（API 27）—— `java.nio.file` 与基岩版 1.26 的共同下限；目标 API 37
 - 只做一件事：选存档 → 选版本 → 转换 → 保存 / 分享 / 导入
@@ -300,10 +300,19 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
     所以从分享流进来时先落一次盘再解；TAR/TAR.GZIP 直接流式解。并行度压到 2，RAR 解码器的
     控制台进度条关掉。包体代价 +95 KB。
 
+18. 多语言：界面文案原来全部写死在布局与代码里（布局 83 处、Java 约 200 条），现在抽成资源，
+    提供 `values`（简体中文）/ `values-en` / `values-ja` 三套，外加 `values-*/quotes.xml` 的英日一言。
+    代码里没有 `Context` 的地方（文件处理、压缩包识别、错误映射）走 `Text.get()`，它用保存的语言偏好
+    构造 `Resources`；这一步是必须的，因为转换跑在 `:chunker` 进程，AppCompat 的 per-app locale 在那种进程里
+    没有 Activity 可以重建。语言入口在「关于 → 语言」，默认跟随系统，切换用
+    `AppCompatDelegate.setApplicationLocales()`，Android 13+ 同时注册进系统的应用语言设置。
+
 ## 运行时设计
 
 - **进程隔离**：`ConversionService` 跑在 `:chunker` 进程，独立堆预算；转换崩溃不影响 UI；取消 = 杀该进程
   （Chunker 没有中断 API）。
+- **多语言**：`values` / `values-en` / `values-ja` 三套资源；没有 `Context` 的代码用 `Text.get()`，
+  它在 `Application.onCreate` 里按保存的语言偏好建立 `Resources`，因此 `:chunker` 进程里的报错也跟 UI 一致。
 - **内存自适应**：`MemoryPlan` 按 `Runtime.maxMemory()` 决定档位（每 200MB 堆 1 线程，上限 2）。
   上限是 2 而不是 8：同一世界 8 线程实测比 2 线程更慢，线程越多 GC 压力越大。
   首次失败若是 OOM，自动降 1 线程 + 精简模式重试一次。
@@ -444,22 +453,23 @@ UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：�
 | 2.2 GB `存档 A` | 前 / 后（单对，2 线程） | 560.8 → **546.0 s（−2.7%）** | 1015.3 → **939.5 s（−7.5%）** | 堆 780 → 765 MB |
 | 基岩 → Java | 前 / 后（同一存档，3 对） | **−5.0 / −5.1 / −6.1%** | −3% | 写 Java 存档走的正是被改的编码 |
 
+真机上目前最大的实测存档 3.5 GB，一次转换约 40 分钟（前台、未灭屏）。
+
 同一轮还试了「高度图按 section 预建 air 位图」，实测中性（`containsKey` 归零但函数本身占比反升 1 个点，
 JIT 早已内联 `get`），已回退，源码不留。
 
-仍需人工确认：
+还有两条只做到数据层验证，没有在游戏里走过：
 
 1. 把输出的 `.mcworld` 导入真机基岩版，确认生物与画真的出现在世界里 —— `actorDump` 只能证明数据写对了，
    不能证明游戏认。
-2. 低版本设备（Android 8.1 / 9）：`ByteBufferSupport` 的反射 unmap 与 LevelDB mmap 行为未验证。
-3. 取消转换（杀 `:chunker` 进程后的清理与通知收尾）只做过代码审查。
+2. 取消转换（杀 `:chunker` 进程后的清理与通知收尾）只做过代码审查。
 
 ## 已知风险
 
 - **压缩包支持 zip / `.mcworld` / RAR 4·5 / 7z / tar / tar.gz**（内置 Arcana 裁剪版，纯 Java）。
   仍不支持 bz2、xz、lzh、cab、iso，也**不支持分卷压缩包**（`.part1.rar`、`.r01`、`.7z.001` 这类只认单个文件，
   选其中一卷会报错），**加密压缩包不会弹密码框**，同样会报错后退出。这些情况都提示「先解压成文件夹再导入」。
-- 最低系统标称 API 27，实测只在 API 35 / 36 上跑过。
+- 最低系统 API 27，主流程在 API 27 与 API 35 / 36 上验证过；RAR / 7z 导入与分享入口在真机上走过一遍。
 - 目标版本列表来自引擎枚举，最新 Java 版本用 `dimensions/<namespace>/<dimension>/region` 新目录结构，
   旧客户端打不开，属预期。
 - 转换在 `:chunker` 进程中进行，App 被划掉后任务会继续；重启 App 不恢复进度（成品仍在 `output/`）。

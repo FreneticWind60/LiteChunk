@@ -21,7 +21,7 @@
             android:layout_width="44dp"
             android:layout_height="44dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="返回"
+            android:contentDescription="@string/activity_about_15"
             android:src="@drawable/ic_back" />
 
         <TextView
@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:layout_weight="1"
-            android:text="关于"
+            android:text="@string/activity_about_01"
             android:textColor="@color/text"
             android:textSize="18sp"
             android:textStyle="bold" />
@@ -88,7 +88,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:gravity="center"
-                    android:text="把存档在 Java 版与基岩版之间来回转换"
+                    android:text="@string/activity_about_02"
                     android:textAppearance="@style/Text.LiteChunk.Caption" />
             </LinearLayout>
 
@@ -107,7 +107,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="软件介绍"
+                        android:text="@string/activity_about_03"
                         android:textAppearance="@style/Text.LiteChunk.Section" />
 
                     <TextView
@@ -115,7 +115,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:lineSpacingExtra="4dp"
-                        android:text="LiteChunk 是一个轻量的 Minecraft 存档转换工具，转换引擎基于开源项目 Chunker。本项目只做一件事——把存档在 Java 版和基岩版之间互相转换，因此界面、安装包和常驻占用都压到了最低。"
+                        android:text="@string/activity_about_04"
                         android:textAppearance="@style/Text.LiteChunk.Body" />
 
                     <TextView
@@ -123,7 +123,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
                         android:lineSpacingExtra="5dp"
-                        android:text="· 支持全部 Java 版与基岩版版本互转\n· 批量转换，进度实时可见，可随时取消\n· 转换在独立进程里运行，大存档也不会拖垮界面\n· 产出的 .mcworld / .zip 统一收在 output 目录，可导出、分享或直接导入游戏"
+                        android:text="@string/activity_about_05"
                         android:textAppearance="@style/Text.LiteChunk.Caption" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -154,7 +154,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="检查更新"
+                            android:text="@string/activity_about_06"
                             android:textAppearance="@style/Text.LiteChunk.Section" />
 
                         <TextView
@@ -163,7 +163,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
                             android:layout_marginEnd="8dp"
-                            android:text="从 GitHub 获取最新发布版本"
+                            android:text="@string/activity_about_07"
                             android:textAppearance="@style/Text.LiteChunk.Caption" />
                     </LinearLayout>
 
@@ -175,7 +175,7 @@
                         android:minWidth="0dp"
                         android:paddingLeft="16dp"
                         android:paddingRight="16dp"
-                        android:text="检查" />
+                        android:text="@string/activity_about_08" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -198,7 +198,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="开发者"
+                        android:text="@string/activity_about_09"
                         android:textAppearance="@style/Text.LiteChunk.Section" />
 
                     <LinearLayout
@@ -238,16 +238,44 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="2dp"
                                 android:lineSpacingExtra="2dp"
-                                android:text="独立开发者。做存档工具、写点小玩意，顺便把 Minecraft 跨版本迁移的坑填一填。"
+                                android:text="@string/activity_about_10"
                                 android:textAppearance="@style/Text.LiteChunk.Caption" />
                         </LinearLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:id="@+id/rowLanguage"
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:layout_marginTop="12dp"
+                        android:background="@drawable/bg_row"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/language_title"
+                            android:textColor="@color/text"
+                            android:textSize="14sp" />
+
+                        <TextView
+                            android:id="@+id/tvLanguage"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textAppearance="@style/Text.LiteChunk.Caption" />
                     </LinearLayout>
 
                     <LinearLayout
                         android:id="@+id/rowGithub"
                         android:layout_width="match_parent"
                         android:layout_height="48dp"
-                        android:layout_marginTop="12dp"
+                        android:layout_marginTop="8dp"
                         android:background="@drawable/bg_row"
                         android:clickable="true"
                         android:focusable="true"
@@ -289,7 +317,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="哔哩哔哩"
+                            android:text="@string/activity_about_11"
                             android:textColor="@color/text"
                             android:textSize="14sp" />
 
@@ -318,7 +346,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="版权声明"
+                        android:text="@string/activity_about_12"
                         android:textAppearance="@style/Text.LiteChunk.Section" />
 
                     <TextView
@@ -326,7 +354,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
                         android:lineSpacingExtra="4dp"
-                        android:text="LiteChunk 以 MIT 许可证开源，转换引擎来自 Chunker。你可以自由使用、修改和再分发，只需在衍生作品中保留原始版权与许可声明。"
+                        android:text="@string/activity_about_13"
                         android:textAppearance="@style/Text.LiteChunk.Body" />
 
                     <TextView
@@ -334,7 +362,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
                         android:lineSpacingExtra="4dp"
-                        android:text="本软件与 Mojang Studios、Microsoft 没有任何隶属、授权或背书关系。Minecraft 是 Mojang Studios 的商标。本软件不包含任何游戏资源，也不修改游戏本体，使用产生的存档请自行备份。"
+                        android:text="@string/activity_about_14"
                         android:textAppearance="@style/Text.LiteChunk.Caption" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
