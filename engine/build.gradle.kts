@@ -83,6 +83,29 @@ tasks.register<JavaExec>("actorDump") {
     notCompatibleWithConfigurationCache("Ad-hoc verification task")
 }
 
+// Builds the field dictionary for Bedrock actors: which NBT keys a real world persists, per entity type. Point it at
+// a world the game itself wrote - a world we converted only contains the keys we emit, so it proves nothing.
+// Usage: gradlew :engine:actorDiff --args="<worldDir> [maxActorsPerType] [compareWorldDir]"
+tasks.register<JavaExec>("actorDiff") {
+    group = "verification"
+    description = "Prints the per-type actor field dictionary of a Bedrock world."
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.frenetic.litechunk.engine.ActorDiff")
+    notCompatibleWithConfigurationCache("Ad-hoc verification task")
+}
+
+// Usage: gradlew :engine:javaActorDump --args="<worldDir> [idFilter] [samplesPerType]"
+// The input side counterpart of actorDiff: prints the Java entity NBT so field names are read, not guessed.
+tasks.register<JavaExec>("javaActorDump") {
+    group = "verification"
+    description = "Prints the raw entity NBT of a Java world, filtered by entity id."
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.frenetic.litechunk.entities.JavaActorDump")
+    notCompatibleWithConfigurationCache("Ad-hoc verification task")
+}
+
 // Runs the same diagnostic entry point the device uses, but on the desktop JVM and under the heap
 // ceiling an Android `largeHeap` process actually gets. An emulator reproduces the heap limit
 // faithfully but runs Chunker roughly 20x slower than a real device, which makes a large world take

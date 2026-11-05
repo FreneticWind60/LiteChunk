@@ -84,6 +84,19 @@ public class BedrockLevelWriter implements LevelWriter, BedrockReaderWriter {
     }
 
     /**
+     * Get the resolvers for the version being written.
+     * <p>
+     * Added for the optional entity pass, which runs after this writer has flushed and closed the database but still
+     * needs the item and block mappings to build actor records. The resolvers are immutable lookup tables and stay
+     * usable after {@link #free()}.
+     *
+     * @return the resolvers used by this writer.
+     */
+    public BedrockResolvers getResolvers() {
+        return resolvers;
+    }
+
+    /**
      * Open the LevelDB database for writing.
      *
      * @throws IOException if it failed to create a new database.

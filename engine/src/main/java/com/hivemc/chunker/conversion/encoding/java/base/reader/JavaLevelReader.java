@@ -66,6 +66,19 @@ public class JavaLevelReader implements LevelReader, JavaReaderWriter {
         resolvers = buildResolvers(converter).build();
     }
 
+    /**
+     * Get the resolvers for the version being read.
+     * <p>
+     * Added for the optional entity pass, which runs after the terrain pass has finished and still needs to turn a
+     * Java item stack into the intermediate form. The resolvers stay valid after {@link #free()} - only the file
+     * handles are released there.
+     *
+     * @return the resolvers used by this reader.
+     */
+    public JavaResolvers getResolvers() {
+        return resolvers;
+    }
+
     @Override
     public Set<ChunkerBiome.ChunkerVanillaBiome> getSupportedBiomes() {
         // String identifiers are used >= 1.18.0

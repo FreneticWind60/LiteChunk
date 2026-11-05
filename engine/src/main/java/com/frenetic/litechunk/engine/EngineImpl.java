@@ -1,16 +1,22 @@
 package com.frenetic.litechunk.engine;
 
 import com.frenetic.litechunk.api.ChunkerEngine;
+import com.frenetic.litechunk.api.ConversionOptions;
 import com.frenetic.litechunk.api.Detection;
 import com.frenetic.litechunk.api.FormatGroup;
 import com.frenetic.litechunk.api.FormatVersion;
 import com.frenetic.litechunk.api.LevelInfo;
 import com.frenetic.litechunk.api.ProgressListener;
+import com.frenetic.litechunk.entities.EntityConversionPass;
 import com.hivemc.chunker.conversion.WorldConverter;
 import com.hivemc.chunker.conversion.encoding.EncodingType;
 import com.hivemc.chunker.conversion.encoding.base.LevelReaderWriter;
 import com.hivemc.chunker.conversion.encoding.base.Version;
 import com.hivemc.chunker.conversion.encoding.base.reader.LevelReader;
+import com.hivemc.chunker.conversion.encoding.bedrock.base.resolver.BedrockResolvers;
+import com.hivemc.chunker.conversion.encoding.bedrock.base.writer.BedrockLevelWriter;
+import com.hivemc.chunker.conversion.encoding.java.base.reader.JavaLevelReader;
+import com.hivemc.chunker.conversion.encoding.java.base.resolver.JavaResolvers;
 import com.hivemc.chunker.conversion.encoding.base.writer.LevelWriter;
 import com.hivemc.chunker.scheduling.task.TrackedTask;
 
@@ -41,9 +47,12 @@ public final class EngineImpl implements ChunkerEngine {
      */
     public static final String ENGINE_VERSION = "1.21.0";
 
-    private static final String STAGE_CONVERT = "转换地形与方块";
-    private static final String STAGE_FINISH = "整理数据";
-    private static final String STAGE_COMPACT = "整理数据库（较慢，请保持前台）";
+    // Stable codes rather than display text: the app owns the wording, this module only says what phase it is in.
+    // The strings are part of the api contract, so they never change; unknown ones are shown verbatim by the app.
+    private static final String STAGE_CONVERT = "terrain";
+    private static final String STAGE_ENTITIES = "entities";
+    private static final String STAGE_FINISH = "finish";
+    private static final String STAGE_COMPACT = "compact";
 
     /** Worker threads for the conversion pipeline, upstream default is 8. */
     private int concurrency = 8;
@@ -139,6 +148,12 @@ public final class EngineImpl implements ChunkerEngine {
 
     @Override
     public void convert(File inputDirectory, File outputDirectory, String outputFormatId, ProgressListener listener) throws Exception {
+        convert(inputDirectory, outputDirectory, outputFormatId, ConversionOptions.DEFAULT, listener);
+    }
+
+    @Override
+    public void convert(File inputDirectory, File outputDirectory, String outputFormatId,
+                        ConversionOptions options, ProgressListener listener) throws Exception {
         if (inputDirectory == null || !inputDirectory.isDirectory()) {
             throw new IllegalArgumentException("存档目录不存在：" + inputDirectory);
         }
@@ -149,9 +164,19 @@ public final class EngineImpl implements ChunkerEngine {
             throw new IllegalStateException("无法创建输出目录：" + outputDirectory);
         }
 
+        // Entities are converted in a second, separate pass so they can be switched off, and so the entity code stays
+        // out of the terrain pipeline. That only makes sense for a Bedrock target for now: the Java writer would need
+        // to write entities/*.mca, which is not implemented.
+        boolean entityPass = (options == null || options.entities())
+                && outputFormatId != null && outputFormatId.startsWith("BEDROCK");
+
         WorldConverter converter = new WorldConverter(UUID.randomUUID());
         converter.setWorkerThreads(concurrency);
         applyProfile(converter);
+        // The terrain pass only handles entities when the second pass will not: a Java target (the entity pass only
+        // writes Bedrock records for now) or a user who asked for entities to be skipped entirely. Leaving it on for a
+        // Bedrock target would write an empty digp record on every column, which the second pass would then replace.
+        converter.setProcessEntities((options == null || options.entities()) && !entityPass);
 
         // Must come after setWorkerThreads: that call derives the three budgets from the thread count and would
         // overwrite anything set before it.
@@ -175,7 +200,8 @@ public final class EngineImpl implements ChunkerEngine {
         while (!future.isDone()) {
             if (listener != null) {
                 if (compacting[0]) {
-                    listener.onProgress(0.97D, STAGE_COMPACT);
+                    // Leaves the last tenth for the entity pass when it is going to run.
+                    listener.onProgress(entityPass ? 0.88D : 0.97D, STAGE_COMPACT);
                 } else {
                     // The task tree's weighting stalls once reading is batched, so prefer the region counter and keep
                     // the remaining tenth for level data + compaction.
@@ -203,8 +229,45 @@ public final class EngineImpl implements ChunkerEngine {
             throw unwrap(failure);
         }
 
+        if (entityPass) {
+            runEntityPass(inputDirectory, outputDirectory, reader, writer, listener);
+        }
+
         if (listener != null) {
             listener.onProgress(1D, STAGE_FINISH);
+        }
+    }
+
+    /**
+     * Run the entity pass, reporting it as the last tenth of the conversion.
+     * <p>
+     * A failure here is logged rather than thrown: the terrain pass has already produced a world that opens, and
+     * losing the mobs is a much smaller problem than losing the conversion.
+     *
+     * @param inputDirectory  the converted source world.
+     * @param outputDirectory the produced Bedrock world.
+     * @param reader          the reader that was used, for its item mappings.
+     * @param writer          the writer that was used, for its item and block mappings.
+     * @param listener        progress receiver, may be null.
+     */
+    private void runEntityPass(File inputDirectory, File outputDirectory, LevelReader reader, LevelWriter writer,
+                               ProgressListener listener) {
+        // Items have to go through the same mappings the terrain pass used, otherwise a chest and a dropped chest
+        // could end up with different names. Both resolvers stay valid after the conversion: closing a reader or
+        // writer only releases its file handles.
+        JavaResolvers javaResolvers = reader instanceof JavaLevelReader javaReader ? javaReader.getResolvers() : null;
+        BedrockResolvers bedrockResolvers =
+                writer instanceof BedrockLevelWriter bedrockWriter ? bedrockWriter.getResolvers() : null;
+
+        EntityConversionPass pass = new EntityConversionPass(
+                inputDirectory, outputDirectory, concurrency,
+                message -> System.err.println("[entities] " + message), javaResolvers, bedrockResolvers);
+        try {
+            pass.run(listener == null ? null
+                    : (fraction, stage) -> listener.onProgress(0.9D + 0.1D * Math.max(0D, Math.min(1D, fraction)),
+                    STAGE_ENTITIES));
+        } catch (Exception failure) {
+            System.err.println("[entities] 实体转换失败，世界仍然可用: " + failure);
         }
     }
 

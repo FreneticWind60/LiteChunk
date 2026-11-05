@@ -85,7 +85,12 @@ public class BedrockColumnWriter implements ColumnWriter {
             // rest of the column down with it.
             writeSection("Metadata", () -> writeMetadata(chunkerColumn, writeBatch));
             writeSection("HeightMap/Biomes", () -> writeHeightMapBiomes(chunkerColumn, writeBatch));
-            writeSection("Entities", () -> writeEntities(chunkerColumn, writeBatch));
+            // Entities can be converted in a second pass (com.frenetic.litechunk.entities) that runs after the whole
+            // world is written. When that is the case this column must not write anything entity related: an empty
+            // digp record here would later be replaced, and it would also cost a key per column for nothing.
+            if (converter.shouldProcessEntities()) {
+                writeSection("Entities", () -> writeEntities(chunkerColumn, writeBatch));
+            }
             writeSection("Block Entities", () -> writeBlockEntities(chunkerColumn, writeBatch));
             writeSection("Chunks", () -> writeChunks(chunkerColumn, writeBatch));
 

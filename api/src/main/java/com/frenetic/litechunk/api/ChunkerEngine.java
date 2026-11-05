@@ -47,6 +47,24 @@ public interface ChunkerEngine {
     void convert(File inputDirectory, File outputDirectory, String outputFormatId, ProgressListener listener) throws Exception;
 
     /**
+     * Convert a world with options.
+     * <p>
+     * A default method so an older engine dex (built before {@link ConversionOptions} existed) still satisfies this
+     * interface: it simply ignores the options. The app can therefore ship ahead of the engine.
+     *
+     * @param inputDirectory  the extracted source world directory.
+     * @param outputDirectory an empty directory the converted world is written to.
+     * @param outputFormatId  one of the ids reported by {@link #formats()}.
+     * @param options         what to convert, never {@code null}.
+     * @param listener        progress receiver, may be {@code null}.
+     * @throws Exception when the conversion fails.
+     */
+    default void convert(File inputDirectory, File outputDirectory, String outputFormatId,
+                         ConversionOptions options, ProgressListener listener) throws Exception {
+        convert(inputDirectory, outputDirectory, outputFormatId, listener);
+    }
+
+    /**
      * Point the engine at the directory that holds the engine's classpath resources which cannot travel inside a
      * dex ({@code java/default_font_width_codepoints.json} and {@code java/CavesAndCliffsHeightPack.zip}).
      *

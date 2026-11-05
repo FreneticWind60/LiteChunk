@@ -21,6 +21,7 @@ import android.util.Log;
 import androidx.core.app.NotificationCompat;
 
 import com.frenetic.litechunk.api.ChunkerEngine;
+import com.frenetic.litechunk.api.ConversionOptions;
 import com.frenetic.litechunk.api.Detection;
 import com.frenetic.litechunk.api.LevelInfo;
 
@@ -50,6 +51,8 @@ public class ConversionService extends Service {
     // The engine survives across service instances so a second conversion does not pay for class loading again.
     private static final Object ENGINE_LOCK = new Object();
     private static ChunkerEngine engine;
+    /** Whether this batch should convert entities; read from the intent, defaults to true. */
+    private boolean convertEntities = true;
 
     /**
      * One job at a time, in arrival order.
@@ -150,6 +153,7 @@ public class ConversionService extends Service {
         final List<QueueItem> items = readItems(intent);
         final boolean packMcworld = intent.getBooleanExtra(Job.EXTRA_PACK_MCWORLD, true);
         final boolean deleteSource = intent.getBooleanExtra(Job.EXTRA_DELETE_SOURCE, false);
+        convertEntities = intent.getBooleanExtra(Job.EXTRA_CONVERT_ENTITIES, true);
         final NamingSettings naming = new NamingSettings(
                 intent.getStringExtra(Job.EXTRA_NAMING_ORDER),
                 intent.getStringExtra(Job.EXTRA_NAMING_ENABLED),
@@ -628,7 +632,8 @@ public class ConversionService extends Service {
         }
 
         final long[] lastEmit = {0L};
-        chunker.convert(inputDirectory, outputDirectory, format, (fraction, stage) -> {
+        chunker.convert(inputDirectory, outputDirectory, format, new ConversionOptions(convertEntities),
+                (fraction, stage) -> {
             long now = SystemClock.elapsedRealtime();
             if (now - lastEmit[0] < 180L && fraction < 0.999D) {
                 return;

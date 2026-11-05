@@ -69,6 +69,9 @@ public final class EngineSmokeTest {
         if (groups.get(0).versions.length == 0) {
             throw new IllegalStateException("First group has no versions");
         }
+        // The entity table is generated from an APK; a regeneration could silently change the actor shape.
+        com.frenetic.litechunk.entities.EntityTableTest.run();
+
         System.out.println("SMOKE TEST OK");
     }
 }

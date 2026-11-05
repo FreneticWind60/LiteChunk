@@ -38,6 +38,8 @@ final class Job {
     static final String EXTRA_FORMAT = "format";
     static final String EXTRA_PACK_MCWORLD = "packMcworld";
     static final String EXTRA_DELETE_SOURCE = "deleteSource";
+    /** Whether the second pass should convert mobs / dropped items. Defaults to true when absent. */
+    static final String EXTRA_CONVERT_ENTITIES = "convertEntities";
     /** Scratch directory the UI staged a world into; the service deletes it once detection has read it. */
     static final String EXTRA_FLUSH = "flush";
     /** Keep the scratch directory after detection instead of deleting it, so the conversion can reuse it. */

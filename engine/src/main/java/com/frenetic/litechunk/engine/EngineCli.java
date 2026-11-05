@@ -80,9 +80,12 @@ public final class EngineCli {
             engine.setConcurrency(concurrency);
         }
         boolean lean = args.length > 5 && Boolean.parseBoolean(args[5]);
+        // 7th argument: "noentities" runs the terrain pass only, which is what the app does when the checkbox is off.
+        boolean entities = args.length <= 6 || !"noentities".equalsIgnoreCase(args[6]);
         engine.setLeanMode(lean);
         log("heap limit = " + (Runtime.getRuntime().maxMemory() / (1024 * 1024)) + " MB, concurrency = "
-                + (concurrency > 0 ? String.valueOf(concurrency) : "default") + ", lean = " + lean);
+                + (concurrency > 0 ? String.valueOf(concurrency) : "default") + ", lean = " + lean
+                + ", entities = " + entities);
 
         log("engine version = " + engine.engineVersion());
         int versions = 0;
@@ -104,7 +107,8 @@ public final class EngineCli {
         long started = System.currentTimeMillis();
         long cpuStarted = processCpuNanos();
         try {
-            engine.convert(worldRoot, output, formatId, (fraction, stage) -> {
+            engine.convert(worldRoot, output, formatId,
+                    new com.frenetic.litechunk.api.ConversionOptions(entities), (fraction, stage) -> {
                 callbacks[0]++;
                 if (!Double.isNaN(fraction) && fraction > peak[0]) {
                     peak[0] = fraction;

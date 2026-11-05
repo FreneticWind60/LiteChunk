@@ -364,4 +364,10 @@
     <string name="language_title">Language</string>
     <string name="language_subtitle">Language</string>
     <string name="action_cancel">Cancel</string>
+    <string name="convert_entities">Also convert entities (mobs, dropped items)</string>
+    <string name="convert_entities_hint">Off: the world is smaller and converts faster, but arrives without mobs or dropped items</string>
+    <string name="stage_terrain">Converting terrain and blocks</string>
+    <string name="stage_entities">Converting entities</string>
+    <string name="stage_compact">Compacting the database (slow, keep the app open)</string>
+    <string name="stage_finish">Wrapping up</string>
 </resources>

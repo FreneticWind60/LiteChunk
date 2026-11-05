@@ -218,6 +218,24 @@
                 </LinearLayout>
 
                 <com.google.android.material.checkbox.MaterialCheckBox
+                    android:id="@+id/cbConvertEntities"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:checked="true"
+                    android:text="@string/convert_entities"
+                    android:textColor="@color/text"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="2dp"
+                    android:paddingEnd="2dp"
+                    android:text="@string/convert_entities_hint"
+                    android:textAppearance="@style/Text.LiteChunk.Caption" />
+
+                <com.google.android.material.checkbox.MaterialCheckBox
                     android:id="@+id/cbDeleteSource"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

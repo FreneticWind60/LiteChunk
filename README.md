@@ -3,7 +3,7 @@
 Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换引擎来自
 [Chunker](https://github.com/HiveGamesOSS/Chunker) 的裁剪版，通过 `DexClassLoader` 在独立进程中加载。
 
-- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build3`（build3 线的正式版，与引擎 Chunker 的版本同步）
+- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build4 pr1`（build4 线的第一个预览，与引擎 Chunker 的版本同步）
 - 每个版本的新特性与已知局限见 [`VERSION.md`](VERSION.md)
 - 最低系统 Android 8.1（API 27）—— `java.nio.file` 与基岩版 1.26 的共同下限；目标 API 37
 - 只做一件事：选存档 → 选版本 → 转换 → 保存 / 分享 / 导入
@@ -307,6 +307,21 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
     没有 Activity 可以重建。语言入口在「关于 → 语言」，默认跟随系统，切换用
     `AppCompatDelegate.setApplicationLocales()`，Android 13+ 同时注册进系统的应用语言设置。
 
+19. 实体转换（可选，独立第二遍）：方块与方块实体转换完成后，再从 Java 的
+    `entities/r.X.Z.mca` 单独跑一遍实体（26.1 起路径在 `dimensions/<namespace>/<dimension>/`，
+    旧布局仍兼容），写 `actorprefix` 与 `digp`。转换页有「同时转换实体」开关，默认开；
+    关掉时第二遍完全不跑，输出里没有任何 actor 记录。
+    - **组件组与变体**：`definitions` 从行为包里生成（129 个实体），变体的整数也从包里的组件组读取
+      （`cat_tabby` 声明 `minecraft:variant: 8`），不猜任何基岩枚举。
+    - **载荷实体**：掉落物（`Item`/`Health`/`Age`）、经验球（`experience value`）、落沙（`FallingBlock`）、
+      TNT（`Fuse`）、末影水晶（`ShowBottom`）。
+    - **装备**：`Mainhand` / `Offhand` / `Armor`（固定 5 槽）；兼容 1.21.5 起的 `equipment` 复合标签
+      与更早的 `ArmorItems` / `HandItems`。
+    - **模板**：`CustomName` / `CustomNameVisible` / `Persistent` / `Attributes`（血量，上限优先取
+      Java 的 `max_health`，其次行为包默认值）。
+    - **画与展示框**交给引擎自己的处理器（需要 Motif、朝向、挂靠方块与半格偏移，通用形状表达不了）。
+    - 引擎侧的改动只有五处（编排、实体写入门控、api 默认方法、两个 resolver 访问器）。
+
 ## 运行时设计
 
 - **进程隔离**：`ConversionService` 跑在 `:chunker` 进程，独立堆预算；转换崩溃不影响 UI；取消 = 杀该进程
@@ -473,6 +488,9 @@ JIT 早已内联 `get`），已回退，源码不留。
 - 目标版本列表来自引擎枚举，最新 Java 版本用 `dimensions/<namespace>/<dimension>/region` 新目录结构，
   旧客户端打不开，属预期。
 - 转换在 `:chunker` 进程中进行，App 被划掉后任务会继续；重启 App 不恢复进度（成品仍在 `output/`）。
+- **实体转换仍是「尽量还原」而非逐字节等价**：村民职业与交易、拴绳、乘客/坐骑、热带鱼花纹没有转换；
+  箱子矿车与羊驼的**箱内物品**写的是推断格式，尚未在游戏里验证。实体记录本身不是逐字节确定的，
+  两次转换的输出在实体顺序上就会有差异（区块数据是一致的）。
 - 常亮 + 唤醒锁解决的是「灭屏后被挂起」，**不是厂商的强制冻结**。部分 ROM 在极低电量或长时间无交互时
   仍会冻结后台进程，白名单引导只是一个引导，能不能免疫取决于系统。
 - 关掉 LevelDB 尾部 compaction 后，中间 `.ldb` 是未压缩的，`db/` 目录会比上游大；打包成 `.mcworld` 后回落。

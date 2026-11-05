@@ -364,4 +364,10 @@
     <string name="language_title">言語</string>
     <string name="language_subtitle">Language</string>
     <string name="action_cancel">キャンセル</string>
+    <string name="convert_entities">エンティティも変換する（Mob・ドロップ品）</string>
+    <string name="convert_entities_hint">オフにすると小さく速くなりますが、Mob とドロップ品は含まれません</string>
+    <string name="stage_terrain">地形とブロックを変換中</string>
+    <string name="stage_entities">エンティティを変換中</string>
+    <string name="stage_compact">データベースを整理中（時間がかかります。アプリを開いたままにしてください）</string>
+    <string name="stage_finish">仕上げ中</string>
 </resources>

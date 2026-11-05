@@ -35,10 +35,19 @@ final class Text {
         Context application = context.getApplicationContext();
         Configuration configuration = new Configuration(application.getResources().getConfiguration());
         String tag = Language.tag(application);
-        if (!tag.isEmpty()) {
-            configuration.setLocale(Locale.forLanguageTag(tag));
-        }
+        // The application's own configuration can still carry the per-app locale that AppCompat applied, so "follow
+        // the system" has to be resolved from the system resources - otherwise the strings looked up here stay in the
+        // language that was just switched away from until the process restarts.
+        configuration.setLocale(tag.isEmpty() ? systemLocale() : Locale.forLanguageTag(tag));
         resources = application.createConfigurationContext(configuration).getResources();
+    }
+
+    /**
+     * @return the primary system locale, unaffected by the app's own override.
+     */
+    private static Locale systemLocale() {
+        Configuration system = Resources.getSystem().getConfiguration();
+        return system.getLocales().get(0);
     }
 
     /** @return the string, or an empty string before {@link #install(Context)} has run. */

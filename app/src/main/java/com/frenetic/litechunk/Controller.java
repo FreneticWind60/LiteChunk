@@ -274,7 +274,8 @@ final class Controller {
     // Conversion
     // ---------------------------------------------------------------------------------------------
 
-    void start(List<QueueItem> items, String formatId, boolean packMcworld, boolean deleteSource) {
+    void start(List<QueueItem> items, String formatId, boolean packMcworld, boolean deleteSource,
+               boolean convertEntities) {
         if (state == State.RUNNING || items.isEmpty()) {
             return;
         }
@@ -296,6 +297,7 @@ final class Controller {
                 .putExtra(Job.EXTRA_FORMAT, formatId)
                 .putExtra(Job.EXTRA_PACK_MCWORLD, packMcworld)
                 .putExtra(Job.EXTRA_DELETE_SOURCE, deleteSource)
+                .putExtra(Job.EXTRA_CONVERT_ENTITIES, convertEntities)
                 .putExtra(Job.EXTRA_NAMING_ORDER, Naming.order(app))
                 .putExtra(Job.EXTRA_NAMING_ENABLED, Naming.enabled(app))
                 .putExtra(Job.EXTRA_NAMING_SEPARATOR, Naming.separator(app))

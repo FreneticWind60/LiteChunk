@@ -575,6 +575,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         boolean bedrock = edition.equals("BEDROCK");
         boolean packMcworld = bedrock && Naming.mcworld(requireContext());
         boolean deleteSource = binding.cbDeleteSource.isChecked();
+        boolean convertEntities = binding.cbConvertEntities.isChecked();
 
         // A conversion that runs out of room fails halfway, and the user is left guessing which of the two things
         // went wrong (bad save, or full disk). Asking here turns that into a decision. Only a warning: the estimate
@@ -590,12 +591,13 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
                             + Text.get(R.string.ConvertFragment_21))
                     .setNegativeButton(Text.get(R.string.ConvertFragment_22), null)
                     .setPositiveButton(Text.get(R.string.ConvertFragment_23), (dialog, which) -> {
-                        announceBackgroundLimits(() -> begin(controller, store, id, packMcworld, deleteSource));
+                        announceBackgroundLimits(() -> begin(controller, store, id, packMcworld, deleteSource,
+                                convertEntities));
                     })
                     .show();
             return;
         }
-        announceBackgroundLimits(() -> begin(controller, store, id, packMcworld, deleteSource));
+        announceBackgroundLimits(() -> begin(controller, store, id, packMcworld, deleteSource, convertEntities));
     }
 
     /**
@@ -607,6 +609,29 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
      * to whitelist the app. Shown on the first conversion only, and never when the app is already exempt, so the
      * user who has dealt with it is not asked twice.
      */
+    /**
+     * Turn the engine's stage code into text.
+     * <p>
+     * The engine reports stable codes ({@code terrain}, {@code entities}, {@code compact}, {@code finish}) instead of
+     * display strings, because the engine has no resources. The service's own stages are already localised before they
+     * reach here, so anything unknown is shown as it came in.
+     *
+     * @param stage the code reported by the engine or the service, may be null.
+     * @return text to show.
+     */
+    private static String localizedStage(String stage) {
+        if (stage == null) {
+            return null;
+        }
+        return switch (stage) {
+            case "terrain" -> Text.get(R.string.stage_terrain);
+            case "entities" -> Text.get(R.string.stage_entities);
+            case "compact" -> Text.get(R.string.stage_compact);
+            case "finish" -> Text.get(R.string.stage_finish);
+            default -> stage;
+        };
+    }
+
     private void announceBackgroundLimits(Runnable start) {
         Context context = requireContext();
         if (LiteChunkApp.hasSeenBackgroundHint(context) || isExemptFromBatteryOptimisation(context)) {
@@ -653,8 +678,9 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         }
     }
 
-    private void begin(Controller controller, Store store, String id, boolean packMcworld, boolean deleteSource) {
-        controller.start(new ArrayList<>(store.queue), id, packMcworld, deleteSource);
+    private void begin(Controller controller, Store store, String id, boolean packMcworld, boolean deleteSource,
+                       boolean convertEntities) {
+        controller.start(new ArrayList<>(store.queue), id, packMcworld, deleteSource, convertEntities);
         render();
     }
 
@@ -745,7 +771,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             int percent = (int) Math.round(Math.max(0D, Math.min(1D, controller.progress())) * 100D);
             binding.tvProgressPercent.setText(percent + "%");
             binding.progress.setProgressCompat(percent, true);
-            String stage = controller.stage();
+            String stage = localizedStage(controller.stage());
             binding.tvStage.setText(stage == null || stage.isEmpty()
                     ? Text.get(R.string.ConvertFragment_39) + controller.elapsedSeconds() + Text.get(R.string.ConvertFragment_40)
                     : stage + " · " + controller.elapsedSeconds() + Text.get(R.string.ConvertFragment_41));

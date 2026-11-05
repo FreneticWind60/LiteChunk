@@ -337,4 +337,10 @@
     <string name="language_title">语言</string>
     <string name="language_subtitle">Language</string>
     <string name="action_cancel">取消</string>
+    <string name="convert_entities">同时转换实体（生物、掉落物）</string>
+    <string name="convert_entities_hint">关闭后世界更小、转换更快，但生物和掉落物不会出现在新世界里</string>
+    <string name="stage_terrain">转换地形与方块</string>
+    <string name="stage_entities">转换实体</string>
+    <string name="stage_compact">整理数据库（较慢，请保持前台）</string>
+    <string name="stage_finish">整理数据</string>
 </resources>
