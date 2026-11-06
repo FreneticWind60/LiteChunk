@@ -220,20 +220,7 @@ public final class EntityConversionPass {
         List<byte[]> keys = new ArrayList<>(entities.size());
         try (WriteBatch batch = db.createWriteBatch()) {
             for (CompoundTag entity : entities) {
-                long uniqueId = nextUniqueId.getAndIncrement() | (0xFFFFFFFFL << 32);
-                CompoundTag actor;
-                try {
-                    actor = BedrockActorBuilder.build(entity, uniqueId, javaResolvers, bedrockResolvers);
-                } catch (Exception failure) {
-                    report("构建实体失败: " + failure);
-                    continue;
-                }
-                if (actor == null) {
-                    continue;
-                }
-                byte[] key = storageKey(uniqueId);
-                batch.put(LevelDBKey.key(LevelDBKey.ACTOR_PREFIX, key), Tag.writeBedrockNBT(actor));
-                keys.add(key);
+                writeActor(batch, keys, entity, 0L);
             }
 
             if (keys.isEmpty()) {
@@ -253,6 +240,102 @@ public final class EntityConversionPass {
             db.write(batch);
         }
         return keys.size();
+    }
+
+    /**
+     * Write one actor, and the entities nested inside it.
+     * <p>
+     * Java keeps a rider inside its vehicle's {@code Passengers} list, so a pig in a boat is not a top level entity at
+     * all. Bedrock wants it as an actor of its own that links back to the vehicle, which is why this recurses and adds
+     * every passenger to the column's key list as well.
+     *
+     * @param batch     the write batch for this column.
+     * @param keys      the actor keys of this column, appended to.
+     * @param entity    the Java entity tag.
+     * @param vehicleId unique id of the actor this one rides, or 0 when it is not a passenger.
+     */
+    private void writeActor(WriteBatch batch, List<byte[]> keys, CompoundTag entity, long vehicleId)
+            throws IOException {
+        long uniqueId = uniqueIdOf(entity);
+        CompoundTag actor;
+        try {
+            actor = BedrockActorBuilder.build(entity, uniqueId, javaResolvers, bedrockResolvers);
+        } catch (Exception failure) {
+            report("构建实体失败: " + failure);
+            return;
+        }
+        if (actor == null) {
+            return;
+        }
+
+        ListTag<CompoundTag, Map<String, Tag<?>>> passengers =
+                entity.getList("Passengers", CompoundTag.class, null);
+
+        if (vehicleId != 0L) {
+            EntityLinks.riding(actor, vehicleId);
+        }
+        if (passengers != null && passengers.size() > 0) {
+            List<Long> riderIds = new ArrayList<>(passengers.size());
+            for (CompoundTag passenger : passengers) {
+                riderIds.add(uniqueIdOf(passenger));
+            }
+            EntityLinks.carried(actor, riderIds);
+        }
+        long holder = EntityLinks.leashHolder(entity, this::uniqueIdFromUuid);
+        if (holder != 0L) {
+            EntityLinks.leashed(actor, holder);
+        }
+
+        byte[] key = storageKey(uniqueId);
+        batch.put(LevelDBKey.key(LevelDBKey.ACTOR_PREFIX, key), Tag.writeBedrockNBT(actor));
+        keys.add(key);
+
+        if (passengers != null) {
+            for (CompoundTag passenger : passengers) {
+                writeActor(batch, keys, passenger, uniqueId);
+            }
+        }
+    }
+
+    /**
+     * The id an actor is written with.
+     * <p>
+     * Derived from the entity's UUID rather than handed out by a counter, because links between actors have to be
+     * resolvable from either end: the vehicle and its rider are usually in different region files, and those are
+     * converted in parallel, so a shared counter would make the reference depend on which thread got there first.
+     * <p>
+     * The visible cost is that the ids no longer look like the game's own (which are {@code 0xFFFFFFFF00000000} plus a
+     * counter). Nothing reads them but the storage key function, which is a bijection over any {@code long}.
+     *
+     * @param entity the Java entity tag.
+     * @return a stable id, never 0.
+     */
+    private long uniqueIdOf(CompoundTag entity) {
+        long derived = uniqueIdFromUuid(entity.getIntArray("UUID", null));
+        return derived != 0L ? derived : nextUniqueId.getAndIncrement() | (0xFFFFFFFFL << 32);
+    }
+
+    /**
+     * @param uuid the four {@code int}s of a Java {@code UUID:[I;a,b,c,d]} tag, may be null.
+     * @return a 64 bit id derived from the 128 bit UUID, or 0 when there is no UUID to derive it from.
+     */
+    private long uniqueIdFromUuid(@Nullable int[] uuid) {
+        if (uuid == null || uuid.length < 4) {
+            return 0L;
+        }
+        long high = ((long) uuid[0] << 32) | (uuid[1] & 0xFFFFFFFFL);
+        long low = ((long) uuid[2] << 32) | (uuid[3] & 0xFFFFFFFFL);
+        // A 128 bit input folded into 64 bits and run through the splitmix64 finaliser: a collision needs two UUIDs
+        // that differ in both halves in exactly the way the fold cancels out, which no real world will produce.
+        long mixed = mix(high ^ mix(low));
+        return mixed == 0L ? 1L : mixed;
+    }
+
+    private static long mix(long value) {
+        long z = value + 0x9E3779B97F4A7C15L;
+        z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L;
+        z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL;
+        return z ^ (z >>> 31);
     }
 
     /**

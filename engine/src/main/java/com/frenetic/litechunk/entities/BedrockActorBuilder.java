@@ -36,7 +36,7 @@ final class BedrockActorBuilder {
     private static final String EXPERIENCE_ORB = "minecraft:xp_orb";
     private static final String FALLING_BLOCK = "minecraft:falling_block";
     private static final String PRIMED_TNT = "minecraft:tnt";
-    private static final String END_CRYSTAL = "minecraft:end_crystal";
+    private static final String END_CRYSTAL = "minecraft:ender_crystal";
 
     /** Vanilla gives a dropped item 5 health; it is destroyed when fire, lava or an explosion takes the last point. */
     private static final short ITEM_HEALTH = 5;
@@ -114,6 +114,9 @@ final class BedrockActorBuilder {
         // Colour, coat and the like: writes the variant integer and, when the pack defines one, the matching group.
         // Runs before the definitions are serialised because it appends to that list.
         EntityVariants.apply(actor, identifier, javaEntity, definitions);
+
+        // Saddle, collar, sitting and the villager's job: also appends groups, so it runs before the serialisation too.
+        EntityStates.apply(actor, identifier, javaEntity, definitions);
 
         actor.put("definitions", ListTag.fromValues(TagType.STRING, definitions));
 

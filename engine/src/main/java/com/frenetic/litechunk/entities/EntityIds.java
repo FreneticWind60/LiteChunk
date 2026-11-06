@@ -32,6 +32,11 @@ final class EntityIds {
         BEDROCK.put("minecraft:trident", "minecraft:thrown_trident");
         BEDROCK.put("minecraft:potion", "minecraft:splash_potion");
 
+        // Same entity, different spelling. Both were missed until a real 1.21.8 world was converted: the actor kept a
+        // Java id the game has never heard of, so the entity was written and then silently dropped on load.
+        BEDROCK.put("minecraft:tropical_fish", "minecraft:tropicalfish");
+        BEDROCK.put("minecraft:end_crystal", "minecraft:ender_crystal");
+
         // Bedrock only has the second generation of these two.
         BEDROCK.put("minecraft:villager", "minecraft:villager_v2");
         BEDROCK.put("minecraft:zombie_villager", "minecraft:zombie_villager_v2");

@@ -319,6 +319,16 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
       与更早的 `ArmorItems` / `HandItems`。
     - **模板**：`CustomName` / `CustomNameVisible` / `Persistent` / `Attributes`（血量，上限优先取
       Java 的 `max_health`，其次行为包默认值）。
+    - **骑乘装备**：1.21.5 起 Java 把鞍、马铠、狼铠、羊驼地毯都放进 `equipment.body`，基岩侧拆成
+      `Saddled` + `<mob>_saddled` 组与 `Armor[4]`；鞍不占护甲槽。更早的 `SaddleItem` / `ArmorItem`
+      / `DecorItem` 有补落分支。
+    - **姿态**：`CollarColor` → `Color`，`Sitting` → `Sitting`（骆驼用 `camel_sitting` 组）。
+    - **村民**：`VillagerData` 的职业/等级/生物群系映射成 `+<profession>`、`+<biome>_villager` 与
+      `TradeTier` / `TradeExperience`；交易表交给游戏自己生成，不搬运。
+    - **热带鱼**：`Variant` 打包整数拆成 `Color` / `Color2` / `MarkVariant`。
+    - **拴绳与乘客**：`leash` → `LinksTag` + `LeasherID`；Java 嵌在载具 `Passengers` 里的骑手会被拆成
+      独立 actor，两边用互相引用的 `LinksTag` 连起来。为此 actor 的 `UniqueID` 改为由实体 UUID 派生
+      （splitmix64），否则载具与骑手在不同 region、并行转换时对不上号。
     - **画与展示框**交给引擎自己的处理器（需要 Motif、朝向、挂靠方块与半格偏移，通用形状表达不了）。
     - 引擎侧的改动只有五处（编排、实体写入门控、api 默认方法、两个 resolver 访问器）。
 
@@ -488,9 +498,9 @@ JIT 早已内联 `get`），已回退，源码不留。
 - 目标版本列表来自引擎枚举，最新 Java 版本用 `dimensions/<namespace>/<dimension>/region` 新目录结构，
   旧客户端打不开，属预期。
 - 转换在 `:chunker` 进程中进行，App 被划掉后任务会继续；重启 App 不恢复进度（成品仍在 `output/`）。
-- **实体转换仍是「尽量还原」而非逐字节等价**：村民职业与交易、拴绳、乘客/坐骑、热带鱼花纹没有转换；
-  箱子矿车与羊驼的**箱内物品**写的是推断格式，尚未在游戏里验证。实体记录本身不是逐字节确定的，
-  两次转换的输出在实体顺序上就会有差异（区块数据是一致的）。
+- **实体转换仍是「尽量还原」而非逐字节等价**：村民只还原职业、等级与生物群系，交易清单交给游戏重新生成；
+  拴绳的 `LinksTag` 极性、`LeasherID` 的语义、箱子矿车与羊驼的**箱内物品**格式目前是推断的，还没有拿真实
+  样本在游戏里核对过。实体记录本身不是逐字节确定的，两次转换的输出在实体顺序上就会有差异（区块数据是一致的）。
 - 常亮 + 唤醒锁解决的是「灭屏后被挂起」，**不是厂商的强制冻结**。部分 ROM 在极低电量或长时间无交互时
   仍会冻结后台进程，白名单引导只是一个引导，能不能免疫取决于系统。
 - 关掉 LevelDB 尾部 compaction 后，中间 `.ldb` 是未压缩的，`db/` 目录会比上游大；打包成 `.mcworld` 后回落。

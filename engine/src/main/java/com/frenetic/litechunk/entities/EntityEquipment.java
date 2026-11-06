@@ -37,7 +37,20 @@ final class EntityEquipment {
     /** Legacy Java {@code ArmorItems} order, which is bottom up. */
     private static final String[] LEGACY_ARMOUR_SLOTS = {"feet", "legs", "chest", "head"};
 
+    /** Index of the body slot, which holds horse armour, wolf armour and - on Java - the saddle. */
+    private static final int BODY_SLOT = 4;
+
+    private static final String SADDLE = "minecraft:saddle";
+
     private EntityEquipment() {
+    }
+
+    /**
+     * @param item an item tag.
+     * @return true when the stack is a saddle, which Bedrock stores as a flag rather than as armour.
+     */
+    static boolean isSaddle(@Nullable CompoundTag item) {
+        return item != null && SADDLE.equals(item.getString("id", null));
     }
 
     /**
@@ -81,7 +94,14 @@ final class EntityEquipment {
         CompoundTag[] armour = new CompoundTag[JAVA_ARMOUR_SLOTS.length];
         boolean any = false;
         for (int index = 0; index < JAVA_ARMOUR_SLOTS.length; index++) {
-            armour[index] = ItemStacks.convert(equipment.getCompound(JAVA_ARMOUR_SLOTS[index], null), source, target);
+            CompoundTag item = equipment.getCompound(JAVA_ARMOUR_SLOTS[index], null);
+            if (index == BODY_SLOT && isSaddle(item)) {
+                // A mount's saddle travels in the body slot on Java but is a flag on Bedrock, not armour: putting it
+                // in Armor would make a horse wear a saddle on its back instead of being ridden. EntityStates writes
+                // the flag; skipping it here keeps the two from disagreeing.
+                continue;
+            }
+            armour[index] = ItemStacks.convert(item, source, target);
             any |= armour[index] != null;
         }
         if (any) {
@@ -106,20 +126,31 @@ final class EntityEquipment {
             }
         }
 
-        ListTag<CompoundTag, ?> armourItems = entity.getList("ArmorItems", CompoundTag.class, null);
-        if (armourItems == null) {
-            return;
-        }
         CompoundTag[] armour = new CompoundTag[JAVA_ARMOUR_SLOTS.length];
         boolean any = false;
-        for (int index = 0; index < LEGACY_ARMOUR_SLOTS.length; index++) {
-            CompoundTag item = ItemStacks.convert(get(armourItems, index), source, target);
-            if (item == null) {
-                continue;
+        ListTag<CompoundTag, ?> armourItems = entity.getList("ArmorItems", CompoundTag.class, null);
+        if (armourItems != null) {
+            for (int index = 0; index < LEGACY_ARMOUR_SLOTS.length; index++) {
+                CompoundTag item = ItemStacks.convert(get(armourItems, index), source, target);
+                if (item == null) {
+                    continue;
+                }
+                armour[legacySlot(index)] = item;
+                any = true;
             }
-            armour[legacySlot(index)] = item;
-            any = true;
         }
+
+        // Horse armour and wolf armour had their own field before 1.21.5 and belong in the same body slot the newer
+        // format uses. The saddle is the exception: it is a flag, so EntityStates writes it instead of this.
+        CompoundTag body = entity.getCompound("ArmorItem", null);
+        if (body != null && !isSaddle(body)) {
+            CompoundTag item = ItemStacks.convert(body, source, target);
+            if (item != null) {
+                armour[BODY_SLOT] = item;
+                any = true;
+            }
+        }
+
         if (any) {
             actor.put("Armor", armourList(armour));
         }

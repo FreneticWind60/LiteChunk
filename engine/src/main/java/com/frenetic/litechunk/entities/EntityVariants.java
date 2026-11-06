@@ -99,8 +99,9 @@ final class EntityVariants {
             case "minecraft:panda" -> panda(actor, identifier, javaEntity, definitions);
             case "minecraft:shulker" -> shulker(actor, identifier, javaEntity, definitions);
             case "minecraft:frog" -> frog(actor, identifier, javaEntity, definitions);
+            case "minecraft:tropicalfish" -> tropicalFish(actor, javaEntity);
             default -> {
-                // Not covered yet: tropical fish, villagers, slimes and the like.
+                // Not covered yet: villagers (their job is a group of its own, see EntityStates), slimes and the like.
             }
         }
     }
@@ -191,6 +192,36 @@ final class EntityVariants {
         addVariant(actor, identifier, definitions, variant + "_frog");
     }
 
+    /**
+     * Tropical fish pack three values into one Java integer: the pattern in bits 16-23, the base colour in bits 8-15
+     * and the pattern colour in the low byte, each a dye index.
+     * <p>
+     * Bedrock splits the same three across two integer channels and two byte ones: the pattern is a
+     * {@code MarkVariant} (the pack's {@code tropicalfish_variant_pattern_1..6} set it to 0..5, so the Java pattern
+     * index carries over unchanged) while the two colours are the generic {@code Color} / {@code Color2} bytes, which
+     * the pack's {@code tropicalfish_base_*} and {@code tropicalfish_pattern_*} groups write with the dye index.
+     * <p>
+     * <strong>The body shape is left alone.</strong> Bedrock also keeps a {@code Variant} of 0 or 1 selecting one of
+     * two fish shapes, and the pack only exposes it through the twenty named pattern groups ({@code clownfish},
+     * {@code blue_dory} ...), whose Java counterparts are the pattern ids this class cannot tell apart from the
+     * Bedrock numbering. Guessing it would flip half the fish to the wrong model, so the default is kept.
+     * <p>
+     * Confirmed against a 1.21.8 world only as far as the Java side goes: summoning fish with 0, 65536 and 262144
+     * gives exactly those integers back, and 16711680 (pattern 255) is reset to 0, which is what pins the pattern to
+     * the third byte.
+     */
+    private static void tropicalFish(CompoundTag actor, CompoundTag entity) {
+        int packed = intValue(entity, "Variant", 0);
+        int pattern = (packed >>> 16) & 0xFF;
+        int baseColour = (packed >>> 8) & 0xFF;
+        int patternColour = packed & 0xFF;
+
+        actor.put("Color", (byte) clamp(baseColour, DYE_COLOURS.length));
+        actor.put("Color2", (byte) clamp(patternColour, DYE_COLOURS.length));
+        // The pack carries six patterns; anything above that is not a fish the game knows how to draw.
+        actor.put("MarkVariant", clamp(pattern, 6));
+    }
+
     // ---------------------------------------------------------------------------------------------
     // Generic helpers
     // ---------------------------------------------------------------------------------------------
@@ -247,7 +278,7 @@ final class EntityVariants {
     /**
      * Add {@code +minecraft:<group>} unless the pack does not define it or it is already there.
      */
-    private static void addGroup(List<String> definitions, String identifier, String group) {
+    static void addGroup(List<String> definitions, String identifier, String group) {
         String entry = "+" + NAMESPACE + group;
         if (definitions.contains(entry)) {
             return;
@@ -256,6 +287,21 @@ final class EntityVariants {
         if (row != null && row.hasGroup(group)) {
             definitions.add(entry);
         }
+    }
+
+    /**
+     * Take a group back off the list.
+     * <p>
+     * Only the enabled form is removed; no {@code -minecraft:<group>} entry is written. Those appear in real saves
+     * when the game switched a group off at runtime, but this list is built from nothing, so simply not enabling the
+     * group leaves it off - which is the state we want.
+     *
+     * @param definitions the list to edit.
+     * @param identifier  the entity the group belongs to.
+     * @param group       the bare group name.
+     */
+    static void removeGroup(List<String> definitions, String identifier, String group) {
+        definitions.remove("+" + NAMESPACE + group);
     }
 
     /**

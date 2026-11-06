@@ -17,10 +17,13 @@ import java.util.Map;
  * records use the same shape (the engine's chest writer produces {@code Items} entries with a {@code Slot} byte), so
  * the conversion is a per-item translate plus the slot.
  * <p>
- * <strong>Not verified in game.</strong> Neither the world used for testing nor the reference save contains a minecart
- * with items or a chested animal, so the Bedrock side is inferred from the engine's own container serialisation rather
- * than observed on a live actor. The failure mode if it is wrong is that the contents simply do not appear - the same
- * outcome as not writing them at all - which is why it is worth shipping before it can be confirmed.
+ * <strong>The Java side is now confirmed; the Bedrock side is still inferred.</strong> Summoning a donkey with
+ * {@code ChestedHorse:1b} and an {@code Items} list into 1.21.8 and reading the save back shows the game keeps both -
+ * and that {@code Chested} (the spelling used before 1.21.5) is dropped along with any inventory that came with it.
+ * What has not been observed is a Bedrock actor with a chest, so the shape written here is taken from the engine's own
+ * container serialisation rather than from a live one. The failure mode if it is wrong is that the contents simply do
+ * not appear - the same outcome as not writing them at all - which is why it is worth shipping before it can be
+ * confirmed.
  */
 final class EntityContainers {
 
@@ -46,8 +49,13 @@ final class EntityContainers {
             }
             case "minecraft:llama", "minecraft:trader_llama", "minecraft:donkey", "minecraft:mule" -> {
                 // The chest has to be visible before the contents make sense, and Java stores that as its own flag.
-                if (javaEntity.contains("Chested")) {
-                    actor.put("Chested", (byte) (intValue(javaEntity, "Chested", 0) != 0 ? 1 : 0));
+                // 1.21.8 spells it `ChestedHorse`; `Chested` was the earlier one and is still read so old worlds keep
+                // their donkey's inventory.
+                int chested = javaEntity.contains("ChestedHorse")
+                        ? intValue(javaEntity, "ChestedHorse", 0)
+                        : intValue(javaEntity, "Chested", 0);
+                if (chested != 0) {
+                    actor.put("Chested", (byte) 1);
                 }
                 if (source != null && target != null) {
                     items(actor, javaEntity, source, target);
