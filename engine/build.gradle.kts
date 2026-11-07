@@ -72,6 +72,17 @@ tasks.register<JavaExec>("levelTest") {
     notCompatibleWithConfigurationCache("Ad-hoc verification task")
 }
 
+// Checks the reverse entity pieces a converted world cannot exercise on its own (leash, packed fish variant).
+// Usage: gradlew :engine:reverseSmoke
+tasks.register<JavaExec>("reverseSmoke") {
+    group = "verification"
+    description = "Checks the Bedrock to Java entity translations in isolation."
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.frenetic.litechunk.entities.ReverseSmoke")
+    notCompatibleWithConfigurationCache("Ad-hoc verification task")
+}
+
 // Dumps the actor (entity) records of a Bedrock world so entity conversion can be inspected without launching the
 // game. Usage: gradlew :engine:actorDump --args="<worldDir> [maxSamples]"
 tasks.register<JavaExec>("actorDump") {

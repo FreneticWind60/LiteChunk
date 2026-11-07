@@ -332,6 +332,34 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
     - **画与展示框**交给引擎自己的处理器（需要 Motif、朝向、挂靠方块与半格偏移，通用形状表达不了）。
     - 引擎侧的改动只有五处（编排、实体写入门控、api 默认方法、两个 resolver 访问器）。
 
+20. 反向实体转换（基岩 → Java）：这条方向不走第二遍，而是借引擎自己的实体链路。基岩侧只给画、展示框、
+    垫子注册了 handler，其它生物一律以 `UnknownEntity` 读入，而通用写法会把整段基岩 NBT 原样抄进 Java
+    （字段名不对、坐标是 float、没有 UUID），游戏要么忽略要么直接丢弃。所以读取时把 actor 原始 NBT 和读取
+    用的 resolver 一起挂在实体上，Java 写出前由 `BedrockToJava` 翻译成真正的 Java 实体标签。
+    - **骨架**：`id` 走引擎的类型表（`zombie_pigman`、`tropicalfish`、`ender_crystal` 会换回 Java 名）、
+      坐标/速度/朝向（float → double）、`UUID`（由基岩 `UniqueID` 哈希成 v4，同一存档两次转换结果一致）。
+    - **状态**：`Saddled` → `equipment.body`（1.21.5+）或 `SaddleItem`；`Color` → `CollarColor`；
+      `Sitting`；村民的组件组与 `TradeTier` → `VillagerData{profession, level, type}` 与 `Xp`。
+    - **装备**：`Mainhand` / `Offhand` / `Armor`（头胸腿脚 body）→ `equipment`（1.21.5+）或
+      `HandItems` / `ArmorItems` / `ArmorItem`；物品走引擎的物品表，`Name:""` 的空槽跳过。
+    - **载荷**：掉落物的 `Item` 转成 Java 物品栈，经验球的 `experience value` → `Value`；血量统一写 float，
+      避免把基岩偶尔写成 short 的 `Health` 带进 Java。
+    - **变体**：基岩的整数先查行为包组表还原成语义，再转成 Java 的表示。羊和马的编号两边一致，直接搬；
+      猫、狼是注册名（`minecraft:tabby`）；兔子、鹦鹉、羊驼、蝾螈是索引，其中**蝾螈的顺序两边不同**；
+      潜影贝是**反着**的染料序（基岩 15 = 白）；热带鱼把 `Color` / `Color2` / `MarkVariant` 重新打包成
+      一个整数。狐狸、蘑菇牛、青蛙、熊猫的变体只存在于组件组里，从 `definitions` 读。
+    - **容器**：驴、骡、羊驼的 `Chested` → `ChestedHorse`，`Items` 逐项换成 Java 物品栈并保留 `Slot`；
+      箱子矿车与漏斗矿车同理。
+    - **拴绳**：`LeasherID` 哈希成 UUID 写进 `leash`（1.20.5+）或 `Leash`，和那条实体自己写出的 UUID 相同，
+      所以绳子挂得上；玩家拴的挂不上，因为玩家 UUID 推不出来。
+    - **乘客**：读取时在同一列里按 `LinksTag` 把骑手配给载具并从列里移走，写出时嵌进 `Passengers`
+      （栈式骑乘会递归，最多 8 层）。
+    - **还没做的**：拴绳结、跨区块边界的骑手（会以普通实体出现，位置对但没骑上），以及只存在于基岩、没有
+      任何方块数据的列——引擎遍历列时会跳过它们，这类列里的实体会在转回 Java 时消失。
+    - 引擎侧的改动只有三处：`Entity` 加 `sourceResolvers` 与 `passengers` 两个字段、
+      `BedrockColumnReader`（保留原始 NBT 并在列内配对乘客）、`JavaEntityResolver.from` 增加一条分支；
+      其余全在新的 `entities/Java*.java` 里。
+
 ## 运行时设计
 
 - **进程隔离**：`ConversionService` 跑在 `:chunker` 进程，独立堆预算；转换崩溃不影响 UI；取消 = 杀该进程
@@ -498,9 +526,12 @@ JIT 早已内联 `get`），已回退，源码不留。
 - 目标版本列表来自引擎枚举，最新 Java 版本用 `dimensions/<namespace>/<dimension>/region` 新目录结构，
   旧客户端打不开，属预期。
 - 转换在 `:chunker` 进程中进行，App 被划掉后任务会继续；重启 App 不恢复进度（成品仍在 `output/`）。
-- **实体转换仍是「尽量还原」而非逐字节等价**：村民只还原职业、等级与生物群系，交易清单交给游戏重新生成；
-  拴绳的 `LinksTag` 极性、`LeasherID` 的语义、箱子矿车与羊驼的**箱内物品**格式目前是推断的，还没有拿真实
-  样本在游戏里核对过。实体记录本身不是逐字节确定的，两次转换的输出在实体顺序上就会有差异（区块数据是一致的）。
+- **实体转换仍是「尽量还原」而非逐字节等价**。Java → 基岩：村民只还原职业、等级与生物群系，交易清单交给
+  游戏重新生成；拴绳的 `LinksTag` 极性与 `LeasherID` 的语义、箱子矿车与羊驼的**箱内物品**格式目前是推断的，
+  还没有拿真实样本在游戏里核对过。基岩 → Java：装备、坐骑装备、项圈颜色、坐下、村民职业等级、变体、
+  容器内容、拴绳与乘客都会跟着走，但**跨区块边界的骑手不会配对**（会变成同一位置的两个实体），
+  玩家拴的绳子挂不上；J→B 时写进「没有任何方块的列」的实体，转回 Java 时会消失（真实存档不会出现这种列）。
+  两个方向的实体记录本身都不是逐字节确定的，两次转换的输出在实体顺序上就会有差异（区块数据是一致的）。
 - 常亮 + 唤醒锁解决的是「灭屏后被挂起」，**不是厂商的强制冻结**。部分 ROM 在极低电量或长时间无交互时
   仍会冻结后台进程，白名单引导只是一个引导，能不能免疫取决于系统。
 - 关掉 LevelDB 尾部 compaction 后，中间 `.ldb` 是未压缩的，`db/` 目录会比上游大；打包成 `.mcworld` 后回落。

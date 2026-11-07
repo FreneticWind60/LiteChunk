@@ -23,16 +23,20 @@ import com.hivemc.chunker.nbt.io.Reader;
 import com.hivemc.chunker.nbt.tags.Tag;
 import com.hivemc.chunker.nbt.tags.TagWithName;
 import com.hivemc.chunker.nbt.tags.collection.CompoundTag;
+import com.hivemc.chunker.nbt.tags.collection.ListTag;
 import com.hivemc.chunker.scheduling.task.Task;
 import com.hivemc.chunker.scheduling.task.TaskWeight;
 import org.iq80.leveldb.DB;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -206,6 +210,86 @@ public class BedrockColumnReader implements ColumnReader {
     }
 
     /**
+     * Pair riders with their vehicles and take the riders out of the column.
+     * <p>
+     * Bedrock keeps every actor as its own record and links them with {@code LinksTag}: the rider carries
+     * {@code RideID = <vehicle unique id>}, the vehicle carries {@code VehicleID = <rider unique id>}. Java does the
+     * opposite - the rider exists only as a compound inside the vehicle's {@code Passengers} - so a rider left in the
+     * column would be written as a second, loose entity standing in the same spot.
+     * <p>
+     * Only actors within the same column are paired. A rider straddling a chunk border is left alone: it still arrives
+     * as a working entity, just not mounted, which is the same outcome as not handling links at all. Splitting a column
+     * apart to chase it would mean buffering the whole world.
+     *
+     * @param column the column that was just read.
+     */
+    private void attachPassengers(ChunkerColumn column) {
+        List<Entity> entities = column.getEntities();
+        if (entities.size() < 2) {
+            return;
+        }
+
+        Map<Long, Entity> byUniqueId = new HashMap<>(entities.size() * 2);
+        for (Entity entity : entities) {
+            long uniqueId = uniqueId(entity.getOriginalNBT());
+            if (uniqueId != 0L) {
+                byUniqueId.put(uniqueId, entity);
+            }
+        }
+        if (byUniqueId.isEmpty()) {
+            return;
+        }
+
+        List<Entity> riding = new ArrayList<>(2);
+        for (Entity entity : entities) {
+            long vehicleId = rideId(entity.getOriginalNBT());
+            if (vehicleId == 0L) {
+                continue;
+            }
+            Entity vehicle = byUniqueId.get(vehicleId);
+            if (vehicle == null || vehicle == entity) {
+                continue;
+            }
+            vehicle.addPassenger(entity);
+            riding.add(entity);
+        }
+
+        if (!riding.isEmpty()) {
+            entities.removeAll(riding);
+        }
+    }
+
+    /**
+     * @param actor the actor tag, may be null.
+     * @return the {@code RideID} of its first link, or 0 when it is not riding anything.
+     */
+    private static long rideId(@Nullable CompoundTag actor) {
+        if (actor == null) {
+            return 0L;
+        }
+        ListTag<CompoundTag, ?> links = actor.getList("LinksTag", CompoundTag.class, null);
+        if (links == null) {
+            return 0L;
+        }
+        for (CompoundTag link : links) {
+            long value = longValue(link, "RideID");
+            if (value != 0L) {
+                return value;
+            }
+        }
+        return 0L;
+    }
+
+    private static long uniqueId(@Nullable CompoundTag actor) {
+        return actor == null ? 0L : longValue(actor, "UniqueID");
+    }
+
+    private static long longValue(CompoundTag tag, String name) {
+        Object value = tag.contains(name) ? tag.get(name).getBoxedValue() : null;
+        return value instanceof Number number ? number.longValue() : 0L;
+    }
+
+    /**
      * Read an entity inside the column.
      *
      * @param chunkerColumn the column being read.
@@ -214,7 +298,15 @@ public class BedrockColumnReader implements ColumnReader {
     protected void readEntity(ChunkerColumn chunkerColumn, CompoundTag compoundTag) {
         Optional<Entity> entity = resolvers.entityResolver().to(compoundTag);
         if (entity.isPresent()) {
-            chunkerColumn.getEntities().add(entity.get());
+            Entity value = entity.get();
+            // Bedrock only has handlers for paintings, item frames and cushions, so every other mob comes back as an
+            // UnknownEntity. Keeping the actor tag and the resolvers that read it is what lets the Java writer
+            // translate the fields it understands; without them only the position would survive a conversion to Java.
+            if (value.getOriginalNBT() == null) {
+                value.setOriginalNBT(compoundTag);
+                value.setSourceResolvers(resolvers);
+            }
+            chunkerColumn.getEntities().add(value);
         } else {
             String identifier = resolvers.entityResolver().getKey(compoundTag).map(Object::toString).orElseGet(compoundTag::toString);
             converter.logMissingMapping(Converter.MissingMappingType.ENTITY, identifier);
@@ -307,6 +399,11 @@ public class BedrockColumnReader implements ColumnReader {
      * @return the column which should be submitted.
      */
     protected ChunkerColumn postProcess(ChunkerColumn column) {
+        // Riders are separate actors in this format and have to be moved inside their vehicle before the column is
+        // handed on, or they would be written as a second entity standing in the same spot. This lives here rather
+        // than in readEntities because the version specific readers override that method.
+        attachPassengers(column);
+
         // Create any block entities / entities which are based on blocks
         for (ChunkerChunk chunk : column.getChunks().values()) {
             resolvers.blockEntityResolver().generateBeforeProcessBlockEntities(column, chunk);

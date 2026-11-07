@@ -1,5 +1,6 @@
 package com.hivemc.chunker.conversion.encoding.java.base.resolver.entity;
 
+import com.frenetic.litechunk.entities.BedrockToJava;
 import com.hivemc.chunker.conversion.encoding.base.Version;
 import com.hivemc.chunker.conversion.encoding.base.resolver.entity.EmptyEntityHandler;
 import com.hivemc.chunker.conversion.encoding.base.resolver.entity.EntityResolver;
@@ -9,7 +10,9 @@ import com.hivemc.chunker.conversion.encoding.java.base.resolver.entity.handlers
 import com.hivemc.chunker.conversion.encoding.java.base.resolver.entity.handlers.JavaHangingEntityHandler;
 import com.hivemc.chunker.conversion.encoding.java.base.resolver.entity.handlers.JavaItemFrameEntityHandler;
 import com.hivemc.chunker.conversion.encoding.java.base.resolver.entity.handlers.JavaPaintingEntityHandler;
+import com.hivemc.chunker.conversion.intermediate.column.entity.Entity;
 import com.hivemc.chunker.conversion.intermediate.column.entity.GlowItemFrameEntity;
+import com.hivemc.chunker.conversion.intermediate.column.entity.UnknownEntity;
 import com.hivemc.chunker.conversion.intermediate.column.entity.type.ChunkerEntityType;
 import com.hivemc.chunker.conversion.intermediate.column.entity.type.ChunkerVanillaEntityType;
 import com.hivemc.chunker.nbt.tags.collection.CompoundTag;
@@ -44,6 +47,25 @@ public class JavaEntityResolver extends EntityResolver<JavaResolvers, CompoundTa
         if (version.isGreaterThanOrEqual(26, 3, 0)) {
             register(new JavaCushionEntityHandler());
         }
+    }
+
+    /**
+     * Write an entity to Java NBT.
+     * <p>
+     * Bedrock worlds hand every mob over as an {@link UnknownEntity} because the Bedrock side only has handlers for
+     * paintings, frames and cushions. The generic path would copy the Bedrock tag through untouched - right position,
+     * wrong field names, no UUID - so the reverse pass gets the first attempt and the generic path is kept as the
+     * fallback for anything it does not recognise.
+     */
+    @Override
+    public Optional<CompoundTag> from(Entity input) {
+        if (input instanceof UnknownEntity && preserveUnknownEntities) {
+            CompoundTag translated = BedrockToJava.translate(input, resolvers, version);
+            if (translated != null) {
+                return Optional.of(translated);
+            }
+        }
+        return super.from(input);
     }
 
     @Override

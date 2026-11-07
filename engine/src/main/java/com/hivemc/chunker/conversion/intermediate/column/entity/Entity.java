@@ -4,6 +4,8 @@ import com.hivemc.chunker.conversion.intermediate.column.entity.type.ChunkerEnti
 import com.hivemc.chunker.nbt.tags.collection.CompoundTag;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -26,6 +28,26 @@ public abstract class Entity {
 
     @Nullable
     private CompoundTag originalNBT;
+
+    /**
+     * The resolvers of the format this entity was read from, when the reader kept them.
+     * <p>
+     * Typed as {@link Object} on purpose: the Bedrock and Java resolver interfaces share no common supertype, and this
+     * is only ever used by the reverse entity pass, which knows which side it started from. It is carried on the
+     * entity because the two halves of a conversion (reader and writer) never see each other.
+     */
+    @Nullable
+    private Object sourceResolvers;
+
+    /**
+     * Entities riding this one, when the source format keeps them as separate records.
+     * <p>
+     * Bedrock stores a rider as its own actor linked by {@code LinksTag}, while Java nests it inside the vehicle's
+     * {@code Passengers}. The reader pairs the two up within a column and parks the riders here so the Java writer can
+     * nest them; without this a pig in a boat would be written as two entities standing on top of each other.
+     */
+    @Nullable
+    private List<Entity> passengers;
 
     /**
      * Get the X co-ordinate of the entity.
@@ -187,6 +209,45 @@ public abstract class Entity {
      */
     public void setOriginalNBT(@Nullable CompoundTag originalNBT) {
         this.originalNBT = originalNBT;
+    }
+
+    /**
+     * Get the resolvers of the format this entity was read from.
+     *
+     * @return the resolvers, or null when the reader did not keep them.
+     */
+    public @Nullable Object getSourceResolvers() {
+        return sourceResolvers;
+    }
+
+    /**
+     * Set the resolvers of the format this entity was read from.
+     *
+     * @param sourceResolvers the resolvers used to read the entity.
+     */
+    public void setSourceResolvers(@Nullable Object sourceResolvers) {
+        this.sourceResolvers = sourceResolvers;
+    }
+
+    /**
+     * Get the entities riding this one.
+     *
+     * @return the passengers, or null when there are none.
+     */
+    public @Nullable List<Entity> getPassengers() {
+        return passengers;
+    }
+
+    /**
+     * Add an entity riding this one.
+     *
+     * @param passenger the entity on top.
+     */
+    public void addPassenger(Entity passenger) {
+        if (passengers == null) {
+            passengers = new ArrayList<>(1);
+        }
+        passengers.add(passenger);
     }
 
     /**
