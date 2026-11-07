@@ -15,7 +15,7 @@ Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换
 api/      com.frenetic.litechunk.api    App 与引擎之间的稳定契约（打进 APK，不混入 dex）
 engine/   Chunker 裁剪源码 + EngineImpl 门面 + level.dat 读写 + R8 打包任务
 app/      UI（转换页 / 文件页 / 存档详情）、文件流、外部导入、:chunker 隔离进程服务、DexClassLoader 加载器
-website/  官网单页（单文件 HTML，零外部请求，可直接丢到 GitHub Pages）
+website/  官网（多页静态站：首页 / 文档 / 更新日志 / 关于，零构建、零外部依赖）
 ```
 
 关键点：`api` 模块只被 App 的 ClassLoader 加载，引擎 dex 里不包含它的副本。`DexClassLoader` 是
@@ -231,9 +231,12 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
 
 ## 官网页面
 
-`website/index.html` 是单文件落地的介绍页：纯 HTML/CSS + 少量原生 JS，不请求任何外部资源
-（图标是内联 sprite，favicon 是 data URI），所以可以离线打开，也直接扔到 GitHub Pages。
-下载按钮指向本仓库的 `releases/latest`，页面里的包体大小与耗时数字都来自上面的实测。
+`website/` 是直接打开就能看的多页静态站：`index.html`（首页）、`doc.html`（使用文档与常见问题）、
+`log.html`（更新日志）、`about.html`（作者、社区、友链、许可），样式与脚本分别是 `common.css` / `common.js`。
+
+没有框架、没有构建步骤，图标全部内联 SVG，字体走系统栈，所以除「更新日志」会读取仓库里的
+[`VERSION.md`](VERSION.md) 之外不产生任何外部请求。下载按钮指向本仓库的 `releases/latest`，
+页面里的包体大小与耗时数字都来自下面的实测。
 
 ## 相对上游 Chunker 的改动
 

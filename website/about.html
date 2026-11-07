@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>关于 — LiteChunk</title>
+  <meta name="description" content="LiteChunk 的项目背景、作者、官方 QQ 群、友情链接与开源许可说明。">
+  <meta name="theme-color" content="#f5f8f5">
+
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('lc-theme');
+        if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) { }
+    })();
+  </script>
+
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="common.css">
+</head>
+
+<body>
+  <a class="skip" href="#main">跳到正文</a>
+
+  <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <clipPath id="crate-top">
+        <rect x="0" y="0" width="24" height="9.3" />
+      </clipPath>
+    </defs>
+    <symbol id="i-crate" viewBox="0 0 24 24">
+      <path fill="currentColor"
+        d="M19.895 11.048a.116.116 0 0 0 .031.201c1.621.579 2.393.66 2.393 2.081v4.011c0 .716-.051.88-.531 1.254c-.877.683-6.185 4.747-6.392 4.913c-.774.62-1.169.556-2.054.339a515 515 0 0 1-9.945-2.577c-1.746-.47-1.701-2.064-1.701-3.203c0-3.945-.015-7.468-.015-11.202c0-1.186.049-1.222.95-1.881c.83-.607 4.296-3.135 6.153-4.499c.553-.406.828-.607 1.618-.406c1.616.41 6.664 1.649 9.382 2.339c2.083.529 2.535.893 2.535 2.326V8.38c0 .465-.007.638-.408.981c-.202.173-1.348 1.14-2.016 1.687m1.624-2.556a.113.113 0 0 0 .141-.112c.001-1.414.011-2.495.011-3.666c0-.622-.35-1.137-1.121-1.343C16.501 2.29 10.486.866 10.191.778c-.197-.059-.322.108-.322.199c-.001 4.294.029 7.832.029 11.854c0 .741.408 1.525 1.292 1.765c3.582.973 6.578 1.655 10.331 2.667a.115.115 0 0 0 .143-.112c.001-.848.014-1.405.014-1.95c0-2.27.279-2.679-1.57-3.194c-2.198-.612-5.306-1.378-5.554-1.441c-.485-.124-.548-.266-.548-.591c0-.122-.011-2.346-.003-2.869c.002-.157.006-.31.157-.397c.134-.077.264-.046.664.053c.448.111 4.598 1.186 6.695 1.73m-7.65 14.735a.114.114 0 0 0 .142-.111c.001-1.185.017-2.484.017-3.352c0-1.475.182-1.334-1.064-1.639c-1.474-.36-4.433-1.146-5.967-1.552c-.355-.094-.459-.424-.459-.998c0-1.726-.006-4.575-.006-6.577c0-1.834.193-1.599-.703-1.832c-.565-.146-2.468-.637-3.313-.828c-.144-.032-.225.085-.225.224c-.003 3.939.053 8.211.053 11.994c0 1.228.439 1.815 1.321 2.051c3.589.963 6.446 1.652 10.204 2.62" />
+      <g clip-path="url(#crate-top)">
+        <path fill="#ffffff" opacity=".32"
+          d="M19.895 11.048a.116.116 0 0 0 .031.201c1.621.579 2.393.66 2.393 2.081v4.011c0 .716-.051.88-.531 1.254c-.877.683-6.185 4.747-6.392 4.913c-.774.62-1.169.556-2.054.339a515 515 0 0 1-9.945-2.577c-1.746-.47-1.701-2.064-1.701-3.203c0-3.945-.015-7.468-.015-11.202c0-1.186.049-1.222.95-1.881c.83-.607 4.296-3.135 6.153-4.499c.553-.406.828-.607 1.618-.406c1.616.41 6.664 1.649 9.382 2.339c2.083.529 2.535.893 2.535 2.326V8.38c0 .465-.007.638-.408.981c-.202.173-1.348 1.14-2.016 1.687m1.624-2.556a.113.113 0 0 0 .141-.112c.001-1.414.011-2.495.011-3.666c0-.622-.35-1.137-1.121-1.343C16.501 2.29 10.486.866 10.191.778c-.197-.059-.322.108-.322.199c-.001 4.294.029 7.832.029 11.854c0 .741.408 1.525 1.292 1.765c3.582.973 6.578 1.655 10.331 2.667a.115.115 0 0 0 .143-.112c.001-.848.014-1.405.014-1.95c0-2.27.279-2.679-1.57-3.194c-2.198-.612-5.306-1.378-5.554-1.441c-.485-.124-.548-.266-.548-.591c0-.122-.011-2.346-.003-2.869c.002-.157.006-.31.157-.397c.134-.077.264-.046.664.053c.448.111 4.598 1.186 6.695 1.73m-7.65 14.735a.114.114 0 0 0 .142-.111c.001-1.185.017-2.484.017-3.352c0-1.475.182-1.334-1.064-1.639c-1.474-.36-4.433-1.146-5.967-1.552c-.355-.094-.459-.424-.459-.998c0-1.726-.006-4.575-.006-6.577c0-1.834.193-1.599-.703-1.832c-.565-.146-2.468-.637-3.313-.828c-.144-.032-.225.085-.225.224c-.003 3.939.053 8.211.053 11.994c0 1.228.439 1.815 1.321 2.051c3.589.963 6.446 1.652 10.204 2.62" />
+      </g>
+    </symbol>
+
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.2" />
+      <path
+        d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" />
+    </symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round">
+      <path d="M20.4 14.3A8.7 8.7 0 1 1 9.6 3.5a6.8 6.8 0 0 0 10.8 10.8Z" />
+    </symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round">
+      <path d="M6 6l12 12M18 6 6 18" />
+    </symbol>
+    <symbol id="i-github" viewBox="0 0 16 16">
+      <path fill="currentColor"
+        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A7.995 7.995 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+    </symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 19.5V4.5" />
+      <path d="m5.5 11 6.5-6.5L18.5 11" />
+    </symbol>
+    <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 4h6v6" />
+      <path d="M20 4 10.5 13.5" />
+      <path d="M19 14.5V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19V6.5A1.5 1.5 0 0 1 5 5h4.5" />
+    </symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round">
+      <path
+        d="M20.5 11.5c0 4-3.8 7.2-8.5 7.2a10 10 0 0 1-2.6-.34L4.5 20.5l1.2-3.5a6.9 6.9 0 0 1-2.2-4.9c0-4 3.8-7.2 8.5-7.2s8.5 3.2 8.5 7.2Z" />
+    </symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round">
+      <rect x="8.5" y="8.5" width="11" height="11" rx="2" />
+      <path d="M15.5 5.5v-1a1 1 0 0 0-1-1h-9a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h1" />
+    </symbol>
+    <symbol id="i-bug" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round">
+      <rect x="7.5" y="7.5" width="9" height="12" rx="4.5" />
+      <path d="M7.5 11H4M20 11h-3.5M7.5 16H4M20 16h-3.5M9 5.5 7.5 3.5M15 5.5l1.5-2" />
+    </symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round">
+      <path d="M12 20s-7.5-4.6-7.5-9.4A4.1 4.1 0 0 1 12 8a4.1 4.1 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z" />
+    </symbol>
+  </svg>
+
+  <header class="site-head" id="siteHead">
+    <div class="wrap head__in">
+      <a class="brand" href="index.html" aria-label="LiteChunk 首页">
+        <span class="brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24">
+            <use href="#i-crate"></use>
+          </svg></span>
+        <span class="brand__name">Lite<b>Chunk</b></span>
+      </a>
+
+      <nav class="nav" id="siteNav" aria-label="主导航">
+        <a href="index.html" data-nav>首页</a>
+        <a href="doc.html" data-nav>文档</a>
+        <a href="log.html" data-nav>更新日志</a>
+        <a href="about.html" data-nav>关于</a>
+        <div class="nav__dl"><a class="btn btn--primary" href="index.html#download">下载 LiteChunk</a></div>
+      </nav>
+
+      <div class="head__act">
+        <a class="icon-btn head__cta" href="https://github.com/FreneticWind60/LiteChunk" target="_blank" rel="noopener"
+          aria-label="GitHub 仓库" title="GitHub 仓库">
+          <svg>
+            <use href="#i-github"></use>
+          </svg>
+        </a>
+        <a class="btn btn--primary btn--sm head__dl" href="index.html#download">下载</a>
+        <button class="icon-btn theme-btn" id="themeBtn" type="button" aria-label="切换主题" aria-pressed="false">
+          <svg class="i-sun" aria-hidden="true">
+            <use href="#i-sun"></use>
+          </svg>
+          <svg class="i-moon" aria-hidden="true">
+            <use href="#i-moon"></use>
+          </svg>
+        </button>
+        <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="打开菜单" aria-expanded="false"
+          aria-controls="siteNav">
+          <svg class="i-menu" aria-hidden="true">
+            <use href="#i-menu"></use>
+          </svg>
+          <svg class="i-close" aria-hidden="true">
+            <use href="#i-close"></use>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <div class="page-head">
+      <div class="wrap">
+        <p class="eyebrow">about</p>
+        <h1>关于 LiteChunk</h1>
+        <p>一个人维护的小项目，从 Chunker 里裁出来的一小块，加了一层安卓界面。</p>
+      </div>
+    </div>
+
+    <div class="wrap about__grid">
+      <div class="about__main">
+        <section id="background">
+          <h2>项目背景</h2>
+          <p>
+            Chunker 把「Java 版 ⇄ 基岩版」的存档转换做成了网页工具，引擎开源、逻辑公开。
+            但手机上一直缺一个不用电脑的版本：网页转换要先把存档传上去，还吃网络和浏览器内存。
+          </p>
+          <p>
+            LiteChunk 就是把 Chunker 的引擎裁下来搬进 Android 的产物。删掉桌面端与网页端用不到的部分，
+            修补几处 Android 运行时缺失的 API，再通过 <code>DexClassLoader</code> 放进独立进程加载。
+            剩下的只有界面、文件流和一层很薄的桥 —— 转换跑在 <code>:chunker</code> 进程里，
+            独立堆、崩溃不牵连界面、取消就是结束那个进程。
+          </p>
+          <p>
+            范围是被刻意缩小的：不做启动器、不做 NBT 树形编辑器、不做材质包转换。
+            目标只有一个 —— 选存档、选版本、转出来、存好。
+          </p>
+
+          <div class="quote">
+            同类项目 Chunkoid 走的是另一条路：功能齐全，网易存档解密、维度裁剪、NBT / LevelDB 编辑器、红石音乐都在里面。
+            它先证明了「在手机上跑完整转换」这件事行得通，LiteChunk 才敢反过来把范围缩到只剩转换。
+            两条路不冲突，也互相链接。
+          </div>
+        </section>
+
+        <section id="community">
+          <h2>官方社区</h2>
+          <p>
+            有问题、想提需求、或者只是想看别人踩过什么坑，都可以来 QQ 群。开发进度与预览版通常先在群里发。
+          </p>
+          <div class="profile" style="margin-top:16px">
+            <div class="profile__top">
+              <span class="profile__avatar" aria-hidden="true">
+                <svg viewBox="0 0 24 24" style="width:22px;height:22px" fill="none" stroke="currentColor"
+                  stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <use href="#i-chat"></use>
+                </svg>
+              </span>
+              <div>
+                <div class="profile__name">LiteChunk 官方群</div>
+                <div class="profile__role">QQ GROUP · 1124116373</div>
+              </div>
+            </div>
+            <p>在 QQ 里搜索群号即可加入。群号长期有效，换群会在本页更新。</p>
+            <div class="profile__list">
+              <button type="button" data-copy="1124116373">
+                <svg aria-hidden="true">
+                  <use href="#i-copy"></use>
+                </svg>
+                复制群号
+                <span>1124116373</span>
+              </button>
+              <a href="https://github.com/FreneticWind60/LiteChunk/issues" target="_blank" rel="noopener">
+                <svg aria-hidden="true">
+                  <use href="#i-bug"></use>
+                </svg>
+                提交 issue
+                <span>GitHub</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section id="friends">
+          <h2>友情链接</h2>
+          <p>Minecraft 工具生态里互相帮过忙的项目。要换友链的话，在仓库开个 issue 就行。</p>
+
+          <div class="links">
+            <a class="link-card link-card--featured reveal" href="https://chunkoid.top/" target="_blank" rel="noopener">
+              <span class="link-card__badge">CK</span>
+              <span class="link-card__body">
+                <span class="link-card__title">
+                  <b>Chunkoid</b>
+                  <span class="link-card__tag">灵感来源</span>
+                </span>
+                <span class="link-card__desc">
+                  同类里走得最远的一个：双向转换之外还有网易存档解密、维度裁剪、NBT / LevelDB 编辑器与红石音乐工坊。
+                  LiteChunk 之所以敢只做转换，是因为它先证明了「在手机上跑完整转换」这条路是通的。
+                </span>
+                <span class="link-card__go">chunkoid.top<svg aria-hidden="true">
+                    <use href="#i-external"></use>
+                  </svg></span>
+              </span>
+            </a>
+
+            <a class="link-card reveal" href="https://chunker.app/" target="_blank" rel="noopener">
+              <span class="link-card__badge">CH</span>
+              <span class="link-card__body">
+                <span class="link-card__title"><b>Chunker</b><span class="link-card__tag">核心引擎</span></span>
+                <span class="link-card__desc">The Hive 开源的网页版世界转换器，LiteChunk 的引擎就是它裁剪后的样子。</span>
+                <span class="link-card__host">chunker.app</span>
+              </span>
+            </a>
+
+            <a class="link-card reveal" href="https://theocraft.pages.dev/" target="_blank" rel="noopener">
+              <span class="link-card__badge">TC</span>
+              <span class="link-card__body">
+                <span class="link-card__title"><b>Theocraft</b><span class="link-card__tag">邻居</span></span>
+                <span class="link-card__desc">Chunkoid 原作者 Dozener 的新项目，同样是 Minecraft 周边工具。</span>
+                <span class="link-card__host">theocraft.pages.dev</span>
+              </span>
+            </a>
+
+            <a class="link-card reveal" href="https://github.com/RealBurst/arcana" target="_blank" rel="noopener">
+              <span class="link-card__badge">AR</span>
+              <span class="link-card__body">
+                <span class="link-card__title"><b>Arcana</b><span class="link-card__tag">解压工具</span></span>
+                <span class="link-card__desc">极致轻量化的压缩包处理工具，和 LiteChunk 一样在讲求克制。</span>
+                <span class="link-card__host">github.com/RealBurst/arcana</span>
+              </span>
+            </a>
+          </div>
+        </section>
+
+        <section id="license">
+          <h2>许可与致谢</h2>
+          <p>
+            LiteChunk 以 MIT 协议开源。用到的第三方内容如下，每条都标了协议与出处。
+          </p>
+
+          <dl class="credits">
+            <div>
+              <dt>转换引擎 · Chunker</dt>
+              <dd>来自 Hive Games，MIT 协议；源码在
+                <a href="https://github.com/HiveGamesOSS/Chunker" target="_blank" rel="noopener"
+                  style="color:var(--accent-ink)">HiveGamesOSS/Chunker</a>。LiteChunk 使用其裁剪版，
+                修改点写在仓库 README 的「相对上游的改动」一节。
+              </dd>
+            </div>
+            <div>
+              <dt>界面图标 · Fluent UI System Icons</dt>
+              <dd>来自 Microsoft，MIT 协议。应用内按 16 / 20 的 viewBox 重绘，网站上的图标同样手写。</dd>
+            </div>
+            <div>
+              <dt>应用 Logo</dt>
+              <dd>CC0 公共领域。站内的 logo 与应用启动图是同一形状。</dd>
+            </div>
+            <div>
+              <dt>本网站</dt>
+              <dd>纯 HTML / CSS / 原生 JS，没有框架、没有构建步骤，也不加载任何第三方资源。更新日志页会读取仓库里的 VERSION.md。</dd>
+            </div>
+          </dl>
+
+          <p class="note" style="margin-top:16px">
+            <strong>非官方项目。</strong>LiteChunk 与 Mojang Studios、Microsoft、Hive Games 均无隶属关系，
+            未经其认可或授权。站内与安装包内都不包含任何 Minecraft 官方素材，Minecraft 是 Mojang Studios 的商标。
+          </p>
+        </section>
+      </div>
+
+      <aside>
+        <div class="profile">
+          <div class="profile__top">
+            <span class="profile__avatar" aria-hidden="true">F</span>
+            <div>
+              <div class="profile__name">Frenetic</div>
+              <div class="profile__role">DEVELOPER</div>
+            </div>
+          </div>
+          <p>独立开发。界面、引擎移植、打包与文档都是一个人在做，所以功能克制，更新也慢一点。</p>
+          <div class="profile__list">
+            <a href="https://github.com/FreneticWind60" target="_blank" rel="noopener">
+              <svg aria-hidden="true">
+                <use href="#i-github"></use>
+              </svg>
+              GitHub
+              <span>@FreneticWind60</span>
+            </a>
+            <a href="https://github.com/FreneticWind60/LiteChunk" target="_blank" rel="noopener">
+              <svg aria-hidden="true">
+                <use href="#i-heart"></use>
+              </svg>
+              项目仓库
+              <span>LiteChunk</span>
+            </a>
+            <a href="https://github.com/FreneticWind60/LiteChunk/releases" target="_blank" rel="noopener">
+              <svg aria-hidden="true">
+                <use href="#i-external"></use>
+              </svg>
+              发布页
+              <span>Releases</span>
+            </a>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot__grid">
+        <div>
+          <div class="foot__brand">
+            <span class="brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24">
+                <use href="#i-crate"></use>
+              </svg></span>
+            <span class="brand__name">Lite<b>Chunk</b></span>
+          </div>
+          <p class="foot__desc">基于 Chunker 的轻量安卓移植版，只做 Minecraft 存档的跨版本转换。</p>
+        </div>
+        <div>
+          <div class="foot__title">站点</div>
+          <nav class="foot__links" aria-label="站点导航">
+            <a href="index.html">首页</a><a href="doc.html">使用文档</a>
+            <a href="log.html">更新日志</a><a href="about.html">关于项目</a>
+          </nav>
+        </div>
+        <div>
+          <div class="foot__title">社区</div>
+          <nav class="foot__links" aria-label="社区链接">
+            <a href="https://github.com/FreneticWind60/LiteChunk" target="_blank" rel="noopener">GitHub 仓库</a>
+            <a href="https://github.com/FreneticWind60/LiteChunk/issues" target="_blank" rel="noopener">问题反馈</a>
+            <a href="https://github.com/FreneticWind60/LiteChunk/releases" target="_blank" rel="noopener">下载发布页</a>
+            <a href="about.html#community">QQ 群 1124116373</a>
+          </nav>
+        </div>
+        <div>
+          <div class="foot__title">友链</div>
+          <nav class="foot__links" aria-label="友情链接">
+            <a href="https://chunkoid.top/" target="_blank" rel="noopener">Chunkoid</a>
+            <a href="https://chunker.app/" target="_blank" rel="noopener">Chunker</a>
+            <a href="https://theocraft.pages.dev/" target="_blank" rel="noopener">Theocraft</a>
+            <a href="https://github.com/RealBurst/arcana/" target="_blank" rel="noopener">Arcana</a>
+          </nav>
+        </div>
+      </div>
+      <div class="foot__bottom">
+        <span>© <span data-year>2026</span> LiteChunk · Frenetic · MIT 许可</span>
+        <span class="dis">非官方项目，与 Mojang Studios、Microsoft、Hive Games 均无隶属关系。</span>
+      </div>
+    </div>
+  </footer>
+
+  <button class="to-top" id="toTop" type="button" aria-label="回到顶部">
+    <svg aria-hidden="true">
+      <use href="#i-arrow-up"></use>
+    </svg>
+  </button>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="common.js" defer></script>
+</body>
+
+</html>
