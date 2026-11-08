@@ -174,7 +174,7 @@ public class LevelActivity extends AppCompatActivity {
         }
 
         StringBuilder summary = new StringBuilder();
-        summary.append(info.formatLabel);
+        summary.append(formatLabel());
         if (info.version != null) {
             summary.append(" ").append(info.version);
         }
@@ -222,7 +222,7 @@ public class LevelActivity extends AppCompatActivity {
         boolean first = true;
         for (LevelField field : info.fields) {
             RowLevelFieldBinding row = RowLevelFieldBinding.inflate(inflater, binding.fieldContainer, false);
-            row.tvLabel.setText(field.labelZh);
+            row.tvLabel.setText(LevelText.label(field));
             row.tvKey.setText(field.labelEn);
 
             String value = display(field);
@@ -258,6 +258,19 @@ public class LevelActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * @return the edition in the current language, falling back to what the engine sent.
+     */
+    private String formatLabel() {
+        if ("BEDROCK".equals(info.formatId)) {
+            return Text.get(R.string.level_format_bedrock);
+        }
+        if ("JAVA".equals(info.formatId)) {
+            return Text.get(R.string.level_format_java);
+        }
+        return info.formatLabel;
+    }
+
     private String display(LevelField field) {
         String current = pending.containsKey(field.id) ? pending.get(field.id) : field.value;
         if (field.kind == LevelField.KIND_BOOL) {
@@ -265,13 +278,13 @@ public class LevelActivity extends AppCompatActivity {
         }
         if (field.kind == LevelField.KIND_ENUM) {
             int index = field.optionIndex(current);
-            return index < 0 ? current : field.optionLabel(index);
+            return index < 0 ? current : LevelText.option(field, index);
         }
         return current == null || current.isEmpty() ? Text.get(R.string.LevelActivity_08) : current;
     }
 
     private String hint(LevelField field) {
-        return field.hintZh != null ? field.hintZh : field.hintEn;
+        return LevelText.hint(field);
     }
 
     private int severityColor(int severity) {
@@ -302,10 +315,10 @@ public class LevelActivity extends AppCompatActivity {
     private void editChoice(LevelField field, String current) {
         String[] labels = new String[field.optionIds.length];
         for (int i = 0; i < labels.length; i++) {
-            labels[i] = field.optionLabel(i);
+            labels[i] = LevelText.option(field, i);
         }
         int checked = field.optionIndex(current);
-        titled(field.labelZh, field.labelEn)
+        titled(LevelText.label(field), field.labelEn)
                 .setSingleChoiceItems(labels, checked, (dialog, which) -> {
                     pending.put(field.id, field.optionIds[which]);
                     dialog.dismiss();
@@ -317,7 +330,7 @@ public class LevelActivity extends AppCompatActivity {
 
     private void editFlag(LevelField field, String current) {
         boolean on = "true".equalsIgnoreCase(current);
-        titled(field.labelZh, field.labelEn)
+        titled(LevelText.label(field), field.labelEn)
                 .setSingleChoiceItems(new String[]{Text.get(R.string.LevelActivity_10), Text.get(R.string.LevelActivity_11)}, on ? 0 : 1, (dialog, which) -> {
                     pending.put(field.id, which == 0 ? "true" : "false");
                     dialog.dismiss();
@@ -338,7 +351,7 @@ public class LevelActivity extends AppCompatActivity {
      */
     private void editText(LevelField field, String current) {
         DialogLevelTextBinding editor = DialogLevelTextBinding.inflate(getLayoutInflater());
-        editor.tvTitle.setText(field.labelZh);
+        editor.tvTitle.setText(LevelText.label(field));
         editor.tvSubtitle.setText(field.labelEn);
 
         boolean numeric = field.kind == LevelField.KIND_INT || field.kind == LevelField.KIND_LONG;

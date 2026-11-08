@@ -109,6 +109,12 @@ final class Job {
     static final String KEY_LEVEL_FIELD_OPTIONS_EN = "levelFieldOptionsEn";
     static final String KEY_LEVEL_FIELD_HINT_ZH = "levelFieldHintZh";
     static final String KEY_LEVEL_FIELD_HINT_EN = "levelFieldHintEn";
+    /**
+     * Stable hint codes, one per field. A Bundle cannot carry objects, so the whole {@code LevelInfo} has to be taken
+     * apart into parallel arrays - and every property has to be added here or it silently arrives as null on the
+     * other side of the process boundary.
+     */
+    static final String KEY_LEVEL_FIELD_HINT_CODE = "levelFieldHintCode";
     static final String KEY_LEVEL_NOTE_SEVERITY = "levelNoteSeverity";
     static final String KEY_LEVEL_NOTE_ZH = "levelNoteZh";
     static final String KEY_LEVEL_NOTE_EN = "levelNoteEn";
@@ -137,6 +143,7 @@ final class Job {
         String[] optionsEn = new String[count];
         String[] hintsZh = new String[count];
         String[] hintsEn = new String[count];
+        String[] hintCodes = new String[count];
 
         for (int i = 0; i < count; i++) {
             LevelField field = info.fields.get(i);
@@ -150,6 +157,7 @@ final class Job {
             optionsEn[i] = join(field.optionEn);
             hintsZh[i] = field.hintZh;
             hintsEn[i] = field.hintEn;
+            hintCodes[i] = field.hintCode;
         }
 
         bundle.putStringArray(KEY_LEVEL_FIELD_IDS, ids);
@@ -162,6 +170,7 @@ final class Job {
         bundle.putStringArray(KEY_LEVEL_FIELD_OPTIONS_EN, optionsEn);
         bundle.putStringArray(KEY_LEVEL_FIELD_HINT_ZH, hintsZh);
         bundle.putStringArray(KEY_LEVEL_FIELD_HINT_EN, hintsEn);
+        bundle.putStringArray(KEY_LEVEL_FIELD_HINT_CODE, hintCodes);
 
         int noteCount = info.notes.size();
         int[] severities = new int[noteCount];
@@ -196,6 +205,7 @@ final class Job {
         String[] optionsEn = orEmpty(bundle.getStringArray(KEY_LEVEL_FIELD_OPTIONS_EN), ids.length);
         String[] hintsZh = orEmpty(bundle.getStringArray(KEY_LEVEL_FIELD_HINT_ZH), ids.length);
         String[] hintsEn = orEmpty(bundle.getStringArray(KEY_LEVEL_FIELD_HINT_EN), ids.length);
+        String[] hintCodes = orEmpty(bundle.getStringArray(KEY_LEVEL_FIELD_HINT_CODE), ids.length);
         int[] kinds = bundle.getIntArray(KEY_LEVEL_FIELD_KINDS);
         if (kinds == null) {
             kinds = new int[ids.length];
@@ -205,7 +215,7 @@ final class Job {
         for (int i = 0; i < ids.length; i++) {
             String[] optionIds = split(options[i]);
             fields.add(new LevelField(ids[i], zh[i], en[i], values[i], kinds[i],
-                    optionIds, split(optionsZh[i]), split(optionsEn[i]), hintsZh[i], hintsEn[i]));
+                    optionIds, split(optionsZh[i]), split(optionsEn[i]), hintsZh[i], hintsEn[i], hintCodes[i]));
         }
 
         int[] severities = bundle.getIntArray(KEY_LEVEL_NOTE_SEVERITY);

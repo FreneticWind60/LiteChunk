@@ -46,10 +46,39 @@ public final class LevelField {
     public final String hintZh;
     /** Short English note about the risk or meaning, or {@code null}. */
     public final String hintEn;
+    /**
+     * Stable code for the hint, so the app can show it in the user's language instead of the two literals below.
+     * <p>
+     * One of {@code HINT_*} or {@code null}. The engine must not hand out display text as its only form - the same
+     * reason progress stages are codes - but the two literals stay as a fallback for a code the app does not know.
+     */
+    public final String hintCode;
+
+    /** A key is missing from the save and will be created on the next save. */
+    public static final String HINT_MISSING = "missing";
+    /** The seed does not control terrain that already exists. */
+    public static final String HINT_SEED = "seed";
+    /** The generator field is a declaration, not a terrain type. */
+    public static final String HINT_GENERATOR = "generator";
+    /** The data version does not upgrade chunk data. */
+    public static final String HINT_DATA_VERSION = "data_version";
+    /** The storage version does not upgrade the chunk format. */
+    public static final String HINT_STORAGE_VERSION = "storage_version";
+    /** The protocol version is unrelated to the chunk format. */
+    public static final String HINT_NETWORK_VERSION = "network_version";
 
     public LevelField(String id, String labelZh, String labelEn, String value, int kind,
                       String[] optionIds, String[] optionZh, String[] optionEn,
                       String hintZh, String hintEn) {
+        this(id, labelZh, labelEn, value, kind, optionIds, optionZh, optionEn, hintZh, hintEn, null);
+    }
+
+    /**
+     * @param hintCode a {@code HINT_*} code, or {@code null} when the hint has no app supplied translation.
+     */
+    public LevelField(String id, String labelZh, String labelEn, String value, int kind,
+                      String[] optionIds, String[] optionZh, String[] optionEn,
+                      String hintZh, String hintEn, String hintCode) {
         this.id = id;
         this.labelZh = labelZh;
         this.labelEn = labelEn;
@@ -60,6 +89,7 @@ public final class LevelField {
         this.optionEn = optionEn;
         this.hintZh = hintZh;
         this.hintEn = hintEn;
+        this.hintCode = hintCode;
     }
 
     /** Plain read-only or free text field without options or hints. */

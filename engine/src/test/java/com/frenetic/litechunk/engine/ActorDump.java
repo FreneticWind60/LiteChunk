@@ -26,7 +26,7 @@ import java.util.TreeMap;
  * missing from the database, or they are present but the game refuses to load them -- and only the database can tell
  * the two apart.
  * <p>
- * Usage: ActorDump &lt;worldDir&gt; [maxSamples]
+ * Usage: ActorDump &lt;worldDir&gt; [maxSamples] [identifierFilter]
  */
 public final class ActorDump {
 
@@ -35,11 +35,14 @@ public final class ActorDump {
 
     public static void main(String[] args) throws Exception {
         if (args.length < 1) {
-            System.err.println("usage: ActorDump <worldDir> [maxSamples]");
+            System.err.println("usage: ActorDump <worldDir> [maxSamples] [identifierFilter]");
             System.exit(2);
         }
         File directory = new File(args[0], "db");
         int maxSamples = args.length > 1 ? Integer.parseInt(args[1]) : 3;
+        // Printing the first few actors of the whole world is useless when the one being investigated is a villager:
+        // the samples are ordered by storage key, not by type.
+        String filter = args.length > 2 ? args[2] : null;
         if (!directory.isDirectory()) {
             System.err.println("no db directory in " + args[0]);
             System.exit(2);
@@ -99,7 +102,7 @@ public final class ActorDump {
                     if (!tag.contains("definitions")) {
                         missingDefinitions++;
                     }
-                    if (samples.size() < maxSamples) {
+                    if (samples.size() < maxSamples && (filter == null || filter.equals(identifier))) {
                         samples.add(tag);
                     }
                 }

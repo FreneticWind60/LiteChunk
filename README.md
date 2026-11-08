@@ -185,6 +185,9 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
 - **只读诊断**：版本（由 `DataVersion` / `NetworkVersion` 反查）、字节数，以及几条会真正影响游玩的检查
   —— 存档名为空、缺 `DataVersion`、缺出生点、基岩版开了哪些实验性玩法（新方块变空气的最常见原因）。
 - **白名单修补**：中文名 + 英文键名 + 当前值，点一下改一项，不做树形编辑器。
+  文案跟随界面语言：引擎只交双语字面量（`labelZh` + `labelEn`），日语界面会显示中文标题，所以每个字段带一个
+  稳定的 `hintCode`（就是 NBT 键名，和进度阶段码一个思路），App 侧 `LevelText` 拿它查 `R.string`，
+  查不到的才回落到引擎给的文字；选项与提示同理。第二行仍显示原始键，那是给查过资料的人看的文档，不翻译。
   Java 侧 `LevelName / GameType / Difficulty / allowCommands / hardcore / RandomSeed / SpawnXYZ / DayTime`；
   基岩侧 `LevelName / GameType / Difficulty / commandsEnabled / Generator / RandomSeed / SpawnXYZ / Time`。
   `DataVersion`、`StorageVersion`、`NetworkVersion` 一律只读并在下方说明原因：改这些数字只改声明、
@@ -327,11 +330,23 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
       / `DecorItem` 有补落分支。
     - **姿态**：`CollarColor` → `Color`，`Sitting` → `Sitting`（骆驼用 `camel_sitting` 组）。
     - **村民**：`VillagerData` 的职业/等级/生物群系映射成 `+<profession>`、`+<biome>_villager` 与
-      `TradeTier` / `TradeExperience`；交易表交给游戏自己生成，不搬运。
+      `TradeTier` / `TradeExperience`。
+    - **交易**：写基岩的 `Offers.Recipes`（`buyA` / `buyB` / `sell` / `maxUses` / `uses` / `traderExp` /
+      `rewardExp` / `priceMultiplierA` / `tier`），物品走引擎的物品解析，附魔与 components 一起带过去。
+      因为基岩拿到 `Offers` 就**整体替换**自己生成的那一套，所以只对**玩家交易过**（任一配方 `uses > 0`）
+      的村民整份搬运；一个都没交易过的村民不写，继续让游戏按职业等级生成。`demand` / `specialPrice`
+      基岩没有对应字段，丢弃。
     - **热带鱼**：`Variant` 打包整数拆成 `Color` / `Color2` / `MarkVariant`。
-    - **拴绳与乘客**：`leash` → `LinksTag` + `LeasherID`；Java 嵌在载具 `Passengers` 里的骑手会被拆成
-      独立 actor，两边用互相引用的 `LinksTag` 连起来。为此 actor 的 `UniqueID` 改为由实体 UUID 派生
-      （splitmix64），否则载具与骑手在不同 region、并行转换时对不上号。
+    - **拴绳与乘客**：`leash` → `LeasherID`（持有者的 `UniqueID`）；Java 嵌在载具 `Passengers` 里的骑手会被
+      拆成独立 actor，两边用 `LinksTag` 连起来——两个方向写在同一个列表里，否则「既骑又载」的实体会丢掉
+      `RideID`。为此 actor 的 `UniqueID` 改为由实体 UUID 派生（splitmix64），否则载具与骑手在不同 region、
+      并行转换时对不上号。拴在栅栏上的绳子另说：1.21 起 Java 把栅栏的**方块坐标直接写在动物身上**
+      （`leash:[I;x,y,z]` 加 `home_pos`/`home_radius`），存档里根本没有绳结实体，所以直接翻成基岩的
+      `hasBoundOrigin` + `boundX/Y/Z`；更早的版本是指向绳结实体的 UUID，那种世界才会先扫一遍全世界定位绳结。
+      但实测发现基岩那边**不认这三个键**：它要求栅栏处有一个独立的绳结 actor（`identifier: minecraft:leash_knot`，
+      `definitions` 为空，`Pos` 在方块中心上方 0.25 格），动物用 `LeasherID` 指向它的 `UniqueID`。所以转换时会按
+      方块坐标哈希出一个绳结 id，并在栅栏所在列补写这个 actor（那一列常常没有别的实体，digp 要单独合并）。
+      `NoAI` 不转换：试过原样写进 actor，进游戏无效，基岩没有等价开关。
     - **画与展示框**交给引擎自己的处理器（需要 Motif、朝向、挂靠方块与半格偏移，通用形状表达不了）。
     - 引擎侧的改动只有五处（编排、实体写入门控、api 默认方法、两个 resolver 访问器）。
 
@@ -384,141 +399,6 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
   前者仍是唯一能跨版本改地形的手段。两者共用同一个 `:chunker` 进程。
 - **dex 加载**：`assets/chunker.jar` → `code_cache/engine/chunker-<size>.jar` → `setReadOnly()`
   （Android 14 起动态加载的代码必须来自只读文件）→ `DexClassLoader`。
-
-## 验证状态
-
-下面是一次发布前跑过的实测，用的是玩家真实存档而不是构造样例。
-
-| 场景 | 环境 | 结果 |
-| --- | --- | --- |
-| 世界 A（Java 1.20.1，278MB / 64 region）→ 基岩 1.26.60 | 桌面 `engineCli`，512MB 堆 / 2 线程 | **77.9 s**，输出 47MB |
-| 上一条输出的实体统计 | `actorDump` | `actorprefix` 35 条、7 类，`without definitions: 0` |
-| 世界 B（Java 1.20.1，58MB，含 5 幅画）→ 基岩 1.26.60 | 模拟器完整 App 路径 | **176.5 s**，flush 目录已清理 |
-| 上一条输出的实体统计 | `actorDump` | 5 幅画全部保留，`Motif` 完好，`without definitions: 0` |
-| 世界 C（Java 1.21.8，257MB，实体密集）→ 基岩 | 桌面 `engineCli` | `actorprefix` 1392 条、28 种生物，`without definitions: 0` |
-| 世界 D（Java 1.21.8，25MB）→ 基岩 | 模拟器，**release 包（R8）** | **19.3 s**，产物 4.0MB |
-| 世界 E（Java，压缩前 1.29GB）→ 基岩 | 真机，512MB 堆（未 root） | **290 s**，≈4.5 MB/s |
-| 同一次转换的分阶段耗时 | 真机，release 包 | `read=0.2s convert=3.0s pack=0.5s`（25MB 世界） |
-
-世界 E 的数字值得单独说明：日志里进度在 60s/120s/180s/240s 时分别是 14%/32%/57%/73%，而 CPU 平均占用
-不到 50%、并且越到后期越低。这是 IO 与 LevelDB compaction 受限，不是 CPU 饱和——所以并发参数（线程数、
-写缓冲、在飞 region 数）没有调整的余地。大世界要快，只有换更大的堆（桌面 CLI）或减少工作量。
-
-UI 侧在模拟器（API 35，堆按真机对齐 512m / 256m）逐项点过：添加与识别、自动切换目标平台、批量转换、
-文件页六个操作（导出落到 `/sdcard/Download` 且字节一致、分享走 `FileProvider`、导入无启动器时回退分享、
-删除二次确认）、右滑多选、转化列表滑删、明暗三态、关于页明暗两套。
-
-`1.21.0 build3 pr2` 新增能力的实测（同一台模拟器，debug 与 release 双包）：
-
-- **导入**：`VIEW` 与 `SEND` 两个入口都能把 `.mcworld` 送进队列并识别出版本；`notes.txt` 被
-  `Inbox.isArchive()` 拒绝，`inbox/` 里没有留下任何文件。
-- **命名模板**：三块全开 / 只留原名 / 换分隔符，产物名与预览一致；同名第二次转换自动加 `(2)`。
-- **暂存复用**：先识别再转换，第二次日志出现 `read=0.0s(staged)`；转换结束后 `inbox/` 与 `stage-*` 都已清理。
-- **存档详情**：真实 Java 1.21.8 存档与基岩 1.26.60 产物双向读写通过——改值生效、**未改字段一个都没变**、
-  只读字段写入被拒；模拟器上改完拉起 zip 里的 `level.dat` 复核，
-  `Difficulty=2`、`GameType=0`，zip 的 7 个条目完整。
-
-`1.21.0 build3 pr3` 的保存模型实测（同一台模拟器，debug 与 release 双包都过）：
-
-| 场景 | 结果 |
-| --- | --- |
-| 另存为 | 产出 `test-nbt-20261028-051703.zip`（4393840 B），原包 4392799 B **一个字节都没动**；副本 `GameType=0`、原包仍为 `1` |
-| 覆盖保存 | 原包变成 4393840 B，没有多出文件，也没有 `.bak` / `.tmp` 残留；zip 65 个条目与原包一致，`testzip()` 无坏项 |
-| 未修改退出 | 直接放行，不弹框 |
-| 已修改退出 | 弹「另存为 / 直接退出 / 保存」；选「直接退出」确认不写盘 |
-| 恢复默认值 | `Difficulty` 从「普通」回到「和平」，脏标记消失、保存图标转灰 |
-| 导出二级选择 | Java 存档只出现「导出为 .zip」，点下去进系统 `documentsui` 保存面板 |
-| 引擎自检 | `:engine:levelTest` 输出 `no backup files, as intended` / `ALL CHECKS PASSED` |
-| R8 release 包 | 详情页与覆盖保存均通过，说明没有依赖反射被裁掉的部分 |
-
-`1.21.0 build3 pr4` 的熬夜修复实测（同一台模拟器 API 35，release 包在 R8 下逐条过）：
-
-| 场景 | 结果 |
-| --- | --- |
-| 唤醒锁 | 转换中 `dumpsys power` 出现 `PARTIAL_WAKE_LOCK 'LiteChunk:convert'`，结束后只剩无关的 `fiid-sync` |
-| 常亮 | `dumpsys power` 出现 `SCREEN_BRIGHT_WAKE_LOCK ... WorkSource{...com.frenetic.litechunk}`；结束后 `dumpsys window \| grep -c KEEP_SCREEN_ON` = 0 |
-| 电池白名单引导 | 首次转换前弹一次，两行标题 + 「直接开始 / 去设置」；第二次转换直接开始，不再弹 |
-| 一言轮换 | t=3 → 第 1 条，9 → 第 2，17 → 第 3，31 → 第 5，54 → 第 8，与 `elapsed/7 % n` 完全吻合 |
-| 自动滚到底 | 开始转换后进度卡整体可见，「取消」按钮能点到 |
-
-（pr4 当时的「俄罗斯方块」一栏已随 pr5 删除该控件而移除，见下表。）
-
-`1.21.0 build3 pr5` 的四项体验修复实测（同一台模拟器 API 35，release 包在 R8 下逐条过）：
-
-| 场景 | 结果 |
-| --- | --- |
-| mcworld 勾选搬家 | 格式卡的勾选框消失；命名 BottomSheet 里出现在分隔符之上、仅基岩版可见，切换目标格式即时显隐 |
-| 勾选状态持久化 | 取消勾选后重开 App 仍是未勾选（`Naming.mcworld()` 存 prefs，pr4 只存在内存里，重启会丢） |
-| 拖动排序 | 按住「时间戳」右侧手柄拖到第一位 → 预览变成 `20261029-1258-BE.mcworld`，行不闪、不跳、不从手指下消失 |
-| 命名即时生效 | 同一份设置在转换完成后的「本轮输出」里产出同名文件 |
-| 导出菜单 | 基岩版存档弹出 16dp 圆角 PopupWindow（`.zip` / `.mcworld`），存成 `.mcworld` |
-| Java 存档导出 | 不弹菜单，直接进 `documentsui`，存成 `test-java.zip` |
-
-`1.21.0 build3 pr6` / `pr7` 的性能实测（桌面 JDK 25 跑 `:engine:engineCli`）：
-
-| 场景 | 结果 |
-| --- | --- |
-| 打包时 `.ldb` 直接 STORED | 同一个 162 MB 输出目录：6.998 s → 3.770 s（**−46%**），归档 75.0 MB → 77.1 MB（+2.75%），`unzip -t` 全部通过 |
-| palette 写入换 `ByteArrayDataOutput` | JFR 里 `ByteArrayOutputStream.ensureCapacity` 从 23.4% 采样到基本消失；墙钟不变，省的是纯 CPU |
-| region 改位置读、去掉 `synchronized(mcaReader)` | 墙钟在噪声内，但删掉了一个把整片 region（1024 列）串行化的锁 |
-| 转换总耗时（257 MB 存档） | 24.5 s → 25.0 s（噪声内，**桌面这一版没有提速**） |
-
-上面四项之外，pr6 还有一轮「少分配」的改动（palette 扁平化、region 读零拷贝、`Inflater` 线程本地复用、
-热路径去 `Optional`）。A/B 用的是 2.2 GB 真实存档 `存档 A`（`region/` 1.3 GB、546 个 region 文件），
-**同一天真回退源码跑**：
-
-| 场景 | 结果 |
-| --- | --- |
-| 堆峰值（上限 1 GB） | 改动前 1020 / 1023 MB → 改动后 944 / 914 / 894 MB，**稳定低约 100 MB** |
-| 墙钟 | 改动前 570.99 / 575.23 s；改动后 542.55 / 562.64 / 654.47 s —— 改后三次自己就差 20%，**噪声大于改动，无法判定** |
-| CPU 总时间 | 1618 s → 1666 s（噪声内）。削的是分配不是计算量 |
-| 区块输出 | `DbCompare` 逐 key 比字节，**区块记录 0 差异** |
-| 实体输出 | 89～155 条差异；同二进制两次运行之间也有 89 条（`actorprefix` / `digp`），属既有非确定性 |
-
-验收判据因此改了：**区块记录必须 0 差异**，实体记录只能看数量级——这套代码的输出本来就不是逐字节确定的。
-
-再往后一轮动的是**写入与调度的骨架**（一列一次 `WriteBatch`、每列 5 个写任务合并成 1 个、进度改原子计数）。
-另外两项（执行器 work-stealing、批量屏障改滑动窗口）实现后实测堆峰值 +290 MB，已回退，源码里不留半成品。
-同日同机**交替跑**的结果（主指标是进程 CPU 总时间，墙钟只作参考）：
-
-| 存档 | 变体 | 墙钟 | CPU 总时间 | 堆峰值 |
-| --- | --- | --- | --- | --- |
-| 2.2 GB `存档 A` | 基线 | 1045.3 / 1110.4 s | 3177.0 / 3250.2 s | 907 / 917 MB |
-| 2.2 GB 同上 | 本版 | **813.4 s** | **2595.0 s** | 903 MB |
-| 257 MB `存档 B` | 基线（5 次） | 51.98 s | 247.6 s | 694 MB |
-| 257 MB 同上 | 本版（6 次） | **46.4 s** | **232.1 s** | 671 MB |
-
-**跨时间对比在这台机器上无效**：同一天里同一条基线从 642 s 漂到 1110 s（CPU 1585 s → 3250 s），
-因为白天有人共用这 32 核。按「早上基线 / 下午改后」比较会把 −20% 读成 +47%。
-
-光照扁平化那一轮（7 对交替跑，`BASE→NEW` / `NEW→BASE` 轮换以消掉「第二棒总是慢」的顺序偏差）：
-
-| 存档 | 变体 | 墙钟（均值） | CPU 总时间 | 堆峰值 |
-| --- | --- | --- | --- | --- |
-| 257 MB `存档 B` | 上一状态 | 63.77 s | 290.6 s | 668 MB |
-| 257 MB 同上 | 加光照扁平化 + 位掩码 | **61.99 s** | **267.0 s** | **611 MB** |
-
-「每列 3 个任务合成 1 个」也做了、也测了，但墙钟中位 +1.8%、CPU +4.1%，已回退（读与写的重叠被拿掉）。
-
-再一轮把**位打包**的逐格重算拿掉（见补丁 15）。257 MB 存档、交替跑、2 线程：
-
-| 存档 | 变体 | 墙钟 | CPU 总时间 | 备注 |
-| --- | --- | --- | --- | --- |
-| 257 MB `存档 B` | 写侧打包前 / 后（1 GB 堆，4 对） | 中位 −0.8% | **−3.7%（8/8 对更低）** | 墙钟 6/8 对更快 |
-| 257 MB 同上 | 读/写解码前 / 后（1 GB 堆，4 对） | 中位 −1.1% | −2.9% | 4/4 对更快 |
-| 2.2 GB `存档 A` | 前 / 后（单对，2 线程） | 560.8 → **546.0 s（−2.7%）** | 1015.3 → **939.5 s（−7.5%）** | 堆 780 → 765 MB |
-| 基岩 → Java | 前 / 后（同一存档，3 对） | **−5.0 / −5.1 / −6.1%** | −3% | 写 Java 存档走的正是被改的编码 |
-
-真机上目前最大的实测存档 3.5 GB，一次转换约 40 分钟（前台、未灭屏）。
-
-同一轮还试了「高度图按 section 预建 air 位图」，实测中性（`containsKey` 归零但函数本身占比反升 1 个点，
-JIT 早已内联 `get`），已回退，源码不留。
-
-还有两条只做到数据层验证，没有在游戏里走过：
-
-1. 把输出的 `.mcworld` 导入真机基岩版，确认生物与画真的出现在世界里 —— `actorDump` 只能证明数据写对了，
-   不能证明游戏认。
-2. 取消转换（杀 `:chunker` 进程后的清理与通知收尾）只做过代码审查。
 
 ## 已知风险
 

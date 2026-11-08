@@ -23,8 +23,8 @@ import java.util.Set;
  *     turns the job into a bare component group ({@code farmer}, {@code librarian}) and the biome into a
  *     {@code <biome>_villager} one, with the level living in {@code TradeTier}.</li>
  * </ul>
- * The trades themselves are deliberately not converted: Bedrock generates its own from the profession and level, and
- * Java's {@code Offers} recipe list has no counterpart in the actor record.
+ * The trades themselves are handled by {@link EntityTrades}: a villager the player never traded with is still left to
+ * the game, which builds a fuller list from the profession and level than a copy of Java's could be.
  */
 final class EntityStates {
 

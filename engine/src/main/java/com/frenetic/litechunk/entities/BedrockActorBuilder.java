@@ -118,6 +118,10 @@ final class BedrockActorBuilder {
         // Saddle, collar, sitting and the villager's job: also appends groups, so it runs before the serialisation too.
         EntityStates.apply(actor, identifier, javaEntity, definitions);
 
+        // The trade list the player actually built up. Bedrock's offers replace whatever the profession would have
+        // generated, so this only writes anything for a villager that was traded with.
+        EntityTrades.apply(actor, identifier, javaEntity, source, target);
+
         actor.put("definitions", ListTag.fromValues(TagType.STRING, definitions));
 
         if (ITEM.equals(identifier)) {

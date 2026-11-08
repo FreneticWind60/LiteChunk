@@ -129,12 +129,11 @@
                 href="#i-download"></use></svg></a> 下载 APK 直接安装，最低支持 Android 8.1（API 27）。
           </p>
           <p class="note">
-            应用不需要任何存储权限，所有文件都写在 <code>Android/data/com.frenetic.litechunk/</code> 下。
+            应用不需要任何存储权限，所有文件都写在 <code>/Android/data/com.frenetic.litechunk/</code> 下。
           </p>
           <ul class="checklist">
             <li>系统可能提示「未知来源应用」，在设置里允许一次即可。</li>
             <li>后续版本使用同一套签名，可以直接覆盖升级，队列与输出目录都保留。</li>
-            <li>从调试包换成正式包，或反过来，签名不同，必须先卸载再装 —— 卸载会连带删掉 <code>Android/data</code> 里的存档。</li>
           </ul>
         </section>
 
@@ -147,7 +146,7 @@
             <li>微信、QQ、网盘里点「用其他应用打开」也能进来，应用会先把文件复制一份再入队。</li>
           </ul>
           <p class="note">
-            压缩包格式支持 <strong>RAR 4/5、7z、tar、tar.gz</strong>（纯 Java 解压）。分卷压缩包、带密码的压缩包，以及 bz2 / xz / lzh 等格式不支持，需要先在<a href="https://mt.cc/" target="_blank"> MT 管理器 </a>等软件上解开。
+            压缩包格式支持 <strong>RAR 4/5、7z、tar、tar.gz</strong>。对于分卷压缩包、带密码的压缩包，以及 bz2 / xz / lzh 等格式不支持，需要先在<a class="link-arrow" href="https://mt2.cc" style="display:inline-flex" target="_blank"> MT 管理器 </a>等软件上解开。
           </p>
         </section>
 
@@ -171,12 +170,10 @@
 
           <h3>转换中</h3>
           <p>
-            进度卡会显示当前阶段、百分比与已用时，长任务期间可以随时取消。转换跑在独立进程里，
-            取消等于结束那个进程，不会把界面一起拖下去。
+            进度卡会显示当前阶段、百分比与已用时，长任务期间可以随时取消。
           </p>
           <p class="note">
-            <strong>转换期间请让应用停在前台，最好别灭屏。</strong>厂商的省电策略会在灭屏后挂起 CPU，
-            表现出来就是「切后台进度不动，回来才继续」。应用已经申请了唤醒锁并引导加白名单，但仍以亮屏最稳。
+            <strong>转换期间请让应用停在前台，最好别灭屏。</strong>厂商的省电策略会在灭屏后挂起 CPU，表现出来就是「切后台进度不动，回来才继续甚至转化失败」。应用已经申请了唤醒锁并引导添加白名单，但仍以亮屏最稳。
           </p>
         </section>
 
@@ -230,14 +227,14 @@
               <summary>转换要多久？</summary>
               <div class="faq__body">
                 <p>取决于存档大小与设备。几十 MB 的存档通常在几十秒内，几 GB 的大存档会到十几分钟。</p>
-                <p>转换期间内存占用很难接近设备上限（不是我不想要内存啊实在是受限于 ART 沟槽的性能调度），所以转换时您大可挂个小窗以保持软转换进程运行，放心玩去吧~</p>
+                <p>事实上，对比 <a class="link-arrow" href="https://chunkoid.top" style="display:inline-flex" target="_blank">同类软件</a>，LiteChunk 的转换速度确实稍有逊色。这往往并非源于您的设备性能不足，转换期间内存占用很难接近设备上限（不是我不想要内存啊实在是受限于 ART 沟槽的性能调度）。所以请您耐心等待，或者通过小窗/分屏方式给软件保活，这样您就可以在漫长的转换过程中挑战一些有趣的数学难题，不再关注这件事情了（？）。</p>
               </div>
             </details>
 
             <details>
               <summary>为什么切到后台进度就停了？</summary>
               <div class="faq__body">
-                <p>前台服务只能保证进程不被优先杀，挡不住灭屏后 CPU 挂起。应用已经加了唤醒锁和电池白名单引导，但最稳的做法还是让屏幕亮着。</p>
+                <p>切到后台，电池优化策略可能阻止软件正常运行。您可以通过分屏/小窗的方式，保证您时时刻刻能够看到转换进度，这样，您就可以边转换边干其他事情了。</p>
               </div>
             </details>
 

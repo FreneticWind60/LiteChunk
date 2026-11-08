@@ -28,7 +28,9 @@ final class JavaEntityLinks {
      */
     static void apply(CompoundTag javaEntity, CompoundTag actor, Version version) {
         long holder = longValue(actor, "LeasherID");
-        if (holder == 0L) {
+        // A Bedrock save always carries the key and writes -1 for "nothing on the other end", which is not a unique id
+        // and must not be turned into a UUID - that would point the lead at an entity that does not exist.
+        if (holder == 0L || holder == -1L) {
             return;
         }
         CompoundTag leash = new CompoundTag(1);

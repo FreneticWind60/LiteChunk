@@ -261,7 +261,10 @@ public final class EngineImpl implements ChunkerEngine {
 
         EntityConversionPass pass = new EntityConversionPass(
                 inputDirectory, outputDirectory, concurrency,
-                message -> System.err.println("[entities] " + message), javaResolvers, bedrockResolvers);
+                message -> System.err.println("[entities] " + message), javaResolvers, bedrockResolvers,
+                // A lead tied to a fence is stored as coordinates on the animal from 1.21 on; before that it points at
+                // a knot entity elsewhere in the world, which has to be located before any animal can be written.
+                !reader.getVersion().isGreaterThanOrEqual(1, 21, 0));
         try {
             pass.run(listener == null ? null
                     : (fraction, stage) -> listener.onProgress(0.9D + 0.1D * Math.max(0D, Math.min(1D, fraction)),

@@ -273,18 +273,19 @@ final class LevelEditor {
         fields.add(choice("GameType", "游戏模式", "Game mode / GameType",
                 new String[]{"0", "1", "2", "3"},
                 new String[]{"生存", "创造", "冒险", "旁观"},
-                new String[]{"Survival", "Creative", "Adventure", "Spectator"}, null, null));
+                new String[]{"Survival", "Creative", "Adventure", "Spectator"}, null, null, null));
         fields.add(choice("Difficulty", "难度", "Difficulty",
                 new String[]{"0", "1", "2", "3"},
                 new String[]{"和平", "简单", "普通", "困难"},
-                new String[]{"Peaceful", "Easy", "Normal", "Hard"}, null, null));
+                new String[]{"Peaceful", "Easy", "Normal", "Hard"}, null, null, null));
         fields.add(flag("allowCommands", "允许作弊", "Allow commands"));
         fields.add(flag("hardcore", "极限模式", "Hardcore"));
         fields.add(new LevelField("RandomSeed", "世界种子", "Seed",
                 textOf("RandomSeed"), LevelField.KIND_LONG, null, null, null,
                 "1.16 起种子实际存放在 WorldGenSettings 里；而且种子只影响尚未生成的区块。",
                 "Since 1.16 the seed lives under WorldGenSettings, and either way it only affects chunks that "
-                        + "have not been generated yet."));
+                        + "have not been generated yet.",
+                LevelField.HINT_SEED));
         fields.add(whole("SpawnX", "出生点 X", "Spawn X", LevelField.KIND_INT));
         fields.add(whole("SpawnY", "出生点 Y", "Spawn Y", LevelField.KIND_INT));
         fields.add(whole("SpawnZ", "出生点 Z", "Spawn Z", LevelField.KIND_INT));
@@ -292,7 +293,9 @@ final class LevelEditor {
         fields.add(new LevelField("DataVersion", "数据版本", "Data version / DataVersion",
                 Integer.toString((int) number("DataVersion", -1)), LevelField.KIND_READ_ONLY, null, null, null,
                 "只改这个数字不会升级区块数据。降级打开旧存档仍需完整转换。",
-                "Changing this number does not upgrade the chunk data. Opening an older save still needs a full conversion."));
+                "Changing this number does not upgrade the chunk data. Opening an older save still needs a full "
+                        + "conversion.",
+                LevelField.HINT_DATA_VERSION));
         return fields;
     }
 
@@ -302,11 +305,11 @@ final class LevelEditor {
         fields.add(choice("GameType", "游戏模式", "Game mode / GameType",
                 new String[]{"0", "1", "2", "6"},
                 new String[]{"生存", "创造", "冒险", "旁观"},
-                new String[]{"Survival", "Creative", "Adventure", "Spectator"}, null, null));
+                new String[]{"Survival", "Creative", "Adventure", "Spectator"}, null, null, null));
         fields.add(choice("Difficulty", "难度", "Difficulty",
                 new String[]{"0", "1", "2", "3"},
                 new String[]{"和平", "简单", "普通", "困难"},
-                new String[]{"Peaceful", "Easy", "Normal", "Hard"}, null, null));
+                new String[]{"Peaceful", "Easy", "Normal", "Hard"}, null, null, null));
         fields.add(flag("commandsEnabled", "允许作弊", "Allow cheats"));
         fields.add(choice("Generator", "世界类型", "World type / Generator",
                 new String[]{"0", "1", "2", "3"},
@@ -314,7 +317,8 @@ final class LevelEditor {
                 new String[]{"Legacy", "Infinite", "Flat", "Void"},
                 "只是声明，改它不会重生地形。转换沿用源存档的类型：超平坦转出来仍是平坦，普通世界仍是无限。",
                 "A declaration only: changing it does not regenerate terrain. Conversion keeps the source type, "
-                        + "so a superflat save stays flat and a normal one stays infinite."));
+                        + "so a superflat save stays flat and a normal one stays infinite.",
+                LevelField.HINT_GENERATOR));
         fields.add(whole("RandomSeed", "世界种子", "Seed", LevelField.KIND_LONG));
         fields.add(whole("SpawnX", "出生点 X", "Spawn X", LevelField.KIND_INT));
         fields.add(whole("SpawnY", "出生点 Y", "Spawn Y", LevelField.KIND_INT));
@@ -323,11 +327,13 @@ final class LevelEditor {
         fields.add(new LevelField("StorageVersion", "存储版本（文件头）", "Storage version / header",
                 Integer.toString(storageVersion), LevelField.KIND_READ_ONLY, null, null, null,
                 "改高不会升级区块格式，反而可能让游戏判定存档损坏。",
-                "Raising it does not upgrade the chunk format and can make the game reject the world."));
+                "Raising it does not upgrade the chunk format and can make the game reject the world.",
+                LevelField.HINT_STORAGE_VERSION));
         fields.add(new LevelField("NetworkVersion", "协议版本", "Protocol version / NetworkVersion",
                 Integer.toString((int) number("NetworkVersion", -1)), LevelField.KIND_READ_ONLY, null, null, null,
                 "游戏用它判断当前版本是否过旧，与区块格式无关。",
-                "The game uses this to decide whether it is too old; it is unrelated to the chunk format."));
+                "The game uses this to decide whether it is too old; it is unrelated to the chunk format.",
+                LevelField.HINT_NETWORK_VERSION));
         return fields;
     }
 
@@ -341,7 +347,8 @@ final class LevelEditor {
         // A missing key is still worth showing: it is exactly the case a user comes here to fix.
         return new LevelField(id, zh, en, value, kind, null, null, null,
                 present ? null : "存档中没有这个字段，保存时才会写入。",
-                present ? null : "This key is missing from the save and will be created on save.");
+                present ? null : "This key is missing from the save and will be created on save.",
+                present ? null : LevelField.HINT_MISSING);
     }
 
     private LevelField flag(String id, String zh, String en) {
@@ -349,9 +356,10 @@ final class LevelEditor {
     }
 
     private LevelField choice(String id, String zh, String en, String[] ids, String[] zhOptions,
-                              String[] enOptions, String hintZh, String hintEn) {
+                              String[] enOptions, String hintZh, String hintEn, String hintCode) {
         String current = Integer.toString((int) number(id, Integer.parseInt(ids[0])));
-        return new LevelField(id, zh, en, current, LevelField.KIND_ENUM, ids, zhOptions, enOptions, hintZh, hintEn);
+        return new LevelField(id, zh, en, current, LevelField.KIND_ENUM, ids, zhOptions, enOptions, hintZh, hintEn,
+                hintCode);
     }
 
     // ---------------------------------------------------------------------------------------------

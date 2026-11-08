@@ -22,8 +22,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -56,6 +59,9 @@ public final class EntityConversionPass {
     private static final Pattern REGION_FILE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca");
     private static final int COLUMNS = 32 * 32;
 
+    /** Share of this pass spent collecting leash knots before any actor is written. */
+    private static final double INDEX_SHARE = 0.30;
+
     private final File inputDirectory;
     private final File outputDirectory;
     private final int threads;
@@ -66,22 +72,48 @@ public final class EntityConversionPass {
     private final AtomicLong nextUniqueId = new AtomicLong();
 
     /**
+     * Where every leash knot of the world stands, by the id its UUID derives to.
+     * <p>
+     * A lead tied to a fence points at a knot entity in the chunk the fence is in, while the animal is usually in the
+     * neighbouring chunk. One pass over the whole world fills this in before any column is written, so the animal's
+     * column can turn the reference into coordinates no matter which worker gets it first.
+     */
+    private final Map<Long, long[]> leashKnots = new ConcurrentHashMap<>();
+
+    /** Whether to look for leash knot entities before writing; false for worlds that store the post themselves. */
+    private final boolean indexKnots;
+
+    /**
+     * Knots that still have to be written, by the column that owns them.
+     * <p>
+     * A knot belongs to the chunk the fence stands in, which is usually a chunk the animal is not in - and often a
+     * chunk with no entities at all, so its digp is never written by the normal pass. They are collected here and
+     * merged in at the end, once every column has been written and there is nobody left to race with.
+     */
+    private final Map<Dimension, Map<ChunkCoordPair, List<long[]>>> pendingKnots = new ConcurrentHashMap<>();
+
+    /**
      * @param inputDirectory   the Java world that was converted.
      * @param outputDirectory  the Bedrock world that was produced.
      * @param threads          worker count, clamped to at least 1.
      * @param log              receives non-fatal problems, may be null.
      * @param javaResolvers    resolvers of the Java version that was read, used for item stacks, may be null.
      * @param bedrockResolvers resolvers of the Bedrock version being written, used for item stacks, may be null.
+     * @param indexKnots       true when the world may contain leash knot entities, which have to be located before any
+     *                         animal can be written. Only worlds from before 1.21 do: that version stores the post on
+     *                         the animal itself instead.
      */
     public EntityConversionPass(File inputDirectory, File outputDirectory, int threads, Consumer<String> log,
                                 @Nullable JavaResolvers javaResolvers,
-                                @Nullable BedrockResolvers bedrockResolvers) {
+                                @Nullable BedrockResolvers bedrockResolvers,
+                                boolean indexKnots) {
         this.inputDirectory = inputDirectory;
         this.outputDirectory = outputDirectory;
         this.threads = Math.max(1, threads);
         this.log = log;
         this.javaResolvers = javaResolvers;
         this.bedrockResolvers = bedrockResolvers;
+        this.indexKnots = indexKnots;
     }
 
     /**
@@ -107,6 +139,15 @@ public final class EntityConversionPass {
         AtomicLong written = new AtomicLong();
 
         try (DB db = new Iq80DBFactory().open(database, options())) {
+            // The knots first: an animal tied to a fence in an older world cannot be written until we know where the
+            // knot it points at stands, and the knot is almost never in the same region file. This pass only reads,
+            // and the second pass then hits the page cache, so the extra cost is one more parse of the entity files
+            // rather than one more read from disk. 1.21 and later store the post on the animal, so this is skipped.
+            final double share = indexKnots ? INDEX_SHARE : 0;
+            if (indexKnots) {
+                indexLeashKnots(tasks, listener);
+            }
+
             ExecutorService pool = Executors.newFixedThreadPool(
                     Math.min(threads, tasks.size()), runnable -> {
                         Thread thread = new Thread(runnable, "entity-pass");
@@ -120,7 +161,7 @@ public final class EntityConversionPass {
                         written.addAndGet(convertRegion(db, task));
                         int done = finished.incrementAndGet();
                         if (listener != null) {
-                            listener.onProgress(done / (double) tasks.size(), "转换实体");
+                            listener.onProgress(share + (1 - share) * done / (double) tasks.size(), "转换实体");
                         }
                     }));
                 }
@@ -132,9 +173,90 @@ public final class EntityConversionPass {
                 //noinspection ResultOfMethodCallIgnored
                 pool.awaitTermination(10, TimeUnit.SECONDS);
             }
+
+            written.addAndGet(writePendingKnots(db));
         }
 
         return (int) written.get();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Leash knots
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Collect the position of every leash knot in the world.
+     *
+     * @param tasks    the region files to read.
+     * @param listener progress for the first {@link #INDEX_SHARE} of this pass, may be null.
+     * @throws Exception when a worker is interrupted.
+     */
+    private void indexLeashKnots(List<Task> tasks, ProgressListener listener) throws Exception {
+        AtomicInteger finished = new AtomicInteger();
+        ExecutorService pool = Executors.newFixedThreadPool(
+                Math.min(threads, tasks.size()), runnable -> {
+                    Thread thread = new Thread(runnable, "entity-knots");
+                    thread.setDaemon(true);
+                    return thread;
+                });
+        try {
+            List<Future<?>> futures = new ArrayList<>(tasks.size());
+            for (Task task : tasks) {
+                futures.add(pool.submit(() -> {
+                    indexRegion(task);
+                    int done = finished.incrementAndGet();
+                    if (listener != null) {
+                        listener.onProgress(INDEX_SHARE * done / (double) tasks.size(), "读取拴绳");
+                    }
+                }));
+            }
+            for (Future<?> future : futures) {
+                future.get();
+            }
+        } finally {
+            pool.shutdown();
+            //noinspection ResultOfMethodCallIgnored
+            pool.awaitTermination(10, TimeUnit.SECONDS);
+        }
+    }
+
+    /**
+     * @param task one region file.
+     */
+    private void indexRegion(Task task) {
+        try (JavaRegionReader reader = new JavaRegionReader(task.file)) {
+            for (int index = 0; index < COLUMNS; index++) {
+                if (!reader.has(index)) {
+                    continue;
+                }
+                CompoundTag column;
+                try {
+                    column = reader.read(index);
+                } catch (Exception failure) {
+                    continue;
+                }
+                if (column == null) {
+                    continue;
+                }
+                ListTag<CompoundTag, Map<String, Tag<?>>> entities =
+                        column.getList("Entities", CompoundTag.class, null);
+                if (entities == null || entities.size() == 0) {
+                    continue;
+                }
+                for (CompoundTag entity : entities) {
+                    if (!EntityLinks.isLeashKnot(entity)) {
+                        continue;
+                    }
+                    long id = uniqueIdFromUuid(entity.getIntArray("UUID", null));
+                    long[] position = EntityLinks.position(entity);
+                    if (id != 0L && position != null) {
+                        leashKnots.put(id, position);
+                    }
+                }
+            }
+        } catch (Exception failure) {
+            report("读取拴绳位置失败 " + task.file.getName() + ": " + failure);
+        }
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -218,9 +340,10 @@ public final class EntityConversionPass {
     private int writeColumn(DB db, Dimension dimension, int regionX, int regionZ, int index,
                             ListTag<CompoundTag, Map<String, Tag<?>>> entities) throws IOException {
         List<byte[]> keys = new ArrayList<>(entities.size());
+
         try (WriteBatch batch = db.createWriteBatch()) {
             for (CompoundTag entity : entities) {
-                writeActor(batch, keys, entity, 0L);
+                writeActor(batch, keys, entity, 0L, dimension);
             }
 
             if (keys.isEmpty()) {
@@ -254,8 +377,14 @@ public final class EntityConversionPass {
      * @param entity    the Java entity tag.
      * @param vehicleId unique id of the actor this one rides, or 0 when it is not a passenger.
      */
-    private void writeActor(WriteBatch batch, List<byte[]> keys, CompoundTag entity, long vehicleId)
-            throws IOException {
+    private void writeActor(WriteBatch batch, List<byte[]> keys, CompoundTag entity, long vehicleId,
+                            Dimension dimension) throws IOException {
+        // Bedrock has no actor for the knot a lead is tied to - the post is stored as coordinates on the animal - so
+        // writing one would leave an invisible, undefined entity standing in the world.
+        if (EntityLinks.isLeashKnot(entity)) {
+            return;
+        }
+
         long uniqueId = uniqueIdOf(entity);
         CompoundTag actor;
         try {
@@ -271,19 +400,32 @@ public final class EntityConversionPass {
         ListTag<CompoundTag, Map<String, Tag<?>>> passengers =
                 entity.getList("Passengers", CompoundTag.class, null);
 
-        if (vehicleId != 0L) {
-            EntityLinks.riding(actor, vehicleId);
-        }
+        List<Long> riderIds = null;
         if (passengers != null && passengers.size() > 0) {
-            List<Long> riderIds = new ArrayList<>(passengers.size());
+            riderIds = new ArrayList<>(passengers.size());
             for (CompoundTag passenger : passengers) {
                 riderIds.add(uniqueIdOf(passenger));
             }
-            EntityLinks.carried(actor, riderIds);
         }
-        long holder = EntityLinks.leashHolder(entity, this::uniqueIdFromUuid);
-        if (holder != 0L) {
-            EntityLinks.leashed(actor, holder);
+        // One tag for both directions: an actor can be a passenger and carry passengers at the same time.
+        EntityLinks.link(actor, vehicleId, riderIds);
+
+        EntityLinks.Leash leash = EntityLinks.leash(entity, this::uniqueIdFromUuid);
+        if (leash != null) {
+            long[] block = leash.isBlock()
+                    ? new long[]{leash.x(), leash.y(), leash.z()}
+                    // An older world (or a lead held by a mob) points at a knot entity in the chunk the fence stands
+                    // in, which is rarely the animal's own chunk; that position came from the whole world pass.
+                    : leashKnots.get(leash.id());
+            if (block != null) {
+                // Bedrock keeps a knot actor of its own and the animal only says which one; anything else and the
+                // lead simply does not render.
+                long knotId = EntityLinks.knotId(block[0], block[1], block[2]);
+                EntityLinks.leashed(actor, knotId);
+                registerKnot(dimension, block, knotId);
+            } else {
+                EntityLinks.leashed(actor, leash.id());
+            }
         }
 
         byte[] key = storageKey(uniqueId);
@@ -292,9 +434,58 @@ public final class EntityConversionPass {
 
         if (passengers != null) {
             for (CompoundTag passenger : passengers) {
-                writeActor(batch, keys, passenger, uniqueId);
+                writeActor(batch, keys, passenger, uniqueId, dimension);
             }
         }
+    }
+
+    /**
+     * Remember that a knot has to exist at this block.
+     *
+     * @param dimension the dimension the fence is in.
+     * @param block     the block the lead is tied to.
+     * @param knotId    the unique id the animal already points at.
+     */
+    private void registerKnot(Dimension dimension, long[] block, long knotId) {
+        ChunkCoordPair column = new ChunkCoordPair((int) (block[0] >> 4), (int) (block[2] >> 4));
+        pendingKnots.computeIfAbsent(dimension, key -> new ConcurrentHashMap<>())
+                .computeIfAbsent(column, key -> java.util.Collections.synchronizedList(new ArrayList<>()))
+                .add(new long[]{knotId, block[0], block[1], block[2]});
+    }
+
+    /**
+     * Write every knot collected during the pass, merging its key into the digp of the column it stands in.
+     *
+     * @param db the output database.
+     * @return the number of actors written.
+     * @throws IOException when a knot cannot be written.
+     */
+    private int writePendingKnots(DB db) throws IOException {
+        int written = 0;
+        for (Map.Entry<Dimension, Map<ChunkCoordPair, List<long[]>>> dimension : pendingKnots.entrySet()) {
+            for (Map.Entry<ChunkCoordPair, List<long[]>> column : dimension.getValue().entrySet()) {
+                byte[] digpKey = LevelDBKey.key(LevelDBKey.DIGP_PREFIX, dimension.getKey(), column.getKey());
+                ByteArrayOutputStream digp = new ByteArrayOutputStream();
+                byte[] existing = db.get(digpKey);
+                if (existing != null) {
+                    digp.write(existing);
+                }
+                Set<Long> done = new HashSet<>();
+                for (long[] knot : column.getValue()) {
+                    // Two animals tied to the same fence share one knot; the second one must not write it twice.
+                    if (!done.add(knot[0])) {
+                        continue;
+                    }
+                    byte[] key = storageKey(knot[0]);
+                    digp.write(key);
+                    db.put(LevelDBKey.key(LevelDBKey.ACTOR_PREFIX, key),
+                            Tag.writeBedrockNBT(EntityLinks.knot(knot[0], knot[1], knot[2], knot[3])));
+                    written++;
+                }
+                db.put(digpKey, digp.toByteArray());
+            }
+        }
+        return written;
     }
 
     /**
