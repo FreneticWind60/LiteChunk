@@ -1,5 +1,6 @@
 package com.hivemc.chunker.conversion.encoding.bedrock.base.resolver.blockentity.handlers;
 
+import com.frenetic.litechunk.commands.ParticleCommand;
 import com.hivemc.chunker.conversion.encoding.base.resolver.blockentity.BlockEntityHandler;
 import com.hivemc.chunker.conversion.encoding.bedrock.base.resolver.BedrockResolvers;
 import com.hivemc.chunker.conversion.intermediate.column.blockentity.CommandBlockEntity;
@@ -23,7 +24,11 @@ public class BedrockCommandBlockBlockEntityHandler extends BlockEntityHandler<Be
 
     @Override
     public void write(@NotNull BedrockResolvers resolvers, @NotNull CompoundTag output, @NotNull CommandBlockEntity value) {
-        output.put("Command", value.getCommand());
+        // A Java particle command cannot be copied across: the name vocabulary and the argument list differ, and the
+        // game rejects the whole command when either is wrong, so the block silently stops emitting anything.
+        // Anything that is not a particle command, or whose particle has no Bedrock counterpart, is left untouched.
+        String translated = ParticleCommand.toBedrock(value.getCommand());
+        output.put("Command", translated != null ? translated : value.getCommand());
         output.put("auto", value.isAuto() ? (byte) 1 : (byte) 0);
         output.put("TrackOutput", value.isTrackOutput() ? (byte) 1 : (byte) 0);
     }

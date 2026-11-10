@@ -18,6 +18,11 @@ public class LiteChunkApp extends Application {
 
     @Override
     public void onCreate() {
+        // LevelDB's mmap path uses MappedByteBuffer methods whose covariant return types only exist from Android 13
+        // (API 33); before that the first database open throws NoSuchMethodError before a single chunk is read. The
+        // engine sets this too, but only once its own class initialises - doing it here covers the :chunker process
+        // whatever order things load in.
+        System.setProperty("leveldb.mmap", "false");
         super.onCreate();
         AppCompatDelegate.setDefaultNightMode(readNightMode(this));
         // Language before anything can read a string: installs the per-process lookup used by the file plumbing and

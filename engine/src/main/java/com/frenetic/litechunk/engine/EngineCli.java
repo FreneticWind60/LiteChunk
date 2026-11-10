@@ -88,6 +88,10 @@ public final class EngineCli {
                 + ", entities = " + entities);
 
         log("engine version = " + engine.engineVersion());
+        // LevelDB maps its files by default; Android has to turn that off (see EngineImpl's static block), so this is
+        // the quickest way to tell which way a run actually went.
+        log("leveldb mmap = " + org.iq80.leveldb.fileenv.MmapLimiter.USE_MMAP
+                + " (leveldb.mmap = " + System.getProperty("leveldb.mmap") + ")");
         int versions = 0;
         for (FormatGroup group : engine.formats()) {
             versions += group.versions.length;

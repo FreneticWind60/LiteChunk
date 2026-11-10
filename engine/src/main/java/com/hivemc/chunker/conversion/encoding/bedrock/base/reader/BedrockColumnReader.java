@@ -212,14 +212,15 @@ public class BedrockColumnReader implements ColumnReader {
     /**
      * Pair riders with their vehicles and take the riders out of the column.
      * <p>
-     * Bedrock keeps every actor as its own record and links them with {@code LinksTag}: the rider carries
-     * {@code RideID = <vehicle unique id>}, the vehicle carries {@code VehicleID = <rider unique id>}. Java does the
-     * opposite - the rider exists only as a compound inside the vehicle's {@code Passengers} - so a rider left in the
-     * column would be written as a second, loose entity standing in the same spot.
+     * Bedrock keeps every actor as its own record and records the mounting on the <em>vehicle</em>: its
+     * {@code LinksTag} holds one {@code {entityID, linkID}} entry per rider, the first being the rider's unique id
+     * and the second its seat. The rider carries nothing. Java does the opposite - the rider exists only as a
+     * compound inside the vehicle's {@code Passengers} - so a rider left in the column would be written as a second,
+     * loose entity standing in the same spot.
      * <p>
-     * Only actors within the same column are paired. A rider straddling a chunk border is left alone: it still arrives
-     * as a working entity, just not mounted, which is the same outcome as not handling links at all. Splitting a column
-     * apart to chase it would mean buffering the whole world.
+     * Nothing is removed unless its vehicle actually named it. An actor whose link points somewhere else - a rider
+     * straddling a chunk border, or a world written with an older field name - stays a normal entity: losing the
+     * mounting is recoverable, dropping the actor is not.
      *
      * @param column the column that was just read.
      */
@@ -241,17 +242,21 @@ public class BedrockColumnReader implements ColumnReader {
         }
 
         List<Entity> riding = new ArrayList<>(2);
-        for (Entity entity : entities) {
-            long vehicleId = rideId(entity.getOriginalNBT());
-            if (vehicleId == 0L) {
-                continue;
+        for (Entity vehicle : entities) {
+            for (long riderId : riderIds(vehicle.getOriginalNBT())) {
+                Entity rider = byUniqueId.get(riderId);
+                if (rider == null || rider == vehicle || riding.contains(rider)) {
+                    continue;
+                }
+                // A save with both halves written can describe a loop if it was damaged; java nests passengers, so a
+                // loop would recurse forever when the column is written out.
+                List<Entity> carried = rider.getPassengers();
+                if (carried != null && carried.contains(vehicle)) {
+                    continue;
+                }
+                vehicle.addPassenger(rider);
+                riding.add(rider);
             }
-            Entity vehicle = byUniqueId.get(vehicleId);
-            if (vehicle == null || vehicle == entity) {
-                continue;
-            }
-            vehicle.addPassenger(entity);
-            riding.add(entity);
         }
 
         if (!riding.isEmpty()) {
@@ -261,23 +266,35 @@ public class BedrockColumnReader implements ColumnReader {
 
     /**
      * @param actor the actor tag, may be null.
-     * @return the {@code RideID} of its first link, or 0 when it is not riding anything.
+     * @return the unique ids this actor is carrying, empty when it is not a vehicle.
      */
-    private static long rideId(@Nullable CompoundTag actor) {
+    private static List<Long> riderIds(@Nullable CompoundTag actor) {
         if (actor == null) {
-            return 0L;
+            return List.of();
         }
         ListTag<CompoundTag, ?> links = actor.getList("LinksTag", CompoundTag.class, null);
-        if (links == null) {
-            return 0L;
+        if (links == null || links.size() == 0) {
+            return List.of();
         }
+        List<Long> riders = new ArrayList<>(links.size());
         for (CompoundTag link : links) {
-            long value = longValue(link, "RideID");
-            if (value != 0L) {
-                return value;
+            // Both ends of a link carry a tag, so direction has to be read from the fields, not assumed from the actor
+            // being looked at: `VehicleID` names something this actor carries, `RideID` names what it rides, and only
+            // an entry with neither is the old bare `entityID` form (which always described a rider).
+            long carried = longValue(link, "VehicleID");
+            if (carried != 0L) {
+                riders.add(carried);
+                continue;
+            }
+            if (longValue(link, "RideID") != 0L) {
+                continue;
+            }
+            long legacy = longValue(link, "entityID");
+            if (legacy != 0L) {
+                riders.add(legacy);
             }
         }
-        return 0L;
+        return riders;
     }
 
     private static long uniqueId(@Nullable CompoundTag actor) {

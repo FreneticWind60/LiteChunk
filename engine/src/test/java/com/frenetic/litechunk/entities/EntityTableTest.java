@@ -162,24 +162,31 @@ public final class EntityTableTest {
     }
 
     /**
-     * Links: a passenger that also carries passengers has to keep both in one tag, and a lead tied to a fence becomes
-     * coordinates rather than a reference to an entity Bedrock does not have.
+     * Links are written on both ends, in every spelling the game reads: {@code entityID}/{@code linkID} on the
+     * vehicle and {@code RideID}/{@code VehicleID} on both. A world the game saved itself uses the second pair, and a
+     * vehicle whose only link used a spelling the running version had dropped is what made loaded boats disappear.
+     * Seats are numbered so two riders do not end up in one seat.
      */
     private static void links() throws Exception {
         CompoundTag boat = entity("minecraft:pig");
-        EntityLinks.link(boat, 42L, List.of(7L, 9L));
+        EntityLinks.link(boat, 0L, List.of(7L, 9L));
 
         ListTag<CompoundTag, Map<String, Tag<?>>> links = boat.getList("LinksTag", CompoundTag.class, null);
-        require("links", links != null && links.size() == 3, "expected one entry per side, got " + links);
-        requireLong("own ride", links.get(0), "RideID", 42L);
-        requireLong("first rider", links.get(1), "VehicleID", 7L);
-        requireLong("second rider", links.get(2), "VehicleID", 9L);
+        require("links", links != null && links.size() == 2, "expected one entry per rider, got " + links);
+        requireLong("first rider", links.get(0), "entityID", 7L);
+        requireLong("first seat", links.get(0), "linkID", 0L);
+        requireLong("first rider ride", links.get(0), "RideID", 0L);
+        requireLong("first rider vehicle", links.get(0), "VehicleID", 7L);
+        requireLong("second rider", links.get(1), "entityID", 9L);
+        requireLong("second seat", links.get(1), "linkID", 1L);
 
-        // One side only: the tag still has to exist, but with a single entry.
+        // The rider names the vehicle as well: the game writes that entry itself, so it has to be expected either way.
         CompoundTag rider = entity("minecraft:pig");
         EntityLinks.link(rider, 42L, null);
         ListTag<CompoundTag, Map<String, Tag<?>>> single = rider.getList("LinksTag", CompoundTag.class, null);
-        require("single link", single != null && single.size() == 1, "expected one entry, got " + single);
+        require("rider link", single != null && single.size() == 1, "expected one entry, got " + single);
+        requireLong("rider ride", single.get(0), "RideID", 42L);
+        requireLong("rider vehicle", single.get(0), "VehicleID", 0L);
 
         // Neither side: nothing is written at all.
         CompoundTag free = entity("minecraft:pig");

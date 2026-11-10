@@ -47,6 +47,35 @@ public final class EngineImpl implements ChunkerEngine {
      */
     public static final String ENGINE_VERSION = "1.21.0";
 
+    /**
+     * Turn LevelDB's memory mapping off on Android.
+     * <p>
+     * LevelDB's mmap path is written against a desktop JDK: {@code MMRandomInputFile} calls
+     * {@code MappedByteBuffer.duplicate()}, {@code MMWritableFile} calls {@code force()} and {@code position()}, and
+     * all of those return {@code MappedByteBuffer} since JDK 13 - the covariant overrides simply do not exist before
+     * Android 13 (API 33). On anything older the first database open dies with
+     * {@code NoSuchMethodError: duplicate()Ljava/nio/MappedByteBuffer;} and no chunk is ever read.
+     * <p>
+     * Patching the individual call sites is not enough: the read path and the write path each need their own
+     * workaround, and the mmap mapping cannot even be released on ART (see {@code ByteBufferSupport}), so repeated
+     * conversions would keep leaking address space. Turning the whole mechanism off routes LevelDB through
+     * {@code FileChannel} instead - one extra copy per block, against a path that works everywhere.
+     * <p>
+     * Desktop keeps mmap: its {@code java.nio} is complete, and the timing figures in the README were measured with
+     * it on.
+     */
+    static {
+        if (isAndroid()) {
+            System.setProperty("leveldb.mmap", "false");
+        }
+    }
+
+    private static boolean isAndroid() {
+        String vendor = System.getProperty("java.vm.vendor", "");
+        String name = System.getProperty("java.vm.name", "");
+        return vendor.contains("Android") || name.toLowerCase(Locale.ROOT).contains("dalvik");
+    }
+
     // Stable codes rather than display text: the app owns the wording, this module only says what phase it is in.
     // The strings are part of the api contract, so they never change; unknown ones are shown verbatim by the app.
     private static final String STAGE_CONVERT = "terrain";

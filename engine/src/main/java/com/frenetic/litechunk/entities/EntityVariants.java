@@ -290,6 +290,27 @@ final class EntityVariants {
     }
 
     /**
+     * Mark a mount as ridden: it has to be saddled and, for the animals that have a wild form, tamed.
+     * <p>
+     * <strong>This is the only way a rider survives on an animal that was not already set up for it.</strong>
+     * Bedrock gives a wild or unsaddled mount no seat at all, so a link written to it is dropped on load and the
+     * rider falls off - Java has no such rule (any entity can be given a passenger), so a Java world can easily hold
+     * a pig riding a horse nobody ever tamed. Turning the mount into a rideable one loses the "was wild" fact, which
+     * is not visible anywhere else, and keeps the thing the player built.
+     *
+     * @param definitions the definition list, modified in place.
+     * @param identifier  the Bedrock identifier, e.g. {@code minecraft:horse}.
+     */
+    static void saddled(List<String> definitions, String identifier) {
+        String group = identifier.startsWith(NAMESPACE) ? identifier.substring(NAMESPACE.length()) : identifier;
+        // The table enables `horse_wild` / `pig_unsaddled` by default, so the off state has to be swapped out rather
+        // than left alongside the on state.
+        replace(definitions, group + "_wild", group + "_tamed");
+        replace(definitions, group + "_unsaddled", group + "_saddled");
+        addGroup(definitions, identifier, group + "_saddled");
+    }
+
+    /**
      * Take a group back off the list.
      * <p>
      * Only the enabled form is removed; no {@code -minecraft:<group>} entry is written. Those appear in real saves

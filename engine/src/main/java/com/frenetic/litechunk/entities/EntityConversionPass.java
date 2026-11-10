@@ -407,7 +407,8 @@ public final class EntityConversionPass {
                 riderIds.add(uniqueIdOf(passenger));
             }
         }
-        // One tag for both directions: an actor can be a passenger and carry passengers at the same time.
+        // Both halves of every relationship, in one tag: an actor can be a passenger and carry passengers at the same
+        // time, and writing them separately replaced the first list with the second.
         EntityLinks.link(actor, vehicleId, riderIds);
 
         EntityLinks.Leash leash = EntityLinks.leash(entity, this::uniqueIdFromUuid);

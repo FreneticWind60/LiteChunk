@@ -72,6 +72,17 @@ tasks.register<JavaExec>("levelTest") {
     notCompatibleWithConfigurationCache("Ad-hoc verification task")
 }
 
+// Checks the Bedrock to Java and Java to Bedrock particle command rewrite in isolation.
+// Usage: gradlew :engine:particleSmoke
+tasks.register<JavaExec>("particleSmoke") {
+    group = "verification"
+    description = "Checks the /particle command rewriting between editions."
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.frenetic.litechunk.commands.ParticleSmoke")
+    notCompatibleWithConfigurationCache("Ad-hoc verification task")
+}
+
 // Checks the reverse entity pieces a converted world cannot exercise on its own (leash, packed fish variant).
 // Usage: gradlew :engine:reverseSmoke
 tasks.register<JavaExec>("reverseSmoke") {
@@ -80,6 +91,17 @@ tasks.register<JavaExec>("reverseSmoke") {
     dependsOn(tasks.named("testClasses"))
     classpath = sourceSets["test"].runtimeClasspath
     mainClass.set("com.frenetic.litechunk.entities.ReverseSmoke")
+    notCompatibleWithConfigurationCache("Ad-hoc verification task")
+}
+
+// Prints the block entities (and their Command field) of a Bedrock world, so command block conversion can be checked
+// without launching the game. Usage: gradlew :engine:blockEntityDump --args="<worldDir>"
+tasks.register<JavaExec>("blockEntityDump") {
+    group = "verification"
+    description = "Prints the block entities stored in a Bedrock world database."
+    dependsOn(tasks.named("testClasses"))
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("com.frenetic.litechunk.engine.BlockEntityDump")
     notCompatibleWithConfigurationCache("Ad-hoc verification task")
 }
 

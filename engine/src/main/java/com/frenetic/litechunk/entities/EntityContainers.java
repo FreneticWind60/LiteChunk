@@ -43,8 +43,12 @@ final class EntityContainers {
                       @Nullable JavaResolvers source, @Nullable BedrockResolvers target) {
         switch (identifier) {
             case "minecraft:chest_minecart", "minecraft:hopper_minecart" -> {
+                // A minecart's inventory is called `ChestItems` on Bedrock, not `Items`. This is not a guess: a world
+                // the game saved itself carries ChestItems on both the chest and the hopper cart, and an actor written
+                // with `Items` comes back from the game with that list dropped entirely - which is why converted chest
+                // minecarts arrived empty.
                 if (source != null && target != null) {
-                    items(actor, javaEntity, source, target);
+                    items(actor, javaEntity, source, target, "ChestItems");
                 }
             }
             case "minecraft:llama", "minecraft:trader_llama", "minecraft:donkey", "minecraft:mule" -> {
@@ -58,7 +62,9 @@ final class EntityContainers {
                     actor.put("Chested", (byte) 1);
                 }
                 if (source != null && target != null) {
-                    items(actor, javaEntity, source, target);
+                    // A chested animal is the one container Bedrock spells `Items`, because its inventory component is
+                    // of the `horse` type rather than one of the minecart ones.
+                    items(actor, javaEntity, source, target, "Items");
                 }
             }
             default -> {
@@ -68,9 +74,16 @@ final class EntityContainers {
     }
 
     /**
-     * Translate the {@code Items} list.
+     * Translate the items list into the field the target container uses.
+     *
+     * @param actor   the actor tag, modified in place.
+     * @param entity  the Java entity NBT.
+     * @param source  resolvers of the Java version that was read.
+     * @param target  resolvers of the Bedrock version being written.
+     * @param field   the Bedrock field name, {@code ChestItems} for a minecart and {@code Items} for an animal.
      */
-    private static void items(CompoundTag actor, CompoundTag entity, JavaResolvers source, BedrockResolvers target) {
+    private static void items(CompoundTag actor, CompoundTag entity, JavaResolvers source, BedrockResolvers target,
+                              String field) {
         ListTag<CompoundTag, Map<String, Tag<?>>> items = entity.getList("Items", CompoundTag.class, null);
         if (items == null || items.size() == 0) {
             return;
@@ -90,7 +103,7 @@ final class EntityContainers {
         }
 
         if (output.size() > 0) {
-            actor.put("Items", output);
+            actor.put(field, output);
         }
     }
 

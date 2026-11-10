@@ -45,10 +45,25 @@ final class EntityLinks {
     }
 
     /**
-     * Record both directions of a mounting relationship on this actor.
+     * Record both halves of a mounting relationship on one actor.
+     * <p>
+     * <strong>The shape is not a guess.</strong> A world written by the game itself, on a boat carrying a pig, saves
+     * the boat as {@code LinksTag:[{RideID:0l, VehicleID:<pig>l}]} and the pig as
+     * {@code LinksTag:[{RideID:<boat>l, VehicleID:0l}]}: {@code RideID} is what this actor rides, {@code VehicleID}
+     * is who rides it, and both ends carry an entry. The same world also stores the pair as
+     * {@code entityID} + {@code linkID} on the vehicle ({@code entityID} = the rider, {@code linkID} = which seat),
+     * which is the older spelling and is still read.
+     * <p>
+     * All of them are written here at once. The two spellings mean the same thing, and a vehicle whose only rider
+     * entry uses the spelling the running version no longer reads is the reason boats, minecarts and horses with
+     * anything sitting on them disappeared: an unresolvable link takes the actor with it.
+     * <p>
+     * Seats are numbered in the order the riders appear in Java's {@code Passengers}, because {@code linkID} is the
+     * only field that distinguishes one seat from another - two riders written with the same one end up stacked in
+     * the same seat.
      *
      * @param actor     the actor tag, modified in place.
-     * @param vehicleId the unique id of what this actor rides, or 0 when it is not a passenger.
+     * @param vehicleId the unique id of what this actor rides, or 0 when it is nobody's passenger.
      * @param riderIds  the unique ids of the actors on top of it, may be null or empty.
      */
     static void link(CompoundTag actor, long vehicleId, @Nullable List<Long> riderIds) {
@@ -60,11 +75,23 @@ final class EntityLinks {
         ListTag<CompoundTag, Map<String, Tag<?>>> links = new ListTag<>(TagType.COMPOUND,
                 riders + (vehicleId != 0L ? 1 : 0));
         if (vehicleId != 0L) {
-            links.add(entry(vehicleId, 0L));
+            // This actor is the passenger: it rides, it does not carry.
+            CompoundTag entry = new CompoundTag(4);
+            entry.put("entityID", vehicleId);
+            entry.put("linkID", 0);
+            entry.put("RideID", vehicleId);
+            entry.put("VehicleID", 0L);
+            links.add(entry);
         }
         if (riderIds != null) {
+            int seat = 0;
             for (long riderId : riderIds) {
-                links.add(entry(0L, riderId));
+                CompoundTag entry = new CompoundTag(4);
+                entry.put("entityID", riderId);
+                entry.put("linkID", seat++);
+                entry.put("RideID", 0L);
+                entry.put("VehicleID", riderId);
+                links.add(entry);
             }
         }
         actor.put("LinksTag", links);
@@ -272,13 +299,6 @@ final class EntityLinks {
         long z() {
             return z;
         }
-    }
-
-    private static CompoundTag entry(long rideId, long vehicleId) {
-        CompoundTag entry = new CompoundTag(2);
-        entry.put("RideID", rideId);
-        entry.put("VehicleID", vehicleId);
-        return entry;
     }
 
     /**

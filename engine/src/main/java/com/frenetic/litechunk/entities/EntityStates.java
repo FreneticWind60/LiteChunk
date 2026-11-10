@@ -70,7 +70,8 @@ final class EntityStates {
             return;
         }
         actor.put("Saddled", (byte) 1);
-        EntityVariants.addGroup(definitions, identifier, bare(identifier) + "_saddled");
+        // A saddle only means something on a tamed animal, and the pack keeps the two states in exclusive groups.
+        EntityVariants.saddled(definitions, identifier);
     }
 
     /**

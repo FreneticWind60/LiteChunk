@@ -1,5 +1,6 @@
 package com.hivemc.chunker.conversion.encoding.java.base.resolver.blockentity.handlers;
 
+import com.frenetic.litechunk.commands.ParticleCommand;
 import com.hivemc.chunker.conversion.encoding.base.resolver.blockentity.BlockEntityHandler;
 import com.hivemc.chunker.conversion.encoding.java.base.resolver.JavaResolvers;
 import com.hivemc.chunker.conversion.intermediate.column.blockentity.CommandBlockEntity;
@@ -29,7 +30,10 @@ public class JavaCommandBlockBlockEntityHandler extends BlockEntityHandler<JavaR
 
     @Override
     public void write(@NotNull JavaResolvers resolvers, @NotNull CompoundTag output, @NotNull CommandBlockEntity value) {
-        output.put("Command", value.getCommand());
+        // Bedrock's /particle takes a name and a position; Java expects a delta, a speed and a count as well, so a
+        // command copied across verbatim is reported as malformed and never spawns anything.
+        String translated = ParticleCommand.toJava(value.getCommand());
+        output.put("Command", translated != null ? translated : value.getCommand());
         output.put("auto", value.isAuto() ? (byte) 1 : (byte) 0);
         output.put("TrackOutput", value.isTrackOutput() ? (byte) 1 : (byte) 0);
 

@@ -1,5 +1,6 @@
 package com.frenetic.litechunk.entities;
 
+import com.frenetic.litechunk.commands.ParticleCommand;
 import com.hivemc.chunker.conversion.encoding.bedrock.base.resolver.BedrockResolvers;
 import com.hivemc.chunker.conversion.encoding.java.base.resolver.JavaResolvers;
 import com.hivemc.chunker.conversion.intermediate.column.chunk.identifier.ChunkerBlockIdentifier;
@@ -37,9 +38,35 @@ final class BedrockActorBuilder {
     private static final String FALLING_BLOCK = "minecraft:falling_block";
     private static final String PRIMED_TNT = "minecraft:tnt";
     private static final String END_CRYSTAL = "minecraft:ender_crystal";
+    private static final String COMMAND_BLOCK_MINECART = "minecraft:command_block_minecart";
 
     /** Vanilla gives a dropped item 5 health; it is destroyed when fire, lava or an explosion takes the last point. */
     private static final short ITEM_HEALTH = 5;
+
+    /**
+     * The largest speed an actor is allowed to keep.
+     * <p>
+     * Java stores {@code Motion} as doubles, Bedrock as floats, and a world with a damaged or hand written entity can
+     * hold a value far past either range: casting {@code -9.6E284} to a float gives {@code -Infinity}, which the game
+     * answers by throwing the actor out of the world. Even a finite but absurd speed is enough - a chest minecart
+     * arriving at 10^250 blocks per tick crashes into everything it passes and breaks, leaving a pile of the items it
+     * was carrying and a minecart drop behind. Ten blocks per tick is above anything vanilla produces (a falling
+     * player is 3.92) and low enough that a corrupted value lands on the floor instead of flying off.
+     */
+    private static final double MAX_SPEED = 10D;
+
+    /** Java's world border, so a broken position lands inside the world rather than out past the far lands. */
+    private static final double MAX_POSITION = 30_000_000D;
+
+    /**
+     * How far above Java's position a minecart has to be written.
+     * <p>
+     * Java puts an entity at its feet, Bedrock puts a minecart at the centre of its 0.7 high collision box. Writing
+     * the feet value leaves the cart 0.35 inside the ground, so the first tick drops it through the block it was
+     * standing on and it comes to rest in the space below - a chest minecart ends up buried in the grass and cannot
+     * be seen or opened. Half the collision box is exactly the missing amount.
+     */
+    private static final double MINECART_LIFT = 0.35D;
 
     private BedrockActorBuilder() {
     }
@@ -150,10 +177,16 @@ final class BedrockActorBuilder {
             actor.put("Fuse", (short) intValue(javaEntity, "fuse", 80));
         } else if (END_CRYSTAL.equals(identifier)) {
             actor.put("ShowBottom", (byte) (isTrue(javaEntity, "ShowBottom") ? 1 : 0));
+        } else if (COMMAND_BLOCK_MINECART.equals(identifier)) {
+            // Bedrock keeps the command on the actor itself, not in a block entity. Dropping it left a minecart that
+            // rolled but never ran anything - which is how a particle command stored in one of these went missing.
+            String command = javaEntity.getString("Command", "");
+            String translated = ParticleCommand.toBedrock(command);
+            actor.put("Command", translated != null ? translated : command);
         }
 
-        actor.put("Pos", vector(javaEntity.getListValues("Pos", DoubleTag.class, null), 3));
-        actor.put("Motion", vector(javaEntity.getListValues("Motion", DoubleTag.class, null), 3));
+        actor.put("Pos", position(javaEntity.getListValues("Pos", DoubleTag.class, null), identifier));
+        actor.put("Motion", motion(javaEntity.getListValues("Motion", DoubleTag.class, null)));
 
         List<Float> rotation = javaEntity.getListValues("Rotation", FloatTag.class, null);
         ListTag<FloatTag, Float> rotationTag = new ListTag<>(TagType.FLOAT, 2);
@@ -224,10 +257,11 @@ final class BedrockActorBuilder {
      */
     private static void finish(CompoundTag actor, CompoundTag javaEntity, long uniqueId) {
         if (!actor.contains("Pos")) {
-            actor.put("Pos", vector(javaEntity.getListValues("Pos", DoubleTag.class, null), 3));
+            actor.put("Pos", position(javaEntity.getListValues("Pos", DoubleTag.class, null),
+                    actor.getString("identifier", "")));
         }
         if (!actor.contains("Motion")) {
-            actor.put("Motion", vector(javaEntity.getListValues("Motion", DoubleTag.class, null), 3));
+            actor.put("Motion", motion(javaEntity.getListValues("Motion", DoubleTag.class, null)));
         }
         if (!actor.contains("Rotation")) {
             List<Float> rotation = javaEntity.getListValues("Rotation", FloatTag.class, null);
@@ -278,12 +312,50 @@ final class BedrockActorBuilder {
     }
 
     /**
-     * Java stores Pos/Motion as doubles, Bedrock as floats.
+     * Java stores Pos as doubles, Bedrock as floats, and a value the float cannot hold becomes an infinity the game
+     * refuses to load the actor with.
+     *
+     * @param values     the Java position.
+     * @param identifier the Bedrock identifier, which decides whether the position needs lifting.
+     * @return the Bedrock position, clamped into the world.
      */
-    private static ListTag<FloatTag, Float> vector(@Nullable List<Double> values, int size) {
-        ListTag<FloatTag, Float> tag = new ListTag<>(TagType.FLOAT, size);
-        for (int index = 0; index < size; index++) {
+    private static ListTag<FloatTag, Float> position(@Nullable List<Double> values, String identifier) {
+        ListTag<FloatTag, Float> tag = vector(values, MAX_POSITION);
+        if (identifier.endsWith("minecart")) {
+            // A minecart is positioned by the centre of its box on Bedrock, so the feet value has to be lifted or the
+            // cart starts inside the ground and drops through it on the first tick.
+            float y = tag.get(1).getValue() + (float) MINECART_LIFT;
+            tag.set(1, new FloatTag(y));
+        }
+        return tag;
+    }
+
+    /**
+     * @param values the Java motion.
+     * @return the Bedrock motion, with anything the game would treat as corrupt levelled to a standstill.
+     */
+    private static ListTag<FloatTag, Float> motion(@Nullable List<Double> values) {
+        return vector(values, MAX_SPEED);
+    }
+
+    /**
+     * Java stores Pos/Motion as doubles, Bedrock as floats.
+     * <p>
+     * A value that is not finite, or larger than {@code limit}, is written as zero instead of being cast: casting a
+     * double past {@link Float#MAX_VALUE} gives an infinity, and the game deletes an actor whose motion or position
+     * cannot be resolved.
+     *
+     * @param values the three Java numbers, may be null or short.
+     * @param limit  the largest magnitude to keep.
+     * @return the Bedrock triple.
+     */
+    private static ListTag<FloatTag, Float> vector(@Nullable List<Double> values, double limit) {
+        ListTag<FloatTag, Float> tag = new ListTag<>(TagType.FLOAT, 3);
+        for (int index = 0; index < 3; index++) {
             double value = values != null && values.size() > index ? values.get(index) : 0D;
+            if (!Double.isFinite(value) || Math.abs(value) > limit) {
+                value = 0D;
+            }
             tag.add(new FloatTag((float) value));
         }
         return tag;

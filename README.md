@@ -338,15 +338,25 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
       基岩没有对应字段，丢弃。
     - **热带鱼**：`Variant` 打包整数拆成 `Color` / `Color2` / `MarkVariant`。
     - **拴绳与乘客**：`leash` → `LeasherID`（持有者的 `UniqueID`）；Java 嵌在载具 `Passengers` 里的骑手会被
-      拆成独立 actor，两边用 `LinksTag` 连起来——两个方向写在同一个列表里，否则「既骑又载」的实体会丢掉
-      `RideID`。为此 actor 的 `UniqueID` 改为由实体 UUID 派生（splitmix64），否则载具与骑手在不同 region、
-      并行转换时对不上号。拴在栅栏上的绳子另说：1.21 起 Java 把栅栏的**方块坐标直接写在动物身上**
+      拆成独立 actor，两端各带一条 `LinksTag`——载具写 `{entityID, linkID, RideID:0, VehicleID:<骑手>}`，骑手写
+      `{RideID:<载具>, VehicleID:0}`。这个形状不是推导出来的：拿一台真机把转换后的世界进游戏、退出保存，
+      游戏自己写回来的就是这两对字段（`RideID` = 我骑谁，`VehicleID` = 谁骑我），所以两套拼写都写上。
+      `linkID` 是座位号，按 Java `Passengers` 的顺序编号——两个乘客写成同一个号，进游戏就会叠在一个座位上。
+      鞍与驯服状态只按 Java 的实际情况写：**基岩的 `minecraft:rideable` 在马上写的是 `family_types: ["player"]`**
+      （猪、骆驼、驴、骡同样），所以「猪骑野马」这类 Java 才有的组合在基岩没有座位，补鞍补驯服也换不来，
+      骑手会站到旁边——这不是转换丢了，是对面不支持。两端能各自算出对方的 id，
+      是因为 actor 的 `UniqueID` 由实体 UUID 派生（splitmix64），载具与骑手在不同 region、并行转换时也对得上号。
+      拴在栅栏上的绳子另说：1.21 起 Java 把栅栏的**方块坐标直接写在动物身上**
       （`leash:[I;x,y,z]` 加 `home_pos`/`home_radius`），存档里根本没有绳结实体，所以直接翻成基岩的
       `hasBoundOrigin` + `boundX/Y/Z`；更早的版本是指向绳结实体的 UUID，那种世界才会先扫一遍全世界定位绳结。
       但实测发现基岩那边**不认这三个键**：它要求栅栏处有一个独立的绳结 actor（`identifier: minecraft:leash_knot`，
       `definitions` 为空，`Pos` 在方块中心上方 0.25 格），动物用 `LeasherID` 指向它的 `UniqueID`。所以转换时会按
       方块坐标哈希出一个绳结 id，并在栅栏所在列补写这个 actor（那一列常常没有别的实体，digp 要单独合并）。
       `NoAI` 不转换：试过原样写进 actor，进游戏无效，基岩没有等价开关。
+    - **容器**：矿车的物品写进 `ChestItems`（游戏自己的存档就是这么存的，写成 `Items` 会被整份丢掉，箱子矿车
+      过去就是空的）；带箱的驴、骡、羊驼用 `Items`，并补 `Chested`。矿车的 `Pos` 还要抬高 0.35 格：Java 记的是
+      脚底，基岩把矿车定在 0.7 高碰撞盒的中心，原样写进去第一 tick 就会掉穿脚下的方块，箱子矿车埋进草方块里
+      既看不见也打不开。
     - **画与展示框**交给引擎自己的处理器（需要 Motif、朝向、挂靠方块与半格偏移，通用形状表达不了）。
     - 引擎侧的改动只有五处（编排、实体写入门控、api 默认方法、两个 resolver 访问器）。
 
@@ -371,12 +381,32 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
     - **拴绳**：`LeasherID` 哈希成 UUID 写进 `leash`（1.20.5+）或 `Leash`，和那条实体自己写出的 UUID 相同，
       所以绳子挂得上；玩家拴的挂不上，因为玩家 UUID 推不出来。
     - **乘客**：读取时在同一列里按 `LinksTag` 把骑手配给载具并从列里移走，写出时嵌进 `Passengers`
-      （栈式骑乘会递归，最多 8 层）。
+      （栈式骑乘会递归，最多 8 层）。方向从字段读，不靠猜：`VehicleID` 非零表示「我载着它」，`RideID` 非零表示
+      「我骑着它」，两个都没有才按旧的 `entityID` 当作骑手。两端都带链接的存档必须这么判，否则会把载具认成乘客、
+      连成一圈。**只有被载具点名的骑手才会被移出列**：单边链接、跨区块边界的骑手都保留为普通实体——丢掉挂接
+      可以重来，丢掉实体不行。
     - **还没做的**：拴绳结、跨区块边界的骑手（会以普通实体出现，位置对但没骑上），以及只存在于基岩、没有
       任何方块数据的列——引擎遍历列时会跳过它们，这类列里的实体会在转回 Java 时消失。
     - 引擎侧的改动只有三处：`Entity` 加 `sourceResolvers` 与 `passengers` 两个字段、
       `BedrockColumnReader`（保留原始 NBT 并在列内配对乘客）、`JavaEntityResolver.from` 增加一条分支；
       其余全在新的 `entities/Java*.java` 里。
+
+21. 粒子命令（`/particle`）在写出时重写：两边的粒子名是**完全不同的词表**（Java 的 `flame` 是基岩的
+    `basic_flame_particle`，`totem_of_undying` 是 `totem_particle`），命令语法也不一样——Java 是
+    `particle <name> <pos> <delta> <speed> <count> [force|normal]`，基岩只有 `particle <id> [x y z]`。原样搬运的
+    结果是基岩把整条命令判为非法，命令方块照常存在但不再产出任何东西，看起来就是「粒子丢了」。
+    - **只动 `particle` 这一条命令**：命令方块写出时按目标版本重写 `Command` 字段，名字查映射表，Java 那边
+      多出来的 `delta` / `speed` / `count` / `force` / `viewers` 全部丢掉（基岩没有这些参数）。
+    - **`execute ... run particle` 也处理**：前缀原样保留，只重写 `run` 之后的部分。两边的 `execute` 语法本身
+      也有差异，改它只会把失败点挪到更难看见的地方；转换不了就整条不动。
+    - **映射表只收语义相同的粒子**。基岩没有对应物的（`ash`、`crimson_spore` 这类跟着生物群系渲的颗粒，
+      以及 `item_slime`、`item_cobweb` 这种只有 Java 有的）故意不映射，命令保持原样——变成「看起来不对的
+      粒子」比「什么都不发生」更难排查。表在 `commands/ParticleIds`，约 110 对。
+    - **1.20.5 前后两种选项写法都认**：新的 `dust{color:[1,0,0],scale:1}` 和旧的 `dust 1 0 0 1`，前者选项粘在
+      名字上，后者是独立参数，跳过数量不同。
+    - 验证：`gradlew :engine:particleSmoke` 覆盖双向 12 个用例；再用一个真的命令方块世界走完整链路
+      （`gradlew :engine:blockEntityDump` 查基岩库里的 `Command` 字段），
+      `particle minecraft:flame ~ ~1 ~ 0.1 0.1 0.1 0.05 20` → `particle minecraft:basic_flame_particle ~ ~1 ~`。
 
 ## 运行时设计
 
@@ -388,7 +418,14 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
   上限是 2 而不是 8：同一世界 8 线程实测比 2 线程更慢，线程越多 GC 压力越大。
   首次失败若是 OOM，自动降 1 线程 + 精简模式重试一次。
 - **进度**：200ms 轮询 + `ResultReceiver` 回传，前台服务通知同步。
-- **文件**：世界先解压 / 复制成 `cacheDir/flush/` 下的真实文件（LevelDB 需要 mmap，不能直接读写 SAF 路径），
+- **LevelDB 在 Android 上不用 mmap**：这个库的 mmap 实现是照着桌面 JDK 写的——`MMRandomInputFile` 调
+  `MappedByteBuffer.duplicate()`，`MMWritableFile` 调 `force()` 和 `position()`，而这些方法的协变返回类型
+  （返回 `MappedByteBuffer` 而不是 `Buffer`）是 **JDK 13** 才加的，Android 到 13（API 33）才有。之前的版本在
+  Android 12 及以下会直接抛 `NoSuchMethodError: duplicate()Ljava/nio/MappedByteBuffer;`，一个区块都读不到，
+  转换在打开存档库的那一刻就失败。`EngineImpl` 的静态块在 Android 上设 `leveldb.mmap=false`，`LiteChunkApp`
+  再设一次兜底（`:chunker` 进程同样会走 `Application.onCreate`），LevelDB 改走 `FileChannel`。
+  桌面保持 mmap，下面所有耗时数字都是在 mmap 下测的。
+- **文件**：世界先解压 / 复制成 `cacheDir/flush/` 下的真实文件（LevelDB 只能按路径打开，不能直接读写 SAF 路径），
   输出打包成 `.zip` / `.mcworld` 放进 `output/`，再由 SAF `CreateDocument` 导出副本。
 - **暂存与复用**：识别与转换都需要解压后的世界，所以暂存目录按队列项命名（`stage-<id>`）而不是匿名 `job-*`。
   识别完不再删除，转换时直接复用——同一个世界以前要解压两遍，现在第二遍是 0 秒（日志里 `read=0.0s(staged)`）。
@@ -410,11 +447,20 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
   旧客户端打不开，属预期。
 - 转换在 `:chunker` 进程中进行，App 被划掉后任务会继续；重启 App 不恢复进度（成品仍在 `output/`）。
 - **实体转换仍是「尽量还原」而非逐字节等价**。Java → 基岩：村民只还原职业、等级与生物群系，交易清单交给
-  游戏重新生成；拴绳的 `LinksTag` 极性与 `LeasherID` 的语义、箱子矿车与羊驼的**箱内物品**格式目前是推断的，
-  还没有拿真实样本在游戏里核对过。基岩 → Java：装备、坐骑装备、项圈颜色、坐下、村民职业等级、变体、
+  游戏重新生成；骑乘的 `LinksTag` 现已按**游戏自己保存出来的格式**写（两端各一条，`RideID` / `VehicleID` 与
+  `entityID` / `linkID` 并存）；矿车的箱内物品写进 `ChestItems`（游戏自己的存档就是这么存的，写在 `Items` 会被
+  整份丢掉），带箱的驴与羊驼仍是 `Items`。**生物骑生物在基岩只能还原一半**：船、矿车、鸡、蜘蛛这类
+  `rideable` 放开了 `family_types` 的组合能保住，而马、猪、骆驼、驴的座位只认玩家，Java 里「猪骑野马」过去后
+  骑手会站到旁边。基岩 → Java：装备、坐骑装备、项圈颜色、坐下、村民职业等级、变体、
   容器内容、拴绳与乘客都会跟着走，但**跨区块边界的骑手不会配对**（会变成同一位置的两个实体），
-  玩家拴的绳子挂不上；J→B 时写进「没有任何方块的列」的实体，转回 Java 时会消失（真实存档不会出现这种列）。
-  两个方向的实体记录本身都不是逐字节确定的，两次转换的输出在实体顺序上就会有差异（区块数据是一致的）。
+  玩家拴的绳子挂不上；J→B 时写进「没有任何方块的列」的实体，转回 Java 时会消失
+  （真实存档不会出现这种列）。速度或坐标超出浮点范围的实体（作弊、损坏的存档）会被归零，否则基岩会把 actor
+  当成无效数据丢掉，或让它以天文数字的速度撞碎在地上。两个方向的实体记录本身都不是逐字节确定的，两次转换的
+  输出在实体顺序上就会有差异（区块数据是一致的）。
+- **粒子只在命令的载体里被重写**。存档本身不存粒子（Java 的粒子是客户端代码，基岩的是资源包定义），能被转换的
+  只有存着 `/particle` 的那条命令——普通命令方块与命令方块矿车（后者的命令写在 actor 上，以前整条丢掉了）。
+  数据包或函数文件里的粒子不随存档转换；没有映射的粒子（`ash`、`crimson_spore`、`item_slime` 等）命令保持原样，
+  进游戏会报参数错误，至少能看出是哪一条没转。
 - 常亮 + 唤醒锁解决的是「灭屏后被挂起」，**不是厂商的强制冻结**。部分 ROM 在极低电量或长时间无交互时
   仍会冻结后台进程，白名单引导只是一个引导，能不能免疫取决于系统。
 - 关掉 LevelDB 尾部 compaction 后，中间 `.ldb` 是未压缩的，`db/` 目录会比上游大；打包成 `.mcworld` 后回落。
