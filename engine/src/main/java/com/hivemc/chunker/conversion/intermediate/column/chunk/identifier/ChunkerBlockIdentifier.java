@@ -285,7 +285,7 @@ public class ChunkerBlockIdentifier implements ChunkerItemStackIdentifier {
         }
         StringBuilder builder = new StringBuilder();
         for (Map.Entry<BlockState<?>, BlockStateValue> entry : states.entrySet()) {
-            if (!builder.isEmpty()) {
+            if (builder.length() != 0) {
                 builder.append(",");
             }
             builder.append(entry.getKey().getName()).append("=").append(entry.getValue());

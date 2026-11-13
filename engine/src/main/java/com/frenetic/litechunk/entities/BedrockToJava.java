@@ -76,7 +76,13 @@ public final class BedrockToJava {
             return null;
         }
 
-        Optional<String> id = target.entityTypeResolver().from(entity.getEntityType());
+        // The NPC is implemented in C++, so it has no entity definition for the engine to resolve. Java's nearest
+        // equivalent is the mannequin: both are a static player-shaped prop. Only the position, rotation and name
+        // survive the round trip - the NPC's skin comes from a fixed list of sixty textures with no Java counterpart.
+        boolean npc = "minecraft:npc".equals(actor.getString("identifier", null));
+        Optional<String> id = npc
+                ? Optional.of("minecraft:mannequin")
+                : target.entityTypeResolver().from(entity.getEntityType());
         if (id.isEmpty()) {
             // A Bedrock type with no Java counterpart (an education edition mob, a custom identifier).
             return null;
@@ -87,6 +93,13 @@ public final class BedrockToJava {
         CompoundTag javaEntity = new CompoundTag(16);
         javaEntity.put("id", id.get());
         javaEntity.put("UUID", uuid(uniqueId(entity, actor)));
+
+        if (npc) {
+            // `profile` is what carries the skin in Java; empty means the default one, which is all we can offer.
+            javaEntity.put("profile", new CompoundTag(0));
+            javaEntity.put("pose", "standing");
+            javaEntity.put("main_hand", "right");
+        }
 
         writePosition(javaEntity, entity);
         health(javaEntity, actor);

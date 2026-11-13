@@ -71,12 +71,34 @@ public final class EntityTableTest {
         requireSkipped("falling block without resolvers", "minecraft:falling_block");
 
         variants();
+        boats();
         equipmentSlots();
         template();
         trades();
         links();
 
         System.out.println("entity table: OK");
+    }
+
+    /**
+     * Boats: Java has one entity id per wood, Bedrock one id and a {@code Variant} number.
+     * <p>
+     * Before this the id table collapsed every wood onto {@code minecraft:boat}, so a cherry or bamboo boat arrived
+     * as an oak one, and the two Java rafts ({@code bamboo_raft}, {@code bamboo_chest_raft}) were not in the table at
+     * all and kept an id Bedrock does not know - they vanished.
+     */
+    private static void boats() throws Exception {
+        requireValue("oak boat", actor(entity("minecraft:oak_boat")), "Variant", 0);
+        requireValue("spruce boat", actor(entity("minecraft:spruce_boat")), "Variant", 1);
+        requireValue("bamboo raft", actor(entity("minecraft:bamboo_raft")), "Variant", 7);
+        requireValue("cherry chest boat", actor(entity("minecraft:cherry_chest_boat")), "Variant", 8);
+        requireValue("poplar boat", actor(entity("minecraft:poplar_boat")), "Variant", 10);
+
+        CompoundTag raft = actor(entity("minecraft:bamboo_chest_raft"));
+        if (!"minecraft:chest_boat".equals(raft.getString("identifier", null))) {
+            throw new IllegalStateException("bamboo chest raft kept the wrong id: "
+                    + raft.getString("identifier", null));
+        }
     }
 
     /**

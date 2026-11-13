@@ -206,6 +206,9 @@ public final class EngineImpl implements ChunkerEngine {
         // writes Bedrock records for now) or a user who asked for entities to be skipped entirely. Leaving it on for a
         // Bedrock target would write an empty digp record on every column, which the second pass would then replace.
         converter.setProcessEntities((options == null || options.entities()) && !entityPass);
+        // Item frames and glow item frames are blocks on Bedrock, and the block entity handler needs the entity in the
+        // column to place them. Reading them is cheap; writing stays with the second pass.
+        converter.setReadEntitiesForBlocks(entityPass);
 
         // Must come after setWorkerThreads: that call derives the three budgets from the thread count and would
         // overwrite anything set before it.

@@ -385,6 +385,13 @@ public final class EntityConversionPass {
             return;
         }
 
+        // Item frames are blocks on Bedrock, not actors. The column writer places them (the frame entity is read into
+        // the column for exactly that reason), so writing an actor here would add a second, unknown entity on top.
+        String javaId = entity.getString("id", "");
+        if ("minecraft:item_frame".equals(javaId) || "minecraft:glow_item_frame".equals(javaId)) {
+            return;
+        }
+
         long uniqueId = uniqueIdOf(entity);
         CompoundTag actor;
         try {

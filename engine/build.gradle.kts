@@ -209,13 +209,13 @@ val patchedDepsDir = layout.buildDirectory.dir("patched")
  * Used to remove leveldb's desktop-only ByteBufferSupport so the Android replacement (engine/src/main/java) is the only
  * definition R8 sees.
  */
-fun repackJar(source: File, target: File, excludeEntry: String) {
+fun repackJar(source: File, target: File, vararg excludeEntries: String) {
     target.parentFile?.mkdirs()
     ZipInputStream(BufferedInputStream(FileInputStream(source))).use { input ->
         ZipOutputStream(BufferedOutputStream(FileOutputStream(target))).use { output ->
             var entry = input.nextEntry
             while (entry != null) {
-                if (entry.name != excludeEntry) {
+                if (entry.name !in excludeEntries) {
                     output.putNextEntry(ZipEntry(entry.name))
                     if (!entry.isDirectory) {
                         input.copyTo(output)
@@ -273,8 +273,12 @@ val engineDex = tasks.register<JavaExec>("engineDex") {
                     return@map jar
                 }
                 val patched = File(patchDir, jar.name)
-                repackJar(jar, patched, "org/iq80/leveldb/fileenv/ByteBufferSupport.class")
-                logger.lifecycle("engineDex: patched ${jar.name} (ByteBufferSupport -> Android replacement)")
+                repackJar(
+                    jar, patched,
+                    "org/iq80/leveldb/fileenv/ByteBufferSupport.class",
+                    "org/iq80/leveldb/util/ZLib.class",
+                )
+                logger.lifecycle("engineDex: patched ${jar.name} (ByteBufferSupport + ZLib -> Android replacements)")
                 patched
             }
 

@@ -154,7 +154,7 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（
 索引是**无状态**的 `quotes[elapsedSeconds / 7 % n]`。`renderInternal` 由 180ms 一次的进度回调驱动，
 若用计数器递增，一轮 60 条会在 12 秒内放完。所以 t=3 是第 1 条、t=9 第 2 条、t=54 第 8 条。
 
-pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、LiteChunk 剪影两个图案一起移除）：它和转换
+pr5 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、LiteChunk 剪影两个图案一起移除）：它和转换
 抢同一个 CPU 与内存带宽，而这一版的方向恰恰是让转换吃满 CPU，留一个会拖慢自己的入口没有意义。
 
 ### 文件页
@@ -358,6 +358,9 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
       脚底，基岩把矿车定在 0.7 高碰撞盒的中心，原样写进去第一 tick 就会掉穿脚下的方块，箱子矿车埋进草方块里
       既看不见也打不开。
     - **画与展示框**交给引擎自己的处理器（需要 Motif、朝向、挂靠方块与半格偏移，通用形状表达不了）。
+      展示框在基岩是**方块 + 方块实体**，不是 actor：实体那一遍会跳过它们，改由列写入前的
+      `shouldRemoveBeforeWrite` 放下方块并附上方块实体。为此 `Converter` 加了
+      `shouldReadEntitiesForBlocks()`——第二遍接管实体时仍然让列读取实体，否则展示框进不了列。
     - 引擎侧的改动只有五处（编排、实体写入门控、api 默认方法、两个 resolver 访问器）。
 
 20. 反向实体转换（基岩 → Java）：这条方向不走第二遍，而是借引擎自己的实体链路。基岩侧只给画、展示框、
@@ -425,6 +428,16 @@ pr6 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
   转换在打开存档库的那一刻就失败。`EngineImpl` 的静态块在 Android 上设 `leveldb.mmap=false`，`LiteChunkApp`
   再设一次兜底（`:chunker` 进程同样会走 `Application.onCreate`），LevelDB 改走 `FileChannel`。
   桌面保持 mmap，下面所有耗时数字都是在 mmap 下测的。
+- **引擎不能调用 Android 13 之后才有的 `java.*` 方法**。R8 会把 `List.of` / `Set.of` / `Map.of` 这类 Java 9 的
+  工厂方法降级成 Guava 或 `Arrays.asList`，但**不会**处理 `List.toArray(IntFunction)`（Java 11）、
+  `Stream.toList()`（Java 16）、`String.formatted()`（Java 15）、`StringBuilder.isEmpty()`（Java 15）和
+  `Inflater.setInput(ByteBuffer)`（Java 11）——这些在 API 33 之前都不存在，一调到就 `NoSuchMethodError`，
+  而且异常会被任务调度器盖成一句 `Unable to free task which has not started`，完全看不出原因。
+  现在这些调用全部换成了 Java 8 的写法；`org.iq80.leveldb.util.ZLib` 是 leveldb jar 里唯一走
+  `Inflater`/`Deflater` 的 ByteBuffer 重载的类，所以和 `ByteBufferSupport` 一样在打包时被剔除，换成
+  `engine/src/main/java` 下的同包实现（见 `engineDex` 里的 `repackJar`）。
+  校验方式是拿 dex 与装好的 API 27 平台库逐条比对方法引用，当前只剩两条：Guava 里被 try/catch 兜住的
+  `findVarHandle`，以及 mmap 关闭后不会执行的 `MappedByteBuffer.duplicate()`。
 - **文件**：世界先解压 / 复制成 `cacheDir/flush/` 下的真实文件（LevelDB 只能按路径打开，不能直接读写 SAF 路径），
   输出打包成 `.zip` / `.mcworld` 放进 `output/`，再由 SAF `CreateDocument` 导出副本。
 - **暂存与复用**：识别与转换都需要解压后的世界，所以暂存目录按队列项命名（`stage-<id>`）而不是匿名 `job-*`。

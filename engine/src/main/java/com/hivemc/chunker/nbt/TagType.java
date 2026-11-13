@@ -109,6 +109,6 @@ public class TagType<T extends Tag<U>, U> {
      * @return a new array of the values.
      */
     public static TagType<?, ?>[] values() {
-        return VALUES.toArray(TagType[]::new);
+        return VALUES.toArray(new TagType[0]);
     }
 }

@@ -118,7 +118,7 @@ public class MCAReader implements AutoCloseable {
         }
 
         if (chunkLength < 0) {
-            throw new IOException("Invalid column length %d for %s".formatted(chunkLength, columnCoordPair));
+            throw new IOException(String.format("Invalid column length %d for %s", chunkLength, columnCoordPair));
         }
 
         // Read, inflate and parse in one go on the calling worker: the payload lives in a per-thread buffer, so it
@@ -193,7 +193,7 @@ public class MCAReader implements AutoCloseable {
                 }
             };
         } catch (Exception e) {
-            throw new IOException("Failed to decompress column %s inside %s".formatted(chunkCoordPair, chunkCoordPair.getRegion()), e);
+            throw new IOException(String.format("Failed to decompress column %s inside %s", chunkCoordPair, chunkCoordPair.getRegion()), e);
         }
     }
 

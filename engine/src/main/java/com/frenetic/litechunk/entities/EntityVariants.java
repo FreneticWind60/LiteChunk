@@ -88,8 +88,7 @@ final class EntityVariants {
             case "minecraft:wolf" -> named(actor, identifier, javaEntity, definitions,
                     name(javaEntity, "variant"), suffix -> "wolf_" + suffix);
             case "minecraft:fox" -> fox(actor, identifier, javaEntity, definitions);
-            case "minecraft:rabbit" -> indexed(actor, identifier, javaEntity, definitions,
-                    "RabbitType", RABBIT_COATS, "coat_");
+            case "minecraft:rabbit" -> rabbit(actor, identifier, javaEntity, definitions);
             case "minecraft:parrot" -> indexed(actor, identifier, javaEntity, definitions,
                     "Variant", PARROT_COLOURS, "parrot_");
             case "minecraft:llama", "minecraft:trader_llama" -> indexed(actor, identifier, javaEntity, definitions,
@@ -99,11 +98,112 @@ final class EntityVariants {
             case "minecraft:panda" -> panda(actor, identifier, javaEntity, definitions);
             case "minecraft:shulker" -> shulker(actor, identifier, javaEntity, definitions);
             case "minecraft:frog" -> frog(actor, identifier, javaEntity, definitions);
+            case "minecraft:slime", "minecraft:magma_cube" -> slime(actor, identifier, javaEntity, definitions);
+            case "minecraft:boat", "minecraft:chest_boat" -> boat(actor, javaEntity);
             case "minecraft:tropicalfish" -> tropicalFish(actor, javaEntity);
             default -> {
                 // Not covered yet: villagers (their job is a group of its own, see EntityStates), slimes and the like.
             }
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Rabbit
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Rabbit coat and age.
+     * <p>
+     * The rabbit is the one entity whose component groups are spelled without a namespace in the behaviour pack
+     * ({@code coat_brown}, {@code adult}, {@code baby}), so both entries have to be written raw. A namespaced entry
+     * does not resolve, which left every converted baby rabbit full sized and made the coat depend on the integer
+     * alone.
+     *
+     * @param actor       the actor tag being built, modified in place.
+     * @param identifier  the Bedrock identifier.
+     * @param entity      the Java entity NBT.
+     * @param definitions the definition list being built, modified in place.
+     */
+    private static void rabbit(CompoundTag actor, String identifier, CompoundTag entity, List<String> definitions) {
+        int type = intValue(entity, "RabbitType", 0);
+        // 99 is the killer rabbit, which has no coat of its own.
+        if (type >= 0 && type < RABBIT_COATS.length) {
+            String group = "coat_" + RABBIT_COATS[type];
+            EntityGroupTable.VariantValue value = EntityGroupTable.variant(identifier, group);
+            if (value != null) {
+                actor.put(value.actorKey(), value.value());
+                addRawGroup(definitions, group);
+            }
+        }
+        addRawGroup(definitions, intValue(entity, "IsBaby", 0) != 0 ? "baby" : "adult");
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Slimes
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Slime and magma cube size.
+     * <p>
+     * Java stores a diameter in {@code Size} using 1/2/4 for small/medium/large (0 only exists for the potion-made
+     * tiny slime). Bedrock keeps the same numbers in {@code Variant} and switches its hitbox and loot groups on them -
+     * the pack declares {@code slime_small: 1}, {@code slime_medium: 2}, {@code slime_large: 4}. Without this every
+     * converted slime came out the default size.
+     *
+     * @param actor       the actor tag being built, modified in place.
+     * @param identifier  the Bedrock identifier.
+     * @param entity      the Java entity NBT.
+     * @param definitions the definition list being built, modified in place.
+     */
+    private static void slime(CompoundTag actor, String identifier, CompoundTag entity, List<String> definitions) {
+        int size = intValue(entity, "Size", 1);
+        int variant = size <= 1 ? 1 : size == 2 ? 2 : 4;
+        String group = variant == 1 ? "slime_small" : variant == 2 ? "slime_medium" : "slime_large";
+        if (!addVariant(actor, identifier, definitions, group)) {
+            actor.put("Variant", variant);
+        }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Boats
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Boat wood types, in the order Bedrock numbers them in {@code Variant}.
+     * <p>
+     * Java has one entity id per wood ({@code minecraft:spruce_boat}, {@code minecraft:bamboo_raft}, ...) while
+     * Bedrock has a single {@code minecraft:boat} with an integer. The bamboo slot is not a guess: the behaviour pack
+     * branches its rideable component on {@code is_variant != 7} to decide whether a passenger may stand on it, and
+     * only the raft rejects that. The three after it follow the order the woods were added to the game.
+     */
+    private static final String[] BOAT_WOODS = {
+            "oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "bamboo", "cherry", "pale_oak",
+            "poplar"
+    };
+
+    /**
+     * Translate the wood type of Java's per-wood boat into Bedrock's {@code Variant}.
+     *
+     * @param actor  the actor tag being built, modified in place.
+     * @param entity the Java entity NBT, whose id carries the wood.
+     */
+    private static void boat(CompoundTag actor, CompoundTag entity) {
+        String id = entity.getString("id", "");
+        if (id == null) {
+            return;
+        }
+        String name = id.startsWith(NAMESPACE) ? id.substring(NAMESPACE.length()) : id;
+
+        // Both spellings exist in Java: `<wood>_boat` / `<wood>_chest_boat`, and the two rafts.
+        String wood = name.replace("_chest_boat", "").replace("_boat", "").replace("bamboo_raft", "bamboo")
+                .replace("bamboo_chest_raft", "bamboo");
+        for (int index = 0; index < BOAT_WOODS.length; index++) {
+            if (BOAT_WOODS[index].equals(wood)) {
+                actor.put("Variant", index);
+                return;
+            }
+        }
+        // Unknown wood (a modded boat): leave the variant alone and let the game pick the default.
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -273,6 +373,19 @@ final class EntityVariants {
         }
         addGroup(definitions, identifier, group);
         return true;
+    }
+
+    /**
+     * Add a group that the behaviour pack does not namespace.
+     *
+     * @param definitions the definition list being built, modified in place.
+     * @param group       the group name as the pack spells it, e.g. {@code baby}.
+     */
+    static void addRawGroup(List<String> definitions, String group) {
+        String entry = "+" + group;
+        if (!definitions.contains(entry)) {
+            definitions.add(entry);
+        }
     }
 
     /**

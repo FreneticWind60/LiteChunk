@@ -5,10 +5,12 @@ import com.hivemc.chunker.conversion.encoding.bedrock.base.resolver.BedrockResol
 import com.hivemc.chunker.conversion.encoding.java.base.resolver.JavaResolvers;
 import com.hivemc.chunker.conversion.intermediate.column.chunk.identifier.ChunkerBlockIdentifier;
 import com.hivemc.chunker.nbt.TagType;
+import com.hivemc.chunker.nbt.tags.Tag;
 import com.hivemc.chunker.nbt.tags.collection.CompoundTag;
 import com.hivemc.chunker.nbt.tags.collection.ListTag;
 import com.hivemc.chunker.nbt.tags.primitive.DoubleTag;
 import com.hivemc.chunker.nbt.tags.primitive.FloatTag;
+import com.hivemc.chunker.nbt.tags.primitive.StringTag;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -39,6 +41,7 @@ final class BedrockActorBuilder {
     private static final String PRIMED_TNT = "minecraft:tnt";
     private static final String END_CRYSTAL = "minecraft:ender_crystal";
     private static final String COMMAND_BLOCK_MINECART = "minecraft:command_block_minecart";
+    private static final String NPC = "minecraft:npc";
 
     /** Vanilla gives a dropped item 5 health; it is destroyed when fire, lava or an explosion takes the last point. */
     private static final short ITEM_HEALTH = 5;
@@ -171,6 +174,16 @@ final class BedrockActorBuilder {
                 return null;
             }
             actor.put("FallingBlock", falling);
+            // Bedrock deletes the actor on the tick `Time` goes from 0 to 1 if the block under it does not match
+            // `FallingBlock`, so a piece hovering in a display case vanished immediately. Java marks "never expire"
+            // with a negative value; starting at 1 skips the check entirely.
+            actor.put("Time", (byte) 1);
+        } else if (NPC.equals(identifier)) {
+            // A Java mannequin arrives here. The skin is an index into a closed list of sixty textures
+            // (`Array.skins[query.skin_id]` in controller.render.npc), so the player skin it used in Java cannot
+            // follow; the first skin at least keeps a body in the room. Everything else - position, rotation, name -
+            // still comes from the shared template.
+            actor.put("SkinID", 0);
         } else if (PRIMED_TNT.equals(identifier)) {
             // Java stores the countdown as `fuse`, Bedrock as `Fuse`. Keep it, otherwise every converted piece of
             // lit TNT restarts its countdown and burns for the full eighty ticks.
@@ -222,7 +235,18 @@ final class BedrockActorBuilder {
         if (source == null || target == null) {
             return null;
         }
-        CompoundTag state = entity.getCompound("BlockState", null);
+        // Three shapes exist. 1.26 stores a block state string ("minecraft:oak_log[axis=y]"), 1.20.2 to 1.21.x a
+        // compound {Name, Properties}, and anything older only the bare block id under `Block`. Reading only the
+        // compound threw ClassCastException on 1.26 and the whole falling block was dropped.
+        Tag<?> raw = entity.get("BlockState");
+        CompoundTag state;
+        if (raw instanceof CompoundTag compound) {
+            state = compound;
+        } else if (raw instanceof StringTag text) {
+            state = parseBlockState(text.getValue());
+        } else {
+            state = null;
+        }
         if (state == null) {
             String name = entity.getString("Block", null);
             if (name == null) {
@@ -236,6 +260,44 @@ final class BedrockActorBuilder {
             return null;
         }
         return target.writeBlock(block).compoundTag();
+    }
+
+    /**
+     * Parse a Java block state string into the compound the resolvers take.
+     *
+     * @param text e.g. {@code minecraft:oak_log[axis=y]}.
+     * @return the {@code {Name, Properties}} form, or null when the text is empty.
+     */
+    @Nullable
+    private static CompoundTag parseBlockState(@Nullable String text) {
+        if (text == null || text.isEmpty()) {
+            return null;
+        }
+        String name = text;
+        CompoundTag properties = null;
+
+        int open = text.indexOf('[');
+        if (open > 0 && text.endsWith("]")) {
+            name = text.substring(0, open);
+            String body = text.substring(open + 1, text.length() - 1);
+            for (String pair : body.split(",")) {
+                int equals = pair.indexOf('=');
+                if (equals <= 0) {
+                    continue;
+                }
+                if (properties == null) {
+                    properties = new CompoundTag(4);
+                }
+                properties.put(pair.substring(0, equals).trim(), pair.substring(equals + 1).trim());
+            }
+        }
+
+        CompoundTag state = new CompoundTag(properties == null ? 1 : 2);
+        state.put("Name", name);
+        if (properties != null) {
+            state.put("Properties", properties);
+        }
+        return state;
     }
 
     /**
@@ -256,6 +318,12 @@ final class BedrockActorBuilder {
      * @param uniqueId   the id to assign.
      */
     private static void finish(CompoundTag actor, CompoundTag javaEntity, long uniqueId) {
+        if (actor.contains("FallingBlock") && !actor.contains("Time")) {
+            // Bedrock counts the entity's age in `Time` and deletes it on the tick it goes from 0 to 1 when the block
+            // under it does not match `FallingBlock` - an exhibit piece floating in a glass case disappears on the
+            // very first tick. Java marks "never expire" with a negative value; starting at 1 skips that check.
+            actor.put("Time", (byte) 1);
+        }
         if (!actor.contains("Pos")) {
             actor.put("Pos", position(javaEntity.getListValues("Pos", DoubleTag.class, null),
                     actor.getString("identifier", "")));

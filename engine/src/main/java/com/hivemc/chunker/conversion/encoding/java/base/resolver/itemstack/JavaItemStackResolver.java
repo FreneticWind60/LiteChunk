@@ -662,13 +662,13 @@ public class JavaItemStackResolver extends ItemStackResolver<JavaResolvers, Comp
                         int[] colorsRGB = explosionTag.getIntArray("Colors", null);
                         List<Color> colors = colorsRGB == null ? Collections.emptyList() : IntStream.of(colorsRGB)
                                 .mapToObj(Color::new)
-                                .toList();
+                                .collect(Collectors.toList());
 
                         // Parse fade colors
                         int[] fadeColorsRGB = explosionTag.getIntArray("FadeColors", null);
                         List<Color> fadeColors = fadeColorsRGB == null ? Collections.emptyList() : IntStream.of(fadeColorsRGB)
                                 .mapToObj(Color::new)
-                                .toList();
+                                .collect(Collectors.toList());
 
                         // Parse trail / twinkle
                         boolean trail = explosionTag.getByte("Trail", (byte) 0) == (byte) 1;
@@ -743,13 +743,13 @@ public class JavaItemStackResolver extends ItemStackResolver<JavaResolvers, Comp
                 int[] colorsRGB = explosionTag.getIntArray("Colors", null);
                 List<Color> colors = colorsRGB == null ? Collections.emptyList() : IntStream.of(colorsRGB)
                         .mapToObj(Color::new)
-                        .toList();
+                        .collect(Collectors.toList());
 
                 // Parse fade colors
                 int[] fadeColorsRGB = explosionTag.getIntArray("FadeColors", null);
                 List<Color> fadeColors = fadeColorsRGB == null ? Collections.emptyList() : IntStream.of(fadeColorsRGB)
                         .mapToObj(Color::new)
-                        .toList();
+                        .collect(Collectors.toList());
 
                 // Parse trail / twinkle
                 boolean trail = explosionTag.getByte("Trail", (byte) 0) == (byte) 1;

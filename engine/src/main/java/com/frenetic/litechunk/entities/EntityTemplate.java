@@ -6,6 +6,7 @@ import com.hivemc.chunker.nbt.TagType;
 import com.hivemc.chunker.nbt.tags.Tag;
 import com.hivemc.chunker.nbt.tags.collection.CompoundTag;
 import com.hivemc.chunker.nbt.tags.collection.ListTag;
+import com.hivemc.chunker.nbt.tags.primitive.StringTag;
 import com.hivemc.chunker.util.JsonTextUtil;
 import org.jetbrains.annotations.Nullable;
 
@@ -52,11 +53,30 @@ final class EntityTemplate {
      * The colour codes survive: {@code toLegacy(..., true)} writes the section sign form Bedrock renders.
      */
     private static void name(CompoundTag actor, CompoundTag entity) {
-        String raw = entity.getString("CustomName", null);
-        if (raw == null || raw.isEmpty()) {
+        Tag<?> raw = entity.get("CustomName");
+        if (raw == null) {
             return;
         }
-        String legacy = toLegacy(raw);
+
+        // 1.21.5 stores the name as a JSON string; older worlds (and anything written by a plugin) use a compound
+        // text component. Reading only the string variant silently dropped those names.
+        String legacy;
+        if (raw instanceof StringTag stringTag) {
+            String value = stringTag.getValue();
+            if (value == null || value.isEmpty()) {
+                return;
+            }
+            legacy = toLegacy(value);
+        } else if (raw instanceof CompoundTag || raw instanceof ListTag<?, ?>) {
+            try {
+                legacy = JsonTextUtil.toLegacy(JsonTextUtil.fromNBT(raw), true);
+            } catch (RuntimeException failure) {
+                return;
+            }
+        } else {
+            return;
+        }
+
         if (legacy == null || legacy.isEmpty()) {
             return;
         }
@@ -131,17 +151,58 @@ final class EntityTemplate {
         float max = maximum;
         float now = current != null ? Math.min(current, max) : max;
 
-        ListTag<CompoundTag, Map<String, Tag<?>>> attributes = new ListTag<>(TagType.COMPOUND, 1);
-        CompoundTag entry = new CompoundTag(7);
-        entry.put("Name", "minecraft:health");
-        entry.put("Base", max);
-        entry.put("Current", now);
-        entry.put("DefaultMax", max);
-        entry.put("DefaultMin", 0F);
-        entry.put("Max", max);
-        entry.put("Min", 0F);
-        attributes.add(entry);
+        ListTag<CompoundTag, Map<String, Tag<?>>> attributes = new ListTag<>(TagType.COMPOUND, 3);
+        attributes.add(attribute("minecraft:health", max, now));
+        // Speed and jump height are the two a player notices on a horse: they are rolled per animal in Java and the
+        // game has no way to recover them. Java stores them in its own attribute list, Bedrock under different names
+        // - `minecraft:horse.jump_strength` is a literal in the game binary, `minecraft:jump_strength` is not.
+        addAttribute(attributes, entity, "minecraft:movement_speed", "minecraft:movement");
+        addAttribute(attributes, entity, "minecraft:jump_strength", "minecraft:horse.jump_strength");
         actor.put("Attributes", attributes);
+    }
+
+    /**
+     * Copy one Java attribute across under its Bedrock name.
+     *
+     * @param attributes the list being built.
+     * @param entity     the Java entity tag.
+     * @param javaId     the Java attribute id.
+     * @param bedrockId  the Bedrock attribute id.
+     */
+    private static void addAttribute(ListTag<CompoundTag, Map<String, Tag<?>>> attributes, CompoundTag entity,
+                                     String javaId, String bedrockId) {
+        Float base = attributeBase(entity, javaId);
+        if (base == null || base <= 0F) {
+            return;
+        }
+        // A real save writes {Base, DefaultMax, DefaultMin, Name} for these two, without Current - the current value
+        // follows Base unless something modifies it.
+        CompoundTag entry = new CompoundTag(4);
+        entry.put("Name", bedrockId);
+        entry.put("Base", base);
+        entry.put("DefaultMax", Float.MAX_VALUE);
+        entry.put("DefaultMin", 0F);
+        attributes.add(entry);
+    }
+
+    /**
+     * Build one health style attribute entry.
+     *
+     * @param name    the Bedrock attribute id.
+     * @param base    the maximum.
+     * @param current the current value.
+     * @return the entry.
+     */
+    private static CompoundTag attribute(String name, float base, float current) {
+        CompoundTag entry = new CompoundTag(7);
+        entry.put("Name", name);
+        entry.put("Base", base);
+        entry.put("Current", current);
+        entry.put("DefaultMax", base);
+        entry.put("DefaultMin", 0F);
+        entry.put("Max", base);
+        entry.put("Min", 0F);
+        return entry;
     }
 
     /**

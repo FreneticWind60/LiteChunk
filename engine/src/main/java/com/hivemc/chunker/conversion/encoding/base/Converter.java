@@ -60,6 +60,19 @@ public interface Converter {
     boolean shouldProcessEntities();
 
     /**
+     * Whether entities have to be read even though they are not written by this pass.
+     * <p>
+     * The second entity pass writes the actors itself, so it turns entity processing off - but Bedrock stores item
+     * frames as blocks, and the frame entity has to reach the column for the block entity handler to place them.
+     * Reading without writing keeps both working: the column gets its frames, the actors come from the second pass.
+     *
+     * @return true when the reader should collect entities into the column anyway.
+     */
+    default boolean shouldReadEntitiesForBlocks() {
+        return false;
+    }
+
+    /**
      * Whether block entities should be processed.
      *
      * @return true if it should be processed.

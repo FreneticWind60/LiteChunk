@@ -28,7 +28,7 @@ public class JavaLegacyFlowerPotBlockEntityHandler extends BlockEntityHandler<Ja
     public void read(@NotNull JavaResolvers resolvers, @NotNull CompoundTag input, @NotNull JavaLegacyFlowerPotBlockEntity value) {
         String identifier = input.getString("Item", null);
         int data = input.getInt("Data", 0);
-        if (identifier != null && !identifier.isBlank()) {
+        if (identifier != null && !identifier.trim().isEmpty()) {
             value.setPlant(resolvers.readBlockIdentifier(Identifier.fromData(identifier, OptionalInt.of(data))));
         }
     }

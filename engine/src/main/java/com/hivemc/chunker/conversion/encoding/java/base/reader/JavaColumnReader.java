@@ -113,7 +113,7 @@ public class JavaColumnReader implements ColumnReader {
         if (converter.shouldProcessBiomes()) {
             processing.add(Task.asyncConsume("Reading Biomes", TaskWeight.NORMAL, this::readBiomes, column));
         }
-        if (converter.shouldProcessEntities()) {
+        if (converter.shouldProcessEntities() || converter.shouldReadEntitiesForBlocks()) {
             processing.add(Task.asyncConsume("Reading Entities", TaskWeight.HIGH, this::readEntities, column));
         }
         if (converter.shouldProcessBlockEntities()) {

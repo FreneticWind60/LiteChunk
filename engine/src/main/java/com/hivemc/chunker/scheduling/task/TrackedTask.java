@@ -108,9 +108,12 @@ public abstract class TrackedTask<O> implements ProgressiveTask<O> {
      */
     protected void free() {
         synchronized (this) {
-            // Ensure the free isn't invalid for safety
+            // A task which never ran has nothing to free. This happens whenever the future it was chained to completed
+            // without it being applied - the task before it threw, or the environment was cancelled - and throwing
+            // here replaced the real failure with a message about this one, leaving the actual cause invisible.
             if (status == TaskStatus.PENDING) {
-                throw new IllegalArgumentException("Unable to free task which has not started");
+                status = TaskStatus.DONE;
+                return;
             }
 
             // Ensure the free isn't invalid for safety
@@ -196,7 +199,13 @@ public abstract class TrackedTask<O> implements ProgressiveTask<O> {
     @Override
     public String getDetailedProgress() {
         synchronized (this) {
-            String padding = "-".repeat(getDepth());
+            // String.repeat is Java 11 and missing before Android 13, and this runs while a conversion is being
+            // debugged - the one place where an exception would be least welcome.
+            StringBuilder paddingBuilder = new StringBuilder(getDepth());
+            for (int i = 0; i < getDepth(); i++) {
+                paddingBuilder.append('-');
+            }
+            String padding = paddingBuilder.toString();
             String details = (padding + " " + getName() + " - " + String.format("%.2f%%", getProgress() * 100D) + " - Weight: " + getWeight() + "\n");
 
             // Print children

@@ -743,11 +743,11 @@ public class JavaComponentItemStackResolver extends ItemStackResolver<JavaResolv
                             colors = StreamSupport.stream(colorsTagList.spliterator(), false)
                                     .mapToInt(colorsTagInt -> (int) colorsTagInt.getBoxedValue())
                                     .mapToObj(Color::new)
-                                    .toList();
+                                    .collect(Collectors.toList());
                         } else if (colorsTag instanceof IntArrayTag colorsArrayTag) {
                             colors = IntStream.of(colorsArrayTag.getBoxedValue())
                                     .mapToObj(Color::new)
-                                    .toList();
+                                    .collect(Collectors.toList());
                         }
 
                         // Parse fade colors (ListTags on 1.21.5 and newer)
@@ -757,11 +757,11 @@ public class JavaComponentItemStackResolver extends ItemStackResolver<JavaResolv
                             fadeColors = StreamSupport.stream(fadeColorsTagList.spliterator(), false)
                                     .mapToInt(colorsTagInt -> (int) colorsTagInt.getBoxedValue())
                                     .mapToObj(Color::new)
-                                    .toList();
+                                    .collect(Collectors.toList());
                         } else if (fadeColorsTag instanceof IntArrayTag fadeColorsArrayTag) {
                             fadeColors = IntStream.of(fadeColorsArrayTag.getBoxedValue())
                                     .mapToObj(Color::new)
-                                    .toList();
+                                    .collect(Collectors.toList());
                         }
 
                         // Parse trail / twinkle
@@ -804,12 +804,12 @@ public class JavaComponentItemStackResolver extends ItemStackResolver<JavaResolv
                             explosion.put("colors", new ListTag<>(TagType.INT,
                                     chunkerFireworkExplosion.getColors().stream()
                                             .map(color -> new IntTag(color.getRGB() & 0x00FFFFFF))
-                                            .toList()
+                                            .collect(Collectors.toList())
                             ));
                             explosion.put("fade_colors", new ListTag<>(TagType.INT,
                                     chunkerFireworkExplosion.getFadeColors().stream()
                                             .map(color -> new IntTag(color.getRGB() & 0x00FFFFFF))
-                                            .toList()
+                                            .collect(Collectors.toList())
                             ));
                         } else {
                             explosion.put("colors", chunkerFireworkExplosion.getColors().stream()
@@ -854,11 +854,11 @@ public class JavaComponentItemStackResolver extends ItemStackResolver<JavaResolv
                     colors = StreamSupport.stream(colorsTagList.spliterator(), false)
                             .mapToInt(colorsTagInt -> (int) colorsTagInt.getBoxedValue())
                             .mapToObj(Color::new)
-                            .toList();
+                            .collect(Collectors.toList());
                 } else if (colorsTag instanceof IntArrayTag colorsArrayTag) {
                     colors = IntStream.of(colorsArrayTag.getBoxedValue())
                             .mapToObj(Color::new)
-                            .toList();
+                            .collect(Collectors.toList());
                 }
 
                 // Parse fade colors (ListTags on 1.21.5 and newer)
@@ -868,11 +868,11 @@ public class JavaComponentItemStackResolver extends ItemStackResolver<JavaResolv
                     fadeColors = StreamSupport.stream(fadeColorsTagList.spliterator(), false)
                             .mapToInt(colorsTagInt -> (int) colorsTagInt.getBoxedValue())
                             .mapToObj(Color::new)
-                            .toList();
+                            .collect(Collectors.toList());
                 } else if (fadeColorsTag instanceof IntArrayTag fadeColorsArrayTag) {
                     fadeColors = IntStream.of(fadeColorsArrayTag.getBoxedValue())
                             .mapToObj(Color::new)
-                            .toList();
+                            .collect(Collectors.toList());
                 }
 
                 // Parse trail / twinkle
@@ -900,12 +900,12 @@ public class JavaComponentItemStackResolver extends ItemStackResolver<JavaResolv
                     explosion.put("colors", new ListTag<>(TagType.INT,
                             chunkerFireworkExplosion.getColors().stream()
                                     .map(color -> new IntTag(color.getRGB() & 0x00FFFFFF))
-                                    .toList()
+                                    .collect(Collectors.toList())
                     ));
                     explosion.put("fade_colors", new ListTag<>(TagType.INT,
                             chunkerFireworkExplosion.getFadeColors().stream()
                                     .map(color -> new IntTag(color.getRGB() & 0x00FFFFFF))
-                                    .toList()
+                                    .collect(Collectors.toList())
                     ));
                 } else {
                     explosion.put("colors", chunkerFireworkExplosion.getColors().stream()

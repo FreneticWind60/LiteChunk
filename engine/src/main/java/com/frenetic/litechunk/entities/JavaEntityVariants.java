@@ -116,10 +116,48 @@ final class JavaEntityVariants {
             case "minecraft:shulker" -> shulker(javaEntity, actor);
             case "minecraft:frog" -> frog(javaEntity, definitions);
             case "minecraft:tropicalfish" -> tropicalFish(javaEntity, actor);
+            case "minecraft:boat", "minecraft:chest_boat" -> boat(javaEntity, actor, identifier);
             default -> {
                 // No variant on this mob, or one this class has no table for.
             }
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Boats
+    // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Boat wood types in Bedrock's {@code Variant} order, shared with the forward pass.
+     * <p>
+     * Java has one entity id per wood, Bedrock one id and a number. Without reading it back every chest boat and
+     * every boat came out as oak, which is how a spruce boat turned into an oak one on the way home.
+     */
+    private static final String[] BOAT_WOODS = {
+            "oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "bamboo", "cherry", "pale_oak",
+            "poplar"
+    };
+
+    /**
+     * Turn Bedrock's boat variant back into Java's per-wood id.
+     *
+     * @param javaEntity the Java entity being built, whose id is replaced.
+     * @param actor      the Bedrock actor tag.
+     * @param identifier the Bedrock identifier, which says whether it carries a chest.
+     */
+    private static void boat(CompoundTag javaEntity, CompoundTag actor, String identifier) {
+        int variant = actor.getInt("Variant", 0);
+        if (variant < 0 || variant >= BOAT_WOODS.length) {
+            return; // Unknown (modded) variant: leave the default oak id rather than invent one.
+        }
+        String wood = BOAT_WOODS[variant];
+        boolean chest = "minecraft:chest_boat".equals(identifier);
+        if ("bamboo".equals(wood)) {
+            // Java spells the bamboo boat as a raft, and its chest form likewise.
+            javaEntity.put("id", chest ? "minecraft:bamboo_chest_raft" : "minecraft:bamboo_raft");
+            return;
+        }
+        javaEntity.put("id", "minecraft:" + wood + (chest ? "_chest_boat" : "_boat"));
     }
 
     // ---------------------------------------------------------------------------------------------

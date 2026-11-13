@@ -41,12 +41,22 @@ final class EntityIds {
         BEDROCK.put("minecraft:villager", "minecraft:villager_v2");
         BEDROCK.put("minecraft:zombie_villager", "minecraft:zombie_villager_v2");
 
-        // Java splits boats by wood type, Bedrock keeps one entity and a variant.
+        // Java splits boats by wood type, Bedrock keeps one entity and a variant number (see EntityVariants.boat for
+        // the index table). Bamboo is a raft in Java but the same `minecraft:boat` actor on Bedrock - the behaviour
+        // pack picks the can_ride_bamboo group with `is_variant != 7`, which is where the 7 comes from.
         for (String wood : new String[]{"oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove",
-                "cherry", "bamboo", "pale_oak"}) {
+                "cherry", "pale_oak", "poplar"}) {
             BEDROCK.put("minecraft:" + wood + "_boat", "minecraft:boat");
             BEDROCK.put("minecraft:" + wood + "_chest_boat", "minecraft:chest_boat");
         }
+        BEDROCK.put("minecraft:bamboo_raft", "minecraft:boat");
+        BEDROCK.put("minecraft:bamboo_chest_raft", "minecraft:chest_boat");
+
+        // Java's mannequin (a static player-shaped display entity) has no Bedrock counterpart: Bedrock's only
+        // player-shaped actor is the NPC, which is a dialogue prop with sixty fixed skins. Mapping it keeps the
+        // position, the rotation and the name; the skin cannot follow, because the client picks it from
+        // `Array.skins[query.skin_id]` - a closed list under textures/entity/npc.
+        BEDROCK.put("minecraft:mannequin", "minecraft:npc");
     }
 
     private EntityIds() {

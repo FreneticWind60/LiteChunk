@@ -41,7 +41,7 @@ public final class ByteArrayReader implements Reader {
     public ByteArrayReader(byte[] data, int offset, int length) {
         if (offset < 0 || length < 0 || offset + length > data.length) {
             throw new IndexOutOfBoundsException(
-                    "Invalid section %s+%s for a %s byte array".formatted(offset, length, data.length));
+                    String.format("Invalid section %s+%s for a %s byte array", offset, length, data.length));
         }
         this.data = data;
         this.position = offset;

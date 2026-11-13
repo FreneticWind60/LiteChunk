@@ -92,6 +92,33 @@ public final class Types {
             return Arrays.hashCode(arguments) ^ Objects.hashCode(rawType) ^ Objects.hashCode(ownerType);
         }
 
+        /**
+         * The rendered form, built here rather than inherited.
+         * <p>
+         * {@code Type.getTypeName()} is a Java 8 default method that Android only gained in API 28, so calling the
+         * inherited one threw {@code NoSuchMethodError} on 8.1 to 9 whenever a Gson message printed a type. Building
+         * the string from {@code toString()} keeps it working everywhere.
+         */
+        @Override
+        public String getTypeName() {
+            StringBuilder text = new StringBuilder();
+            if (ownerType != null) {
+                text.append(ownerType).append('.');
+            }
+            text.append(rawType);
+            if (arguments.length > 0) {
+                text.append('<');
+                for (int index = 0; index < arguments.length; index++) {
+                    if (index > 0) {
+                        text.append(", ");
+                    }
+                    text.append(arguments[index]);
+                }
+                text.append('>');
+            }
+            return text.toString();
+        }
+
         @Override
         public String toString() {
             return getTypeName();

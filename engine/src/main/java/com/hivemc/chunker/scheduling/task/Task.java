@@ -268,7 +268,9 @@ public interface Task<O> {
         }
 
         // Join the results and combine them
-        return new FutureTask<>(join(tasks).future().thenApply((results) -> results.toArray(arrayConstructor)));
+        // Note: the array is built with the typed array rather than `toArray(IntFunction)`, which is Java 11 and does
+        // not exist before Android 13 - calling it there is a NoSuchMethodError on the level loading path.
+        return new FutureTask<>(join(tasks).future().thenApply((results) -> results.toArray(arrayConstructor.apply(0))));
     }
 
     /**

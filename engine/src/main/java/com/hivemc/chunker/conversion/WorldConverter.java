@@ -85,6 +85,7 @@ public class WorldConverter implements Converter {
     private boolean processMaps = true;
     private boolean processItems = true;
     private boolean processEntities = true;
+    private boolean readEntitiesForBlocks;
     private boolean processBlockEntities = true;
     private boolean processLootTables = true;
     private boolean processBiomes = true;
@@ -439,6 +440,21 @@ public class WorldConverter implements Converter {
     @Override
     public boolean shouldProcessEntities() {
         return processEntities;
+    }
+
+    @Override
+    public boolean shouldReadEntitiesForBlocks() {
+        return readEntitiesForBlocks;
+    }
+
+    /**
+     * Read entities into the column even when this pass does not write them, so block bound entities (item frames)
+     * can still be turned into blocks by the block entity handlers.
+     *
+     * @param value true to read entities without writing them.
+     */
+    public void setReadEntitiesForBlocks(boolean value) {
+        this.readEntitiesForBlocks = value;
     }
 
     @Override
