@@ -17,7 +17,7 @@ import java.util.Set;
  * <ul>
  *     <li>the <strong>saddle</strong> is a {@code Saddled} flag on Bedrock but an item in the Java body slot since
  *     1.21.5 (before that it had a {@code SaddleItem} field of its own);</li>
- *     <li>the <strong>collar</strong> is the generic {@code Color} byte on Bedrock and {@code CollarColor} on
+ *     <li>the <strong>collar</strong> is {@code CollarColor} on both sides ({@code Color} is the body tint on
  *     Java;</li>
  *     <li><strong>sitting</strong> is a flag with the same spelling on both sides, so it is only a rename of the
  *     numeric type;</li>
@@ -108,10 +108,14 @@ final class JavaEntityStates {
         if (!"minecraft:cat".equals(identifier) && !"minecraft:wolf".equals(identifier)) {
             return;
         }
-        if (!actor.contains("Color")) {
+        // Bedrock keeps the collar under its own key; `Color` is the body tint, and reading that as a collar is what
+        // turned a plain cat into a red one on the way in. Worlds converted before this fix still carry the old field,
+        // so it is accepted as a fallback rather than dropping their collars.
+        String key = actor.contains("CollarColor") ? "CollarColor" : actor.contains("Color") ? "Color" : null;
+        if (key == null) {
             return;
         }
-        int colour = intValue(actor, "Color", -1);
+        int colour = intValue(actor, key, -1);
         if (colour < 0 || colour > 15) {
             return;
         }

@@ -51,9 +51,10 @@ public final class EntityTableTest {
             throw new IllegalStateException("cow properties missing or wrong: " + properties);
         }
 
-        // Rabbit has no age sub event in the behaviour pack, so it must stay a bare shell rather than enabling every
-        // coat and both ages.
-        require("rabbit", definitions("minecraft:rabbit", false), "minecraft:rabbit");
+        // The rabbit's groups are the one set the behaviour pack does not namespace, so they are written raw
+        // ("+adult", "+coat_brown"); a namespaced entry would not resolve and babies would arrive full sized.
+        require("rabbit", definitions("minecraft:rabbit", false),
+                "minecraft:rabbit", "coat_brown", "adult");
 
         // Ids that Bedrock spells differently are mapped on the way out.
         require("zombified piglin", definitions("minecraft:zombified_piglin", false), "minecraft:zombie_pigman");
@@ -71,6 +72,7 @@ public final class EntityTableTest {
         requireSkipped("falling block without resolvers", "minecraft:falling_block");
 
         variants();
+        colours();
         boats();
         equipmentSlots();
         template();
@@ -78,6 +80,30 @@ public final class EntityTableTest {
         links();
 
         System.out.println("entity table: OK");
+    }
+
+    /**
+     * Colours: the sheep dye is the int `minecraft:color` component, the collar has its own key.
+     * <p>
+     * Both were wrong in the same release. The wool went in as a byte, which the component does not read, so every
+     * sheep arrived white; the collar went in as `Color`, which is the body tint, so a red-collared cat arrived red.
+     */
+    private static void colours() throws Exception {
+        CompoundTag sheep = withField("minecraft:sheep", "Color", 14);
+        requireValue("sheep colour", sheep, "Color", 14);
+        require("sheep colour is an int", sheep.get("Color") instanceof com.hivemc.chunker.nbt.tags.primitive.IntTag,
+                "sheep Color was written as " + sheep.get("Color").getClass().getSimpleName());
+        require("sheep red group", decode(sheep).getListValues("definitions", StringTag.class),
+                "minecraft:sheep_red");
+
+        CompoundTag cat = withField("minecraft:cat", "CollarColor", 14);
+        CompoundTag catActor = decode(cat);
+        if (!catActor.contains("CollarColor")) {
+            throw new IllegalStateException("cat lost its collar: " + catActor);
+        }
+        if (catActor.contains("Color")) {
+            throw new IllegalStateException("cat wrote Color, which tints the whole body: " + catActor.get("Color"));
+        }
     }
 
     /**
@@ -396,17 +422,17 @@ public final class EntityTableTest {
         CompoundTag brownSheep = withField("minecraft:sheep", "Color", (byte) 12);
         List<String> brownGroups = decode(brownSheep).getListValues("definitions", StringTag.class);
         require("sheep brown", brownGroups, "minecraft:sheep_brown");
-        if (brownSheep.getByte("Color", (byte) -1) != 12) {
+        if (brownSheep.getInt("Color", -1) != 12) {
             throw new IllegalStateException("sheep colour was not written: " + brownSheep.get("Color"));
         }
 
         // Lime has no group in the pack, so only the integer may be written.
-        CompoundTag limeSheep = withField("minecraft:sheep", "Color", (byte) 5);
+        CompoundTag limeSheep = withField("minecraft:sheep", "Color", 5);
         List<String> limeGroups = decode(limeSheep).getListValues("definitions", StringTag.class);
         if (limeGroups.contains("+minecraft:sheep_lime")) {
             throw new IllegalStateException("sheep_lime does not exist in the pack but was written: " + limeGroups);
         }
-        if (limeSheep.getByte("Color", (byte) -1) != 5) {
+        if (limeSheep.getInt("Color", -1) != 5) {
             throw new IllegalStateException("lime sheep lost its colour: " + limeSheep.get("Color"));
         }
 
@@ -453,7 +479,7 @@ public final class EntityTableTest {
         requireValue("rusty wolf variant", wolf, "Variant", 4);
 
         CompoundTag rabbit = withField("minecraft:rabbit", "RabbitType", 4);
-        require("desert rabbit", decode(rabbit).getListValues("definitions", StringTag.class), "minecraft:coat_desert");
+        require("desert rabbit", decode(rabbit).getListValues("definitions", StringTag.class), "coat_desert");
         requireValue("desert rabbit variant", rabbit, "Variant", 4);
 
         // The axolotl is the case where the two orderings differ: Java 1 is `wild`, Bedrock renders it as 3.
@@ -562,9 +588,6 @@ public final class EntityTableTest {
             if (!actual.contains("+" + group)) {
                 throw new IllegalStateException(label + " is missing +" + group + " (got " + actual + ")");
             }
-        }
-        if (label.startsWith("rabbit") && actual.size() != 1) {
-            throw new IllegalStateException("rabbit should only have its own identifier, got " + actual);
         }
     }
 }

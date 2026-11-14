@@ -212,10 +212,13 @@ final class EntityVariants {
 
     private static void sheep(CompoundTag actor, String identifier, CompoundTag entity, List<String> definitions) {
         int colour = clamp(intValue(entity, "Color", 0), DYE_COLOURS.length);
+        // The wool colour is the `minecraft:color` component, and that component is an int in the game's own schema
+        // (JsonSchemaTypedNode<int, ..., ColorDefinition>). addVariant writes it; the fallback below covers the four
+        // dyes the pack has no group for.
         if (!addVariant(actor, identifier, definitions, "sheep_" + DYE_COLOURS[colour])) {
-            // No group for this colour: the pack only carries 12 of the 16. The integer still has to be written, and
-            // the two orderings are the same dye order, confirmed by a real save (Color 0 <-> sheep_white).
-            actor.put("Color", (byte) colour);
+            // No group for this colour: the pack only carries 12 of the 16. The integer alone is enough - both sides
+            // use the dye order.
+            actor.put("Color", colour);
         }
 
         if (intValue(entity, "Sheared", 0) != 0) {
@@ -365,12 +368,10 @@ final class EntityVariants {
         if (value == null) {
             return false;
         }
-        // Colour is a byte in a real save (sheep Color:0b), the other two are ints (horse Variant/MarkVariant).
-        if ("color".equals(value.component())) {
-            actor.put(value.actorKey(), (byte) value.value());
-        } else {
-            actor.put(value.actorKey(), value.value());
-        }
+        // Every component the table records is an `int` in the game's own schema (the colour one included:
+        // JsonSchemaTypedNode<int, ..., ColorDefinition>), so the value goes in untouched. Narrowing the colour to a
+        // byte was a guess, and a copy of our own output mistaken for a save - it left every sheep white.
+        actor.put(value.actorKey(), value.value());
         addGroup(definitions, identifier, group);
         return true;
     }

@@ -404,4 +404,15 @@
     <string name="level_hint_missing">This key is missing from the save and will be created on save.</string>
     <string name="level_format_java">Java Edition</string>
     <string name="level_format_bedrock">Bedrock Edition</string>
+
+    <string name="ConvertFragment_43">Grouped by major version - tap the one to convert to</string>
+    <string name="Updates_01">Check for updates</string>
+    <string name="Updates_02">Stable</string>
+    <string name="Updates_03">Preview</string>
+    <string name="Updates_05">You are up to date</string>
+    <string name="Updates_07">Download stable</string>
+    <string name="Updates_08">The latest preview is $1, in case you want to try it.</string>
+    <string name="Updates_09">Download preview</string>
+    <string name="Updates_10">Stable $1 is out - you can update now.</string>
+    <string name="Updates_11">Close</string>
 </resources>

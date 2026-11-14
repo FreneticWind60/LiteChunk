@@ -377,4 +377,15 @@
     <string name="level_hint_missing">存档中没有这个字段，保存时才会写入。</string>
     <string name="level_format_java">Java 版</string>
     <string name="level_format_bedrock">基岩版</string>
+
+    <string name="ConvertFragment_43">按大版本分组，点选要转到的版本</string>
+    <string name="Updates_01">检查更新</string>
+    <string name="Updates_02">正式版</string>
+    <string name="Updates_03">测试版</string>
+    <string name="Updates_05">已是最新版本</string>
+    <string name="Updates_07">下载正式版</string>
+    <string name="Updates_08">最新测试版是 $1，想尝尝鲜可以试试。</string>
+    <string name="Updates_09">下载测试版</string>
+    <string name="Updates_10">正式版 $1 已发布，可以更新了。</string>
+    <string name="Updates_11">关闭</string>
 </resources>

@@ -25,6 +25,14 @@ final class OutputActions {
     }
 
     static void showSheet(FragmentActivity activity, Store.OutputFile file) {
+        showSheet(activity, file, null);
+    }
+
+    /**
+     * @param onDeleted run after the file was deleted, so a caller whose list does not come from a directory scan
+     *                  (the round output list) can drop the row instead of showing a file that is already gone.
+     */
+    static void showSheet(FragmentActivity activity, Store.OutputFile file, OnDeleted onDeleted) {
         BottomSheetDialog sheet = new BottomSheetDialog(activity);
         View content = LayoutInflater.from(activity).inflate(R.layout.sheet_output_actions, null);
         content.<android.widget.TextView>findViewById(R.id.tvTitle).setText(file.name);
@@ -59,7 +67,7 @@ final class OutputActions {
         });
         content.findViewById(R.id.rowDelete).setOnClickListener(view -> {
             sheet.dismiss();
-            confirmDelete(activity, java.util.Collections.singletonList(file), null);
+            confirmDelete(activity, java.util.Collections.singletonList(file), onDeleted);
         });
 
         sheet.setContentView(content);

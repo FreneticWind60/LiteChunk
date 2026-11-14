@@ -136,6 +136,18 @@ final class Controller {
         return new ArrayList<>(roundOutputs);
     }
 
+    /**
+     * Drop one entry from the list of files this round produced.
+     * <p>
+     * The list is not a folder scan, so deleting the file from disk leaves the row behind - which is exactly what
+     * happened when an output was deleted from the conversion page: it stayed on screen until the next conversion.
+     *
+     * @param file the file that was just deleted.
+     */
+    void forgetRoundOutput(File file) {
+        roundOutputs.removeIf(entry -> entry.getAbsolutePath().equals(file.getAbsolutePath()));
+    }
+
     long elapsedSeconds() {
         return startedAt == 0L ? 0L : Math.max(0L, (SystemClock.elapsedRealtime() - startedAt) / 1000L);
     }

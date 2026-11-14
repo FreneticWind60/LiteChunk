@@ -4,6 +4,8 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -12,17 +14,11 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.frenetic.litechunk.databinding.ActivityAboutBinding;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * The about page: what the app is, how to reach the developer, and the licence.
@@ -37,13 +33,7 @@ public class AboutActivity extends AppCompatActivity {
     private static final String GITHUB_PROFILE = "https://github.com/FreneticWind60";
     private static final String BILIBILI_PROFILE = "https://space.bilibili.com/1688072577";
 
-    /** Where a released build would live. Kept in one place so a rename only touches this line. */
-    private static final String REPO = "FreneticWind60/LiteChunk";
-    private static final String RELEASE_API = "https://api.github.com/repos/" + REPO + "/releases/latest";
-    private static final String RELEASE_PAGE = "https://github.com/" + REPO + "/releases/latest";
 
-    private static final Pattern TAG_NAME = Pattern.compile("\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
-    private static final Pattern HTML_URL = Pattern.compile("\"html_url\"\\s*:\\s*\"([^\"]+)\"");
 
     private ActivityAboutBinding binding;
     private final ExecutorService io = Executors.newSingleThreadExecutor(runnable -> {
@@ -134,47 +124,148 @@ public class AboutActivity extends AppCompatActivity {
         binding.tvUpdateStatus.setText(Text.get(R.string.AboutActivity_02));
         io.execute(() -> {
             try {
-                String json = fetch(RELEASE_API);
-                String tag = group(TAG_NAME, json);
-                String page = group(HTML_URL, json);
-                if (tag == null) {
-                    throw new IOException("unexpected payload");
-                }
-                String published = tag.startsWith("v") || tag.startsWith("V") ? tag.substring(1) : tag;
-                // A git tag cannot contain a space, so a release is tagged "1.21.0-build1" while the app calls
-                // itself "1.21.0 build1". Comparing the raw strings would make every release look newer than
-                // itself and offer the user a download of what they already have.
-                boolean same = squashed(published).equals(squashed(BuildConfig.VERSION_NAME));
-                String url = page == null ? RELEASE_PAGE : page;
-                runOnUiThread(() -> showResult(same, published, url));
+                Updates.Result result = Updates.check();
+                runOnUiThread(() -> showUpdateDialog(result));
             } catch (Throwable failure) {
                 runOnUiThread(this::showUnavailable);
             }
         });
     }
 
-    private void showResult(boolean upToDate, String published, String url) {
+    /**
+     * Show what GitHub has, from the point of view of the build that is running.
+     * <p>
+     * A stable user sees the stable release first and a preview below it, but only when that preview is genuinely
+     * ahead of the stable one. A preview user sees the preview first and the stable release below, but only when that
+     * stable is ahead of the preview they are on - otherwise there is nothing to tell them.
+     */
+    private void showUpdateDialog(Updates.Result result) {
         if (binding == null) {
             return;
         }
         binding.btnCheckUpdate.setEnabled(true);
-        binding.tvUpdateStatus.setText(upToDate ? Text.get(R.string.AboutActivity_03) : Text.get(R.string.AboutActivity_04) + published);
-        if (upToDate) {
-            new MaterialAlertDialogBuilder(this)
-                    .setTitle(Text.get(R.string.AboutActivity_05))
-                    .setMessage(Text.get(R.string.AboutActivity_06) + BuildConfig.VERSION_NAME + Text.get(R.string.AboutActivity_07))
-                    .setPositiveButton(Text.get(R.string.AboutActivity_08), null)
-                    .show();
+
+        Updates.Version mine = Updates.Version.parse(BuildConfig.VERSION_NAME);
+        if (mine == null || (result.stable == null && result.preview == null)) {
+            showUnavailable();
             return;
         }
+
+        boolean onStable = mine.isStable();
+        Updates.Release primary = onStable ? result.stable : result.preview;
+        Updates.Release secondary = onStable ? result.preview : result.stable;
+
+        // Nothing of the kind the user is on: fall back to whatever is published, as the main block.
+        if (primary == null) {
+            primary = onStable ? result.preview : result.stable;
+            secondary = null;
+        }
+
+        boolean primaryNewer = primary.version.compareTo(mine) > 0;
+
+        if (secondary != null) {
+            // A preview is only worth showing when it is ahead of the stable release; a stable is only worth showing
+            // to a preview user when it is ahead of the build they are running.
+            boolean wanted = onStable
+                    ? secondary.version.compareTo(primary.version) > 0
+                    : secondary.version.compareTo(mine) > 0;
+            if (!wanted) {
+                secondary = null;
+            }
+        }
+
+        binding.tvUpdateStatus.setText(primaryNewer
+                ? Text.get(R.string.AboutActivity_04) + primary.label()
+                : Text.get(R.string.AboutActivity_03));
+
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        int side = dp(20);
+        column.setPadding(side, dp(4), side, 0);
+
+        // The label describes the build, not the channel the user is on: a stable-only repo still has to say
+        // "正式版" to someone running a preview.
+        addSection(column, primary, primary.version.isStable() ? R.string.Updates_02 : R.string.Updates_03,
+                result, primaryNewer, true);
+
+        if (secondary != null) {
+            addSection(column, secondary, secondary.version.isStable() ? R.string.Updates_02 : R.string.Updates_03,
+                    result, secondary.version.compareTo(mine) > 0, false);
+        }
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(column);
+
         new MaterialAlertDialogBuilder(this)
-                .setTitle(Text.get(R.string.AboutActivity_09))
-                .setMessage(Text.get(R.string.AboutActivity_10) + published + Text.get(R.string.AboutActivity_11) + BuildConfig.VERSION_NAME)
-                .setNegativeButton(Text.get(R.string.AboutActivity_12), null)
-                .setPositiveButton(Text.get(R.string.AboutActivity_13), (dialog, which) -> openLink(url))
+                .setTitle(Text.get(R.string.Updates_01))
+                .setView(scroll)
+                .setNegativeButton(Text.get(R.string.Updates_11), null)
                 .show();
     }
 
+    /**
+     * One block of the dialog: which kind of build it is, what it changed, and a button when it is worth taking.
+     *
+     * @param column  the vertical container being filled.
+     * @param release the build to describe.
+     * @param label   "正式版" or "测试版".
+     * @param result  the check result, for its notes.
+     * @param newer   whether this build is ahead of the running one.
+     * @param main    whether this is the block about the channel the user is on.
+     */
+    private void addSection(LinearLayout column, Updates.Release release, int label,
+                            Updates.Result result, boolean newer, boolean main) {
+        TextView kind = new TextView(this);
+        kind.setText(Text.get(label));
+        kind.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge);
+        kind.setPadding(0, dp(14), 0, 0);
+        column.addView(kind);
+
+        TextView version = new TextView(this);
+        version.setText(release.label());
+        version.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium);
+        version.setPadding(0, dp(4), 0, 0);
+        column.addView(version);
+
+        String notes = result.notes.get(Updates.key(release.tag));
+        if (notes == null) {
+            notes = result.notes.get(Updates.key(release.label()));
+        }
+        if (notes != null && !notes.isEmpty()) {
+            TextView body = new TextView(this);
+            body.setText(notes);
+            body.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
+            body.setPadding(0, dp(6), 0, 0);
+            column.addView(body);
+        }
+
+        if (newer) {
+            MaterialButton button = new MaterialButton(this);
+            button.setText(Text.get(release.version.isStable() ? R.string.Updates_07 : R.string.Updates_09));
+            button.setOnClickListener(view -> openLink(release.url));
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            params.topMargin = dp(10);
+            column.addView(button, params);
+            return;
+        }
+
+        TextView status = new TextView(this);
+        if (main) {
+            status.setText(Text.get(R.string.Updates_05));
+        } else if (release.version.isStable()) {
+            status.setText(Text.get(R.string.Updates_10).replace("$1", release.label()));
+        } else {
+            status.setText(Text.get(R.string.Updates_08).replace("$1", release.label()));
+        }
+        status.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium);
+        status.setPadding(0, dp(8), 0, 0);
+        column.addView(status);
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
     private void showUnavailable() {
         if (binding == null) {
             return;
@@ -189,38 +280,6 @@ public class AboutActivity extends AppCompatActivity {
                 .show();
     }
 
-    private static String fetch(String endpoint) throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
-        connection.setConnectTimeout(8000);
-        connection.setReadTimeout(8000);
-        connection.setRequestProperty("Accept", "application/vnd.github+json");
-        connection.setRequestProperty("User-Agent", "LiteChunk/" + BuildConfig.VERSION_NAME);
-        try {
-            int code = connection.getResponseCode();
-            if (code != HttpURLConnection.HTTP_OK) {
-                throw new IOException("HTTP " + code);
-            }
-            try (InputStream in = connection.getInputStream()) {
-                byte[] buffer = new byte[8 * 1024];
-                StringBuilder builder = new StringBuilder();
-                int read;
-                while ((read = in.read(buffer)) > 0) {
-                    builder.append(new String(buffer, 0, read, StandardCharsets.UTF_8));
-                }
-                return builder.toString();
-            }
-        } finally {
-            connection.disconnect();
-        }
-    }
 
-    private static String group(Pattern pattern, String json) {
-        Matcher matcher = pattern.matcher(json);
-        return matcher.find() ? matcher.group(1) : null;
-    }
 
-    /** Letters and digits only, so "1.21.0-build1", "v1.21.0 build1" and "1.21.0 build1" all compare equal. */
-    private static String squashed(String value) {
-        return value.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
-    }
 }

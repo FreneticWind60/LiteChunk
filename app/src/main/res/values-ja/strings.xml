@@ -404,4 +404,15 @@
     <string name="level_hint_missing">このフィールドはワールドに存在せず、保存時に書き込まれます。</string>
     <string name="level_format_java">Java版</string>
     <string name="level_format_bedrock">統合版</string>
+
+    <string name="ConvertFragment_43">メジャーバージョンごとに並んでいます。変換先をタップしてください</string>
+    <string name="Updates_01">アップデートを確認</string>
+    <string name="Updates_02">正式版</string>
+    <string name="Updates_03">テスト版</string>
+    <string name="Updates_05">最新バージョンです</string>
+    <string name="Updates_07">正式版をダウンロード</string>
+    <string name="Updates_08">最新のテスト版は $1 です。試してみたい場合はどうぞ。</string>
+    <string name="Updates_09">テスト版をダウンロード</string>
+    <string name="Updates_10">正式版 $1 が公開されました。更新できます。</string>
+    <string name="Updates_11">閉じる</string>
 </resources>

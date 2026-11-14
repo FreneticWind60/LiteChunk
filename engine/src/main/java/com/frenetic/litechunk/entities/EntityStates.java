@@ -110,10 +110,12 @@ final class EntityStates {
         if (!entity.contains("CollarColor")) {
             return;
         }
-        // Bedrock reuses the generic integer colour channel: for a wolf or a cat it is the collar, for a sheep the
-        // wool. Java keeps it as a dye index, which is the same order on both sides.
+        // The collar has a key of its own on Bedrock (`CollarColor` is a literal in the game binary, next to the cat
+        // and wolf component groups). Writing `Color` instead tinted the whole animal: that is the generic entity
+        // colour channel the renderer multiplies into the body texture, which is why a red-collared cat arrived as a
+        // red cat. Java spells the field the same way, and the dye order matches, so the value goes straight across.
         int colour = intValue(entity, "CollarColor", 0);
-        actor.put("Color", (byte) Math.max(0, Math.min(15, colour)));
+        actor.put("CollarColor", (byte) Math.max(0, Math.min(15, colour)));
     }
 
     // ---------------------------------------------------------------------------------------------

@@ -14,6 +14,7 @@ import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -22,6 +23,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -31,7 +33,10 @@ import com.frenetic.litechunk.databinding.FragmentConvertBinding;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.checkbox.MaterialCheckBox;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+
 
 import java.io.File;
 import java.util.ArrayList;
@@ -103,7 +108,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         outputAdapter = new OutputAdapter(Controller.get(requireContext()).roundOutputs().isEmpty()
                 ? new ArrayList<>()
                 : OutputAdapter.wrap(controller.roundOutputs()),
-                output -> OutputActions.showSheet(requireActivity(), output));
+                this::openOutput);
         binding.rvOutputs.setLayoutManager(new LinearLayoutManager(requireContext()));
         binding.rvOutputs.setAdapter(outputAdapter);
 
@@ -156,6 +161,17 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
     // ---------------------------------------------------------------------------------------------
     // Adding sources
     // ---------------------------------------------------------------------------------------------
+
+    /**
+     * Open the actions for one finished file, and drop the row when the user deletes it - the list is the controller's
+     * record of this round, not a folder scan, so nothing else would notice the file is gone.
+     */
+    private void openOutput(Store.OutputFile output) {
+        OutputActions.showSheet(requireActivity(), output, () -> {
+            Controller.get(requireContext()).forgetRoundOutput(output.file);
+            render();
+        });
+    }
 
     private void showSourceSheet(View anchor) {
         BottomSheetDialog sheet = new BottomSheetDialog(requireContext());
@@ -271,18 +287,126 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
             return;
         }
         String[] labels = group.versions;
-        String current = currentFormatId();
-        int checked = current == null ? 0 : group.indexOf(current);
-        new MaterialAlertDialogBuilder(requireContext())
-                .setTitle(formats.editionLabel(edition) + Text.get(R.string.ConvertFragment_06))
-                .setSingleChoiceItems(labels, checked, (dialog, which) -> {
-                    formatId = group.formatIds[which];
+        String theCurrent = currentFormatId();
+        int checked = theCurrent == null ? 0 : group.indexOf(theCurrent);
+
+        View content = getLayoutInflater().inflate(R.layout.dialog_version_picker, null);
+        LinearLayout list = content.findViewById(R.id.listVersions);
+        buildVersionSections(list, labels, checked);
+
+        View header = getLayoutInflater().inflate(R.layout.dialog_header, null);
+        ((TextView) header.findViewById(R.id.tvTitle)).setText(
+                formats.editionLabel(edition) + Text.get(R.string.ConvertFragment_06));
+        ((TextView) header.findViewById(R.id.tvSubtitle)).setText(R.string.ConvertFragment_43);
+
+        ScrollView scroll = content.findViewById(R.id.scrollVersions);
+        AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext())
+                .setCustomTitle(header)
+                .setView(content)
+                .setNegativeButton(Text.get(R.string.ConvertFragment_07), null)
+                .create();
+        dialog.setOnShowListener(ignored -> {
+            // A group runs to eighty entries; open at the version in use instead of at the top.
+            View selected = list.findViewWithTag("selected");
+            if (selected != null) {
+                scroll.post(() -> scroll.smoothScrollTo(0, Math.max(0, selected.getTop() - 48)));
+            }
+        });
+        dialog.show();
+
+        // The chips are built before the dialog exists, so their listener is patched in afterwards.
+        for (int index = 0; index < list.getChildCount(); index++) {
+            View child = list.getChildAt(index);
+            if (child instanceof LinearLayout section) {
+                wireSection(section, group, dialog);
+            }
+        }
+    }
+
+    /** One section per major version: a heading, then its patch versions as chips. */
+    private void buildVersionSections(LinearLayout list, String[] labels, int checked) {
+        String major = null;
+        ChipGroup chips = null;
+        for (int index = 0; index < labels.length; index++) {
+            String key = majorOf(labels[index]);
+            if (!key.equals(major)) {
+                major = key;
+                TextView heading = new TextView(requireContext());
+                heading.setText(key);
+                heading.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall);
+                int top = dp(list.getChildCount() == 0 ? 4 : 18);
+                heading.setPadding(0, top, 0, dp(6));
+                list.addView(heading);
+
+                chips = new ChipGroup(requireContext());
+                chips.setSingleSelection(true);
+                chips.setSelectionRequired(true);
+                chips.setTag("section:" + key);
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                params.bottomMargin = dp(2);
+                list.addView(chips, params);
+            }
+
+            Chip chip = (Chip) getLayoutInflater().inflate(R.layout.view_version_chip, chips, false);
+            chip.setText(labels[index]);
+            chip.setId(View.generateViewId());
+            chip.setTag(index);
+            chip.setChecked(index == checked);
+            if (index == checked) {
+                chips.setTag("selected");
+            }
+            chips.addView(chip);
+        }
+    }
+
+    /** Give every chip in one section the same click behaviour. */
+    private void wireSection(LinearLayout section, Formats.Group group, AlertDialog dialog) {
+        for (int index = 0; index < section.getChildCount(); index++) {
+            View child = section.getChildAt(index);
+            if (!(child instanceof ChipGroup chips)) {
+                continue;
+            }
+            for (int chipIndex = 0; chipIndex < chips.getChildCount(); chipIndex++) {
+                View view = chips.getChildAt(chipIndex);
+                if (!(view instanceof Chip chip)) {
+                    continue;
+                }
+                int position = (int) chip.getTag();
+                chip.setOnClickListener(v -> {
+                    formatId = group.formatIds[position];
                     dialog.dismiss();
                     render();
-                })
-                .setNegativeButton(Text.get(R.string.ConvertFragment_07), null)
-                .show();
+                });
+            }
+        }
     }
+
+    /**
+     * Which heading a version belongs under.
+     * <p>
+     * Two eras, two schemes. Up to 1.21 the interesting number is the second one - "1.21.8" and "1.21.4" are far
+     * apart in time, "1.20" and "1.21" even more so, and grouping by the leading 1 would put eighteen years of the
+     * game under one heading. From 26 onwards Mojang dropped the leading 1, so the first number is the year-ish
+     * generation and the second is a point release inside it: "26.3.0" belongs with "26.1.2", not on its own.
+     *
+     * @param version a label from the format list, e.g. {@code 1.21.8} or {@code 26.3.0}.
+     * @return the heading text.
+     */
+    private static String majorOf(String version) {
+        String[] parts = version.split("\\.");
+        if (parts.length < 2) {
+            return version;
+        }
+        try {
+            // 22 is the first version without the leading 1 (25w14a aside), so anything up to 21 uses the second
+            // number as its grouping key and anything from 22 uses the first.
+            return Integer.parseInt(parts[0]) >= 22 ? parts[0] : parts[0] + "." + parts[1];
+        } catch (NumberFormatException notAVersion) {
+            return version;
+        }
+    }
+
 
     private String currentFormatId() {
         if (formats == null) {
