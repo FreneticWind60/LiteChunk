@@ -83,15 +83,19 @@ public final class EntityTableTest {
     }
 
     /**
-     * Colours: the sheep dye is the int `minecraft:color` component, the collar has its own key.
+     * Colours: the sheep dye is a byte, the collar has a key of its own.
      * <p>
-     * Both were wrong in the same release. The wool went in as a byte, which the component does not read, so every
-     * sheep arrived white; the collar went in as `Color`, which is the body tint, so a red-collared cat arrived red.
+     * The collar used to go in as `Color`, which is the body tint, so a red-collared cat arrived as a red cat. The
+     * wool is the opposite: `Color` is right for a sheep and the game expects it as a byte, so a regression to int
+     * here would be a silent one - it reads back fine and renders white.
      */
     private static void colours() throws Exception {
         CompoundTag sheep = withField("minecraft:sheep", "Color", 14);
-        requireValue("sheep colour", sheep, "Color", 14);
-        require("sheep colour is an int", sheep.get("Color") instanceof com.hivemc.chunker.nbt.tags.primitive.IntTag,
+        if (sheep.getByte("Color", (byte) -1) != 14) {
+            throw new IllegalStateException("sheep colour was not written: " + sheep.get("Color"));
+        }
+        require("sheep colour is a byte",
+                sheep.get("Color") instanceof com.hivemc.chunker.nbt.tags.primitive.ByteTag,
                 "sheep Color was written as " + sheep.get("Color").getClass().getSimpleName());
         require("sheep red group", decode(sheep).getListValues("definitions", StringTag.class),
                 "minecraft:sheep_red");
@@ -422,17 +426,17 @@ public final class EntityTableTest {
         CompoundTag brownSheep = withField("minecraft:sheep", "Color", (byte) 12);
         List<String> brownGroups = decode(brownSheep).getListValues("definitions", StringTag.class);
         require("sheep brown", brownGroups, "minecraft:sheep_brown");
-        if (brownSheep.getInt("Color", -1) != 12) {
+        if (brownSheep.getByte("Color", (byte) -1) != 12) {
             throw new IllegalStateException("sheep colour was not written: " + brownSheep.get("Color"));
         }
 
         // Lime has no group in the pack, so only the integer may be written.
-        CompoundTag limeSheep = withField("minecraft:sheep", "Color", 5);
+        CompoundTag limeSheep = withField("minecraft:sheep", "Color", (byte) 5);
         List<String> limeGroups = decode(limeSheep).getListValues("definitions", StringTag.class);
         if (limeGroups.contains("+minecraft:sheep_lime")) {
             throw new IllegalStateException("sheep_lime does not exist in the pack but was written: " + limeGroups);
         }
-        if (limeSheep.getInt("Color", -1) != 5) {
+        if (limeSheep.getByte("Color", (byte) -1) != 5) {
             throw new IllegalStateException("lime sheep lost its colour: " + limeSheep.get("Color"));
         }
 
