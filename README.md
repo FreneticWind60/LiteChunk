@@ -146,17 +146,6 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（
 - **白名单引导**：首次转换前弹一次「让转换安静地跑完 / Background limits」，按
   `isIgnoringBatteryOptimizations` 判断后跳系统设置；两个按钮都会开始转换，看过一次就不再弹。
 
-### 等待时的一言
-
-短句是 `res/values/quotes.xml` 里的 60 条静态文本，**零依赖、不走网络**——断网超时比没有更烦，且全应用
-只该有「检查更新」一个网络请求。
-
-索引是**无状态**的 `quotes[elapsedSeconds / 7 % n]`。`renderInternal` 由 180ms 一次的进度回调驱动，
-若用计数器递增，一轮 60 条会在 12 秒内放完。所以 t=3 是第 1 条、t=9 第 2 条、t=54 第 8 条。
-
-pr5 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、LiteChunk 剪影两个图案一起移除）：它和转换
-抢同一个 CPU 与内存带宽，而这一版的方向恰恰是让转换吃满 CPU，留一个会拖慢自己的入口没有意义。
-
 ### 文件页
 
 管理 `output/`：
@@ -197,9 +186,7 @@ pr5 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
   `ClassCastException`（这个 bug 是 `:engine:levelTest` 抓到的）。
 - **写入安全**：写 `.tmp` → **读回校验每个被改字段** → rename 才替换原文件；存档本身是 zip，
   重写走同目录 `.tmp` 再 rename，中途失败原包不动。所以不会写出半坏的包。
-- **不自动备份**：`level.dat.bak-*` 和 `output/backup/` 都没有了。以前每次保存都在世界目录里堆一个
-  看起来一模一样的 `.bak`，没人找得到、也没人分得清哪个是当前的，最后只会被当成垃圾文件删掉。
-  安全兜底改成由用户显式选择——顶栏保存图标 + 汉堡菜单（保存 / 另存为 / 恢复默认值）：
+- **安全兜底**：由用户显式选择——顶栏保存图标 + 汉堡菜单（保存 / 另存为 / 恢复默认值）：
   - **保存**：弹确认框，明确写「原文件不会保留副本，覆盖后不可找回」，并引导用「另存为」。
   - **另存为**：不弹确认，用**新时间戳**生成 `原名-yyyyMMdd-HHmmss.zip|mcworld`，原包不动，完成后回到文件页。
   - **恢复默认值**：丢弃待写改动，回到打开页面时的值，不写盘。
@@ -481,7 +468,7 @@ pr5 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
   覆盖回去——改之前先关掉游戏。
 - 存档详情保存要重写整个压缩包（同目录 `.tmp` 再 rename），所以需要**与包体等量**的剩余空间；
   空间不足时写 `.tmp` 会失败，原包保持不动。
-- **保存没有后悔药**：写入链路能保证不写出半坏的包，但覆盖成功之后旧内容就没有了（不再有 `.bak`）。
+- **保存没有后悔药**：写入链路能保证不写出半坏的包，但覆盖成功之后旧内容就没有了。
   想留原档只能用「另存为」。
 - 卸载重装后系统不一定清理 `/sdcard/Android/data/com.frenetic.litechunk/`。如果它留着且属主还是旧 uid，
   `output/` 里会写不进去（`EACCES`）。启动时会把不可写的 `output/` 改名成 `output.old-<时间戳>` 再新建；
@@ -491,3 +478,28 @@ pr5 起卡片里**不再有打地鼠小游戏**（`MoleGrid` 连同苦力怕、L
 
 MIT，见 `LICENSE`。第三方组件（Chunker、Fluent System Icons、Maven 依赖）见 `THIRD-PARTY.md`。
 本项目与 Mojang Studios、Microsoft 无关，Minecraft 是 Mojang Studios 的商标。
+
+## 致谢
+
+LiteChunk 的诞生离不开开源社区与各位朋友的帮助。在此，谨向以下项目和个人致以诚挚的感谢：
+
+### 开源项目
+
+- **[HiveGamesOSS/Chunker](https://github.com/HiveGamesOSS/Chunker)**
+  本项目的基础核心。LiteChunk 的诸多设计思路与实现均受益于 Chunker 的开源成果，感谢 HiveGames 团队的无私分享。
+
+- **[RealBurst/arcana](https://github.com/RealBurst/arcana)**
+  本项目的解压缩工具。感谢 arcana 项目在压缩/解压环节提供的可靠支持。
+
+### 特别感谢
+
+- **Dozener**
+  感谢你在此项目上的奠基性工作。你对可行性的验证为 LiteChunk 的立项与推进提供了关键信心，这份贡献不可替代。
+
+- **[Dicecan](https://github.com/Dicecan)**
+  感谢你在实体转换方面提供的巨大帮助与技术支持。LiteChunk 在这一环节的顺利实现，离不开你的耐心解答与专业指导。
+
+我们始终坚持将所有帮助过我们的朋友忠实地列在 README 致谢名单内，放在官网的醒目位置。希望大家可以把这一份开源精神传承下去。
+## 最后
+
+感谢所有关注、使用和反馈 LiteChunk 的朋友。开源的意义在于互相成就，LiteChunk 也将继续以开放的态度回馈社区。
