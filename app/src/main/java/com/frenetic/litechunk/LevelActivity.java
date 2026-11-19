@@ -81,6 +81,9 @@ public class LevelActivity extends AppCompatActivity {
     private boolean busy;
     /** True when the save in flight is meant to land in a new file rather than over the original. */
     private boolean saveAsCopy;
+    /** What kind of archive {@link #archive} is; anything but ZIP has to be saved out as a zip. */
+    private WorldFiles.Container container = WorldFiles.Container.ZIP;
+
     /** Set when leaving on purpose, so the unsaved-changes guard does not fire on the way out. */
     private boolean leaving;
 
@@ -103,6 +106,9 @@ public class LevelActivity extends AppCompatActivity {
             return;
         }
         archive = new File(path);
+        // Zip is rewritten in place; everything else can only be read (Arcana ships extractors, not compressors), so
+        // a save for those formats lands next to the original as a zip.
+        container = WorldFiles.sniff(archive);
 
         binding.btnBack.setOnClickListener(view -> attemptExit());
         binding.btnSave.setOnClickListener(view -> requestSave());
@@ -119,7 +125,11 @@ public class LevelActivity extends AppCompatActivity {
             }
         });
 
-        load();
+        if (container == WorldFiles.Container.ZIP) {
+            load();
+        } else {
+            openWhole();
+        }
     }
 
     @Override
@@ -138,13 +148,78 @@ public class LevelActivity extends AppCompatActivity {
             try {
                 workDirectory = new File(getCacheDir(), "detail/" + key(archive));
                 WorldFiles.delete(workDirectory);
-                File levelDat = new File(workDirectory, "level.dat");
-                entryName = Archive.extractLevelDat(archive, levelDat);
+                entryName = Archive.extractLevelDat(archive, new File(workDirectory, "level.dat"));
                 Controller.get(this).inspectLevel(workDirectory, receiver);
             } catch (Throwable failure) {
                 post(() -> showFailure(failure));
             }
         });
+    }
+
+    /**
+     * Open a non-zip archive, asking first when it looks like it could expand into something enormous.
+     * <p>
+     * Zip is read one entry at a time, so a zip bomb costs nothing here. 7z, rar and tar have to be unpacked whole
+     * into the cache, and a 300 MB archive can hold several gigabytes - legitimately, or not. The estimate comes from
+     * the archive index; when the format does not carry one the compressed size alone decides.
+     */
+    private void openWhole() {
+        setBusy(true);
+        io.execute(() -> {
+            try {
+                long compressed = archive.length();
+                long estimate = Archives.estimatedSize(archive, container);
+                Limits limits = Limits.load(this);
+                if (compressed > limits.extractIn && (estimate < 0L || estimate > limits.extractOut)) {
+                    post(() -> askBomb(estimate));
+                    return;
+                }
+                extractWhole();
+            } catch (Throwable failure) {
+                post(() -> showFailure(failure));
+            }
+        });
+    }
+
+    private void extractWhole() throws Exception {
+        workDirectory = new File(getCacheDir(), "detail/" + key(archive));
+        WorldFiles.delete(workDirectory);
+        File levelDat = new File(workDirectory, "level.dat");
+        // 7z / rar / tar / gz are unpacked whole through Arcana: they are read at random offsets (or through a
+        // stream this class does not own), so there is no cheap single-entry read.
+        if (!workDirectory.isDirectory() && !workDirectory.mkdirs()) {
+            throw new java.io.IOException("cannot create " + workDirectory);
+        }
+        Archives.extract(archive, workDirectory, container);
+        if (!levelDat.isFile()) {
+            throw new java.io.IOException(Text.get(R.string.LevelActivity_43));
+        }
+        Controller.get(this).inspectLevel(workDirectory, receiver);
+    }
+
+    private void askBomb(long estimate) {
+        if (binding == null) {
+            return;
+        }
+        setBusy(false);
+        String unpacked = estimate < 0L ? "?" : WorldFiles.humanSize(estimate);
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(Text.get(R.string.LevelActivity_47))
+                .setMessage(Text.get(R.string.LevelActivity_48)
+                        .replace("$1", WorldFiles.humanSize(archive.length()))
+                        .replace("$2", unpacked)
+                        .replace("$3", Space.free(this) > 0L ? WorldFiles.humanSize(Space.free(this)) : "?"))
+                .setNegativeButton(Text.get(R.string.action_cancel), (dialog, which) -> leave())
+                .setPositiveButton(Text.get(R.string.LevelActivity_49), (dialog, which) -> {
+                    io.execute(() -> {
+                        try {
+                            extractWhole();
+                        } catch (Throwable failure) {
+                            post(() -> showFailure(failure));
+                        }
+                    });
+                })
+                .show();
     }
 
     private final ResultReceiver receiver = new ResultReceiver(main) {
@@ -408,6 +483,15 @@ public class LevelActivity extends AppCompatActivity {
         if (busy || pending.isEmpty()) {
             return;
         }
+        if (container != WorldFiles.Container.ZIP) {
+            // Overwriting is not on the table for these formats, so the dialog asks about the only thing it can do.
+            titled(Text.get(R.string.LevelActivity_15), "SaveAsZip")
+                    .setMessage(Text.get(R.string.LevelActivity_44) + archive.getName() + Text.get(R.string.LevelActivity_45))
+                    .setNegativeButton(Text.get(R.string.LevelActivity_29), null)
+                    .setPositiveButton(Text.get(R.string.LevelActivity_46), (dialog, which) -> startSave(true))
+                    .show();
+            return;
+        }
         titled(Text.get(R.string.LevelActivity_15), "Overwrite")
                 .setMessage(Text.get(R.string.LevelActivity_16) + pending.size() + Text.get(R.string.LevelActivity_17) + archive.getName() + "」，"
                         + Text.get(R.string.LevelActivity_18)
@@ -458,16 +542,28 @@ public class LevelActivity extends AppCompatActivity {
         boolean asCopy = saveAsCopy;
         io.execute(() -> {
             try {
-                File target = asCopy ? copyTarget() : archive;
-                Archive.rewrite(archive, target, entryName, levelDat);
+                File target;
+                if (container == WorldFiles.Container.ZIP) {
+                    target = asCopy ? copyTarget() : archive;
+                    Archive.rewrite(archive, target, entryName, levelDat);
+                } else {
+                    // Packing a zip is the one archive this app can write. The original is left untouched - turning
+                    // a 7z into a zip in place would either lose the file or silently change what the user has.
+                    target = WorldFiles.unique(archive.getParentFile(),
+                            WorldFiles.stripArchiveExtension(archive.getName()) + ".zip");
+                    WorldFiles.zip(workDirectory, target);
+                }
                 WorldFiles.delete(workDirectory);
                 post(() -> {
                     setBusy(false);
                     pending.clear();
                     Store.get(this).refreshOutputs();
-                    String message = asCopy
-                            ? Text.get(R.string.LevelActivity_31) + target.getName()
-                            : Text.get(R.string.LevelActivity_32) + archive.getName() + Text.get(R.string.LevelActivity_33);
+                    String message;
+                    if (container == WorldFiles.Container.ZIP && !asCopy) {
+                        message = Text.get(R.string.LevelActivity_32) + archive.getName() + Text.get(R.string.LevelActivity_33);
+                    } else {
+                        message = Text.get(R.string.LevelActivity_31) + target.getName();
+                    }
                     Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                     leave();
                 });

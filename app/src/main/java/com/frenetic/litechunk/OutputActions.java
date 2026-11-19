@@ -89,9 +89,18 @@ final class OutputActions {
         }
     }
 
-    /** Export as a copy with the requested extension; the content is identical, only the name changes. */
+    /**
+     * Export as a copy with the requested extension; the content is identical, only the name changes.
+     * <p>
+     * A 7z or rar that the user imported themselves is not a zip: renaming it would hand them a file whose name
+     * lies about its content, so those keep the extension they came with.
+     */
     static void export(FragmentActivity activity, Store.OutputFile file, boolean mcworld) {
-        String name = WorldFiles.baseName(file.name) + (mcworld ? ".mcworld" : ".zip");
+        String lower = file.name.toLowerCase(java.util.Locale.ROOT);
+        boolean zipLike = lower.endsWith(".zip") || lower.endsWith(".mcworld");
+        String name = zipLike
+                ? WorldFiles.baseName(file.name) + (mcworld ? ".mcworld" : ".zip")
+                : file.name;
         ((MainActivity) activity).startExport(file.file, name);
     }
 

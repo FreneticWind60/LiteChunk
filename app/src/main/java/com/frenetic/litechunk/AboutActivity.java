@@ -62,6 +62,8 @@ public class AboutActivity extends AppCompatActivity {
         binding.rowBilibili.setOnClickListener(view -> openLink(BILIBILI_PROFILE));
         binding.rowLanguage.setOnClickListener(view -> chooseLanguage());
         updateLanguageLabel();
+        binding.rowLimits.setOnClickListener(view -> chooseLimits());
+        updateLimitsLabel();
     }
 
     @Override
@@ -101,6 +103,153 @@ public class AboutActivity extends AppCompatActivity {
                 })
                 .setNegativeButton(R.string.action_cancel, null)
                 .show();
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Size limits
+    // ---------------------------------------------------------------------------------------------
+
+    /** The active set sits on the row, so the numbers are visible without opening the sheet. */
+    private void updateLimitsLabel() {
+        binding.tvLimits.setText(Limits.load(this).summary() + " \u203A");
+    }
+
+    /**
+     * Four thresholds behind the "this is big" prompts, plus the switch that derives them from the free space.
+     * <p>
+     * The sheet is a plain form rather than a preference screen: there are four numbers, they only make sense
+     * together, and the recommended set has to be shown next to them to be understandable.
+     */
+    private void chooseLimits() {
+        com.google.android.material.bottomsheet.BottomSheetDialog sheet =
+                new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+        View content = getLayoutInflater().inflate(R.layout.sheet_limits, null);
+
+        TextView free = content.findViewById(R.id.tvFree);
+        TextView recommended = content.findViewById(R.id.tvRecommended);
+        com.google.android.material.materialswitch.MaterialSwitch auto = content.findViewById(R.id.switchAuto);
+        com.google.android.material.slider.Slider seekArchive = content.findViewById(R.id.seekArchive);
+        com.google.android.material.slider.Slider seekFolder = content.findViewById(R.id.seekFolder);
+        com.google.android.material.slider.Slider seekIn = content.findViewById(R.id.seekExtractIn);
+        com.google.android.material.slider.Slider seekOut = content.findViewById(R.id.seekExtractOut);
+        TextView inputArchive = content.findViewById(R.id.inputArchive);
+        TextView inputFolder = content.findViewById(R.id.inputFolder);
+        TextView inputIn = content.findViewById(R.id.inputExtractIn);
+        TextView inputOut = content.findViewById(R.id.inputExtractOut);
+
+        Limits current = Limits.load(this);
+        long[] suggested = Limits.recommended(this);
+        long space = Space.free(this);
+
+        free.setText(Text.get(R.string.Limits_09) + (space > 0 ? WorldFiles.humanSize(space) : "?"));
+        recommended.setText(Text.get(R.string.Limits_10)
+                + Limits.mb(suggested[0]) + " / " + Limits.mb(suggested[1]) + " / "
+                + Limits.mb(suggested[2]) + " / " + Limits.mb(suggested[3]));
+
+        // Ranges are deliberately wide: the limits are advice, so a user with a 2 TB drive can say "8 GB, go away".
+        bind(seekArchive, inputArchive, 64, 8192, 16, Limits.mb(current.archive));
+        bind(seekFolder, inputFolder, 128, 16384, 64, Limits.mb(current.folder));
+        bind(seekIn, inputIn, 32, 4096, 16, Limits.mb(current.extractIn));
+        bind(seekOut, inputOut, 128, 16384, 64, Limits.mb(current.extractOut));
+
+        auto.setChecked(current.auto);
+        // Turned on, the sliders show what the switch decided - and cannot be dragged.
+        Runnable sync = () -> {
+            boolean on = auto.isChecked();
+            seekArchive.setEnabled(!on);
+            seekFolder.setEnabled(!on);
+            seekIn.setEnabled(!on);
+            seekOut.setEnabled(!on);
+            inputArchive.setEnabled(!on);
+            inputFolder.setEnabled(!on);
+            inputIn.setEnabled(!on);
+            inputOut.setEnabled(!on);
+            if (on) {
+                seekArchive.setValue(snap(Limits.mb(suggested[0]), 64, 8192, 16));
+                seekFolder.setValue(snap(Limits.mb(suggested[1]), 128, 16384, 64));
+                seekIn.setValue(snap(Limits.mb(suggested[2]), 32, 4096, 16));
+                seekOut.setValue(snap(Limits.mb(suggested[3]), 128, 16384, 64));
+            }
+            recommended.setVisibility(on ? View.VISIBLE : View.GONE);
+        };
+        auto.setOnCheckedChangeListener((button, checked) -> sync.run());
+        sync.run();
+
+        content.findViewById(R.id.btnSaveLimits).setOnClickListener(view -> {
+            Limits saved = Limits.load(this);
+            saved.auto = auto.isChecked();
+            if (!saved.auto) {
+                saved.archive = (long) seekArchive.getValue() * Limits.MB;
+                saved.folder = (long) seekFolder.getValue() * Limits.MB;
+                saved.extractIn = (long) seekIn.getValue() * Limits.MB;
+                saved.extractOut = (long) seekOut.getValue() * Limits.MB;
+            }
+            saved.save(this);
+            updateLimitsLabel();
+            sheet.dismiss();
+        });
+
+        sheet.setContentView(content);
+        sheet.show();
+    }
+
+    /**
+     * Tie one slider to one text field.
+     * <p>
+     * Both directions, one flag: the slider writes its value into the field, the field (digits only) snaps to the
+     * slider's step and moves it. Without the flag the two would ping-pong and the caret would jump on every keystroke.
+     */
+    private static void bind(com.google.android.material.slider.Slider slider, TextView field,
+                             int min, int max, int step, long value) {
+        slider.setValueFrom(min);
+        slider.setValueTo(max);
+        slider.setStepSize(step);
+
+        boolean[] guard = {false};
+        slider.setValue(snap(value, min, max, step));
+        field.setText(String.valueOf((int) slider.getValue()));
+
+        slider.addOnChangeListener((changed, current, fromUser) -> {
+            if (guard[0]) {
+                return;
+            }
+            guard[0] = true;
+            field.setText(String.valueOf((int) current));
+            guard[0] = false;
+        });
+
+        field.addTextChangedListener(new android.text.TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence text, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence text, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(android.text.Editable text) {
+                if (guard[0]) {
+                    return;
+                }
+                long typed;
+                try {
+                    typed = Long.parseLong(text.toString().trim());
+                } catch (NumberFormatException empty) {
+                    return; // Mid-edit (the field is empty), nothing to apply yet.
+                }
+                guard[0] = true;
+                slider.setValue(snap(typed, min, max, step));
+                guard[0] = false;
+            }
+        });
+    }
+
+    /** @return the value rounded to the slider's step and kept inside its range. */
+    private static float snap(long value, int min, int max, int step) {
+        long clamped = Math.max(min, Math.min(max, value));
+        long snapped = min + Math.round((double) (clamped - min) / step) * step;
+        return Math.max(min, Math.min(max, snapped));
     }
 
     // ---------------------------------------------------------------------------------------------

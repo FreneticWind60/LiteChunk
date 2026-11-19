@@ -83,6 +83,61 @@ final class Archives {
      * @param container   TAR or GZIP (a bare .gz is treated as tar.gz, which is the only shape a world arrives in).
      * @throws Exception when the archive is damaged or is not a tar.
      */
+    /**
+     * How big the archive becomes once unpacked, without unpacking it.
+     * <p>
+     * Only used to warn before a save is extracted whole (see {@code LevelActivity}): a 300 MB 7z can legitimately
+     * hold 2 GB of world, and it can also be a decompression bomb. RAR, 7z and TAR carry per-entry sizes in their
+     * index, so listing is cheap. GZIP has no index, but its trailer holds the uncompressed size as a little endian
+     * int - good enough for a warning, and wrong only above 4 GB, where it wraps.
+     *
+     * @param archive   the archive on disk.
+     * @param container what the sniffer said it is.
+     * @return the uncompressed size in bytes, or -1 when it cannot be known without unpacking.
+     */
+    static long estimatedSize(File archive, WorldFiles.Container container) {
+        try {
+            switch (container) {
+                case RAR:
+                    return total(new RarExtractor().list(archive));
+                case SEVEN_Z:
+                    return total(new SevenZExtractor().list(archive));
+                case TAR:
+                    return total(new TarExtractor().list(archive));
+                case GZIP:
+                    return gzipSize(archive);
+                default:
+                    return -1L;
+            }
+        } catch (Throwable failure) {
+            return -1L;
+        }
+    }
+
+    private static long total(java.util.List<be.stef.arcana.ArcanaEntry> entries) {
+        long sum = 0L;
+        for (be.stef.arcana.ArcanaEntry entry : entries) {
+            long size = entry.getUncompressedSize();
+            if (size > 0L) {
+                sum += size;
+            }
+        }
+        return sum > 0L ? sum : -1L;
+    }
+
+    /** The ISIZE field at the end of a gzip stream: uncompressed size modulo 2^32. */
+    private static long gzipSize(File archive) throws IOException {
+        try (java.io.RandomAccessFile file = new java.io.RandomAccessFile(archive, "r")) {
+            if (file.length() < 4L) {
+                return -1L;
+            }
+            file.seek(file.length() - 4L);
+            byte[] tail = new byte[4];
+            file.readFully(tail);
+            return (tail[0] & 0xFFL) | (tail[1] & 0xFFL) << 8 | (tail[2] & 0xFFL) << 16 | (tail[3] & 0xFFL) << 24;
+        }
+    }
+
     static void extract(InputStream in, File destination, WorldFiles.Container container) throws Exception {
         switch (container) {
             case TAR:

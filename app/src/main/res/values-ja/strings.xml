@@ -415,4 +415,41 @@
     <string name="Updates_09">テスト版をダウンロード</string>
     <string name="Updates_10">正式版 $1 が公開されました。更新できます。</string>
     <string name="Updates_11">閉じる</string>
+
+    <string name="FilesFragment_11">追加</string>
+    <string name="FilesFragment_12">出力フォルダに取り込む</string>
+    <string name="FilesFragment_13">変換せずに NBT を編集したいときはここに入れてください</string>
+    <string name="FilesFragment_14">圧縮ファイル（.zip / .mcworld）</string>
+    <string name="FilesFragment_15">フォルダ（ここで .zip にまとめます）</string>
+    <string name="FilesFragment_16">出力フォルダに追加しました</string>
+    <string name="FilesFragment_17">取り込みに失敗しました</string>
+    <string name="FilesFragment_18">対応しているのは .zip と .mcworld のみです</string>
+
+    <string name="LevelActivity_43">この圧縮ファイルに level.dat が見つかりません</string>
+    <string name="LevelActivity_44">7z・rar・tar・gzip は展開のみで、書き換えはできません。保存すると .zip として別名保存し、「</string>
+    <string name="LevelActivity_45">」は変更しません。</string>
+    <string name="LevelActivity_46">.zip として保存</string>
+
+    <string name="FilesFragment_19">サイズが大きすぎます</string>
+    <string name="FilesFragment_20">このまま取り込む</string>
+    <string name="FilesFragment_21">この圧縮ファイルは $1 です。取り込むと出力フォルダに複製するため、同じだけの空き容量が必要です。空き容量は $2 です。</string>
+    <string name="FilesFragment_22">このフォルダは $1 です。取り込むと .zip にまとめるため、元のサイズと圧縮後の両方の容量が必要です。空き容量は $2 です。</string>
+    <string name="LevelActivity_47">展開すると非常に大きくなります</string>
+    <string name="LevelActivity_48">圧縮ファイルは $1 ですが、展開後は約 $2 になり、空き容量は $3 です。読み込むにはすべてキャッシュに展開する必要があります。出所が不明な場合は圧縮爆弾にご注意ください。続行しますか？</string>
+    <string name="LevelActivity_49">展開して続行</string>
+
+    <string name="Limits_01">推奨値を使う</string>
+    <string name="Limits_02">カスタム</string>
+    <string name="Limits_03">取り込みと展開の上限</string>
+    <string name="Limits_04">圧縮ファイル取り込み（MB）</string>
+    <string name="Limits_05">フォルダ取り込み（MB）</string>
+    <string name="Limits_06">展開前チェック：圧縮ファイル（MB）</string>
+    <string name="Limits_07">展開前チェック：展開後（MB）</string>
+    <string name="Limits_08">保存</string>
+    <string name="Limits_09">空き容量：</string>
+    <string name="Limits_10">推奨値：</string>
+    <string name="FilesFragment_23">空き容量は $2 です。</string>
+    <string name="FilesFragment_24">サイズを計算しています…</string>
+
+    <string name="activity_about_16">環境設定</string>
 </resources>

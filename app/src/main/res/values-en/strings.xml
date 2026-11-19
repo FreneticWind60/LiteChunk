@@ -415,4 +415,41 @@
     <string name="Updates_09">Download preview</string>
     <string name="Updates_10">Stable $1 is out - you can update now.</string>
     <string name="Updates_11">Close</string>
+
+    <string name="FilesFragment_11">Add</string>
+    <string name="FilesFragment_12">Import into the output folder</string>
+    <string name="FilesFragment_13">Drop a save here to edit its NBT without converting it first</string>
+    <string name="FilesFragment_14">Archive (.zip / .mcworld)</string>
+    <string name="FilesFragment_15">Folder (packed into a .zip here)</string>
+    <string name="FilesFragment_16">Added to the output folder</string>
+    <string name="FilesFragment_17">Import failed</string>
+    <string name="FilesFragment_18">Only .zip and .mcworld archives are supported</string>
+
+    <string name="LevelActivity_43">This archive has no level.dat</string>
+    <string name="LevelActivity_44">7z, rar, tar and gzip can only be unpacked on a phone, not rewritten. Saving writes a .zip next to the original and leaves「</string>
+    <string name="LevelActivity_45">」untouched.</string>
+    <string name="LevelActivity_46">Save as .zip</string>
+
+    <string name="FilesFragment_19">This is large</string>
+    <string name="FilesFragment_20">Import anyway</string>
+    <string name="FilesFragment_21">This archive is $1. Importing copies it into the output folder, so it takes that much space again. Free space: $2.</string>
+    <string name="FilesFragment_22">This folder is $1. Importing packs it into a .zip, which needs room for both the original and the archive. Free space: $2.</string>
+    <string name="LevelActivity_47">This archive unpacks to a lot</string>
+    <string name="LevelActivity_48">The archive is only $1 but should unpack to about $2, with $3 free. Reading this save means writing all of it to the cache - be careful with a decompression bomb if you do not trust the source. Continue?</string>
+    <string name="LevelActivity_49">Unpack anyway</string>
+
+    <string name="Limits_01">Use recommended</string>
+    <string name="Limits_02">Custom</string>
+    <string name="Limits_03">Import and unpack limits</string>
+    <string name="Limits_04">Archive import threshold (MB)</string>
+    <string name="Limits_05">Folder import threshold (MB)</string>
+    <string name="Limits_06">Unpack check: archive (MB)</string>
+    <string name="Limits_07">Unpack check: unpacked (MB)</string>
+    <string name="Limits_08">Save</string>
+    <string name="Limits_09">Free space: </string>
+    <string name="Limits_10">Recommended: </string>
+    <string name="FilesFragment_23">Free space: $2.</string>
+    <string name="FilesFragment_24">Measuring…</string>
+
+    <string name="activity_about_16">Preferences</string>
 </resources>

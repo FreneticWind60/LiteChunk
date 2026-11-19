@@ -258,12 +258,21 @@ final class Store {
     // Output folder
     // ---------------------------------------------------------------------------------------------
 
+    /**
+     * Run a task on the store's single background thread.
+     * <p>
+     * Used by the file page when it copies an imported save into {@code output/}: zipping a folder can take a while,
+     * and doing it on the UI thread would freeze the list for as long as the archive takes to build.
+     *
+     * @param task the work to run off the UI thread.
+     */
+    void runOnIo(Runnable task) {
+        io.execute(task);
+    }
+
     void refreshOutputs() {
         File directory = Paths.output(app);
-        File[] files = directory.listFiles((dir, name) -> {
-            String lower = name.toLowerCase(java.util.Locale.ROOT);
-            return lower.endsWith(".mcworld") || lower.endsWith(".zip");
-        });
+        File[] files = directory.listFiles((dir, name) -> WorldFiles.isOutputArchive(name));
         List<OutputFile> scanned = new ArrayList<>();
         if (files != null) {
             for (File file : files) {

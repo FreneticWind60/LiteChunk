@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Four thresholds, each a slider plus a text field. The slider is for "roughly this much", the field for an exact
+    number - a 4 GB ceiling is unusable as a slider alone, and typing is the only way to land on a round value.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="20dp"
+    android:paddingTop="16dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="20dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/Limits_03"
+        android:textColor="@color/text"
+        android:textSize="16sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvFree"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textAppearance="@style/Text.LiteChunk.Caption" />
+
+    <com.google.android.material.materialswitch.MaterialSwitch
+        android:id="@+id/switchAuto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/Limits_01" />
+
+    <TextView
+        android:id="@+id/tvRecommended"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="4dp"
+        android:textAppearance="@style/Text.LiteChunk.Caption" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/Limits_04"
+        android:textAppearance="@style/Text.LiteChunk.Caption" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/seekArchive"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputArchive"
+            android:layout_width="92dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:inputType="number"
+            android:maxLength="5"
+            android:singleLine="true" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/Limits_05"
+        android:textAppearance="@style/Text.LiteChunk.Caption" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/seekFolder"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputFolder"
+            android:layout_width="92dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:inputType="number"
+            android:maxLength="5"
+            android:singleLine="true" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/Limits_06"
+        android:textAppearance="@style/Text.LiteChunk.Caption" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/seekExtractIn"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputExtractIn"
+            android:layout_width="92dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:inputType="number"
+            android:maxLength="5"
+            android:singleLine="true" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:text="@string/Limits_07"
+        android:textAppearance="@style/Text.LiteChunk.Caption" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/seekExtractOut"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/inputExtractOut"
+            android:layout_width="92dp"
+            android:layout_height="wrap_content"
+            android:gravity="end"
+            android:inputType="number"
+            android:maxLength="5"
+            android:singleLine="true" />
+    </LinearLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btnSaveLimits"
+        style="@style/Widget.LiteChunk.PrimaryButton"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="18dp"
+        android:text="@string/Limits_08" />
+
+</LinearLayout>

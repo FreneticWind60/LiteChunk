@@ -239,6 +239,36 @@ final class WorldFiles {
         return null;
     }
 
+    /**
+     * Total size of a picked folder, walked through the content provider.
+     * <p>
+     * Used only to warn before importing something huge, so an unreadable provider simply reports -1 and the
+     * warning is skipped rather than refusing the import.
+     *
+     * @param context  a context.
+     * @param treeUri  the tree the user picked.
+     * @return the summed size in bytes, or -1 when it cannot be read.
+     */
+    static long treeSize(Context context, Uri treeUri) {
+        try {
+            DocumentFile root = DocumentFile.fromTreeUri(context, treeUri);
+            return root == null ? -1L : sizeOf(root);
+        } catch (RuntimeException failure) {
+            return -1L;
+        }
+    }
+
+    private static long sizeOf(DocumentFile document) {
+        if (document.isDirectory()) {
+            long sum = 0L;
+            for (DocumentFile child : document.listFiles()) {
+                sum += sizeOf(child);
+            }
+            return sum;
+        }
+        return Math.max(0L, document.length());
+    }
+
     static boolean isWorld(File directory) {
         return new File(directory, "level.dat").isFile();
     }
@@ -388,6 +418,23 @@ final class WorldFiles {
         int dot = lower.lastIndexOf('.');
         String extension = dot == -1 ? "" : lower.substring(dot + 1);
         return "ldb".equals(extension) || "sst".equals(extension);
+    }
+
+    /**
+     * Whether a file name in {@code output/} is an archive the file page should list.
+     * <p>
+     * Wider than what the converter writes: the file page also accepts a save the user brought themselves, and
+     * Arcana lets the details screen read the formats the engine cannot. {@code .tar.gz} needs no entry of its own,
+     * it ends with {@code .gz}.
+     *
+     * @param name the file name.
+     * @return true when the name looks like an archive.
+     */
+    static boolean isOutputArchive(String name) {
+        String lower = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
+        return lower.endsWith(".zip") || lower.endsWith(".mcworld") || lower.endsWith(".7z")
+                || lower.endsWith(".rar") || lower.endsWith(".tar") || lower.endsWith(".gz")
+                || lower.endsWith(".tgz");
     }
 
     static long size(File file) {
