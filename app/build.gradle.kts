@@ -33,8 +33,8 @@ android {
         // The 10^8 scale (rather than 10^7) is deliberate: the first two previews shipped as
         // 12_100_501 / 12_100_502 under an older encoding, and a release has to be installable over
         // them on any device that still has one.
-        versionCode = 121_000_450
-        versionName = "1.21.0 build4"
+        versionCode = 121_000_451
+        versionName = "1.21.0 build4 pt1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

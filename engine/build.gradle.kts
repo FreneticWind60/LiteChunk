@@ -29,13 +29,23 @@ dependencies {
     compileOnly(project(":api"))
 
     // Chunker runtime dependencies (shrunk + dexed by R8).
-    implementation("com.google.guava:guava:33.7.1-jre")
+    // Pinned on purpose, do not bump blindly: Guava 33.4.8 replaced AbstractFuture's atomic helper with
+    // java.lang.invoke.VarHandle. VarHandle only exists from Android 13 (API 33), so on every older release
+    // ART rejects AbstractFutureState$VarHandleAtomicHelper with a VerifyError while linking AbstractFutureState
+    // -- before Guava's own fallback can catch anything, because the throwable is an Error, not an Exception.
+    // leveldb's TableCache loads tables through Guava's LocalCache, and that path creates a SettableFuture, so a
+    // single .ldb table (or a recovered write log) kills the conversion process. 33.4.0 is the last release that
+    // still uses AtomicReferenceFieldUpdater/Unsafe. engineDex fails the build if this regresses.
+    implementation("com.google.guava:guava:33.4.0-jre")
     implementation("com.google.code.gson:gson:2.14.0")
     implementation("it.unimi.dsi:fastutil:8.5.19")
     implementation("net.jpountz.lz4:lz4:1.3.0")
     implementation("com.hivemc.leveldb:leveldb:1.1.0")
     implementation("com.hivemc.leveldb:leveldb-api:1.1.0")
     compileOnly("org.jetbrains:annotations:26.1.0")
+    // Chunker's sources annotate with jspecify. Newer Guava releases expose it transitively, older ones do not,
+    // and the annotations are compile time only, so declare them here instead of inheriting them from Guava.
+    compileOnly("org.jspecify:jspecify:1.0.1")
 
     testImplementation(project(":api"))
 }
@@ -304,6 +314,16 @@ val engineDex = tasks.register<JavaExec>("engineDex") {
             .orEmpty()
             .sortedBy { it.name }
         check(dexFiles.isNotEmpty()) { "R8 produced no dex output in ${r8OutputDir.get().asFile}" }
+
+        // Guard for the Guava pin above: a VarHandle based atomic helper verifies itself only from API 33 on, and
+        // the artefact is a dex that crashes on Android 11/12 at the first leveldb table read. Fail here instead.
+        dexFiles.forEach { dex ->
+            val strings = dex.readBytes().toString(Charsets.ISO_8859_1)
+            check(!strings.contains("VarHandleAtomicHelper")) {
+                "engineDex: ${dex.name} contains a VarHandle based AbstractFuture helper, which ART rejects below " +
+                    "API 33. Keep Guava at a release that does not use java.lang.invoke.VarHandle."
+            }
+        }
 
         val target = engineAssetsDir.file("chunker.jar").asFile
         target.parentFile.mkdirs()

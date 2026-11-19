@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Locale;
+import java.util.zip.CRC32;
 import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -277,9 +278,18 @@ final class WorldFiles {
     /**
      * Pack a converted world into a {@code .zip} / {@code .mcworld}.
      * <p>
-     * There is no single right deflate level for a converted world: the archive mixes already compressed LevelDB
-     * tables, uncompressed LevelDB logs and Java region files, and each wants a different answer. See
-     * {@link #levelFor(String)} for the measured numbers behind the split.
+     * A converted world mixes two very different kinds of bytes: LevelDB tables that the engine already zlib
+     * compressed block by block ({@code db/*.ldb}), and uncompressed data ({@code db/*.log}, Java region files). The
+     * tables are stored as is, everything else is deflated at the default level; see {@link #storeAsIs(String)} for
+     * the measured numbers.
+     * <p>
+     * The level is deliberately <em>not</em> changed per entry through {@link ZipOutputStream#setLevel(int)}. That
+     * API re-initialises the single {@link Deflater} the stream owns, and ART does not survive the re-initialisation
+     * cleanly: on Android 11 switching levels between entries writes the level of one entry into the next one and, on
+     * the transition back to {@code NO_COMPRESSION}, emits a stream that no inflater accepts. The result was an
+     * archive whose first {@code .ldb} entry could not be extracted at all ("invalid compressed data to inflate", CRC
+     * 0) while the conversion itself reported success. Storing the tables needs no deflater at all, so nothing
+     * switches any more.
      */
     static void zip(File directory, File zipFile) throws IOException {
         File parent = zipFile.getParentFile();
@@ -309,8 +319,35 @@ final class WorldFiles {
         if (entryName.isEmpty()) {
             return;
         }
-        // The level has to be set before putNextEntry: that is where the stream initialises the deflater.
-        zip.setLevel(levelFor(entryName));
+        if (storeAsIs(entryName)) {
+            // STORED needs size and CRC up front, so the file is read once for the checksum and once for the payload.
+            // For a table that costs one extra pass over page cache; keeping the deflater out of the picture is worth
+            // far more than the bytes deflate would save (already compressed data shrinks by 4% at most).
+            long size = file.length();
+            CRC32 crc = new CRC32();
+            try (InputStream in = new BufferedInputStream(new FileInputStream(file), BUFFER)) {
+                byte[] buffer = new byte[BUFFER];
+                int read;
+                while ((read = in.read(buffer)) > 0) {
+                    crc.update(buffer, 0, read);
+                }
+            }
+            ZipEntry entry = new ZipEntry(entryName);
+            entry.setMethod(ZipEntry.STORED);
+            entry.setSize(size);
+            entry.setCompressedSize(size);
+            entry.setCrc(crc.getValue());
+            zip.putNextEntry(entry);
+            try (InputStream in = new BufferedInputStream(new FileInputStream(file), BUFFER)) {
+                byte[] buffer = new byte[BUFFER];
+                int read;
+                while ((read = in.read(buffer)) > 0) {
+                    zip.write(buffer, 0, read);
+                }
+            }
+            zip.closeEntry();
+            return;
+        }
         zip.putNextEntry(new ZipEntry(entryName));
         try (InputStream in = new BufferedInputStream(new FileInputStream(file), BUFFER)) {
             byte[] buffer = new byte[BUFFER];
@@ -323,38 +360,34 @@ final class WorldFiles {
     }
 
     /**
-     * Deflate level for a single entry.
+     * Whether an entry is copied into the archive without deflating.
      * <p>
      * The rule has to be per file type, because a converted world is two very different kinds of bytes:
      * <ul>
      *   <li>{@code db/*.ldb} are LevelDB tables that the engine already zlib compressed block by block
      *       ({@code CompressionType.ZLIB_RAW}). Deflating them again is pure waste: measured on a 257 MB world,
-     *       66.1 MB of {@code .ldb} shrinks to 64.0 MB (96%) and costs 3.7 s. Storing them costs 0.1 s and makes the
-     *       archive 4% bigger - the only case where level 0 is the right answer.</li>
+     *       66.1 MB of {@code .ldb} shrinks to 64.0 MB (96%) and costs 3.7 s, while storing them costs 0.1 s and
+     *       leaves the archive 4% bigger - the only case where no compression is the right answer.</li>
      *   <li>{@code db/*.log} is the LevelDB write ahead log, which is <em>not</em> compressed: 103.3 MB deflates to
-     *       11.0 MB (10%). This is where the archive actually gets small, so these keep the default level.</li>
+     *       11.0 MB (10%). This is where the archive actually gets small, so the log keeps the default level.</li>
      *   <li>Java region files are the case where a cheaper level is free, because two thirds of a converted
-     *       {@code .mca} is 4 KB sector padding and repeated zlib headers, which even the fast level catches:
-     *       converted 278 MB world, 80 MB output: level 1 = 38.7% of source, level 6 = 38.0%, 1.4x faster.</li>
+     *       {@code .mca} is 4 KB sector padding and repeated zlib headers: converted 278 MB world, 80 MB output,
+     *       level 1 = 38.7% of source, level 6 = 38.0% and 1.4x slower. They keep the default level as well: the
+     *       difference is 0.7% of size, and switching levels per entry corrupts the archive on ART (see
+     *       {@link #zip(File, File)}).</li>
      * </ul>
      * An earlier version of this comment claimed the whole {@code db/} folder "still deflates to 38%". That was
      * measured on a world small enough that almost everything was still in {@code .log}, and it does not hold for a
      * large world where the tables dominate - which is exactly the case this optimisation is for.
      *
      * @param entryName the path inside the archive.
-     * @return the deflate level to use for this entry.
+     * @return true when the entry should be stored instead of deflated.
      */
-    private static int levelFor(String entryName) {
+    private static boolean storeAsIs(String entryName) {
         String lower = entryName.toLowerCase(Locale.ROOT);
         int dot = lower.lastIndexOf('.');
         String extension = dot == -1 ? "" : lower.substring(dot + 1);
-        if ("mca".equals(extension) || "mcr".equals(extension)) {
-            return Deflater.BEST_SPEED;
-        }
-        if ("ldb".equals(extension) || "sst".equals(extension)) {
-            return Deflater.NO_COMPRESSION;
-        }
-        return Deflater.DEFAULT_COMPRESSION;
+        return "ldb".equals(extension) || "sst".equals(extension);
     }
 
     static long size(File file) {

@@ -43,6 +43,7 @@ final class Updates {
     private static final Pattern VERSION = Pattern.compile(
             "^\\s*v?(\\d+)\\.(\\d+)\\.(\\d+)"
                     + "(?:[-\\s]+[Bb]uild\\s*(\\d+))?"
+                    + "(?:[-\\s]+[Pp][Tt]\\s*(\\d+))?"
                     + "(?:[-\\s]+[Pp][Rr]\\s*(\\d+))?");
 
     private Updates() {
@@ -79,7 +80,17 @@ final class Updates {
             }
             try {
                 int build = matcher.group(4) == null ? 0 : Integer.parseInt(matcher.group(4));
-                int stage = matcher.group(5) == null ? STABLE : Integer.parseInt(matcher.group(5));
+                // Two kinds of tail: `pr6` is the sixth preview of a build (below stable), `pt1` is the first patch
+                // of a released build (above it). Both live in the same stage field, so a patch is 50 + n and a
+                // preview is n - that keeps 1.21.0 build4 < build4 pt1 < build4 pr1 of the next build.
+                int stage;
+                if (matcher.group(5) != null) {
+                    stage = STABLE + Integer.parseInt(matcher.group(5));
+                } else if (matcher.group(6) != null) {
+                    stage = Integer.parseInt(matcher.group(6));
+                } else {
+                    stage = STABLE;
+                }
                 return new Version(
                         Integer.parseInt(matcher.group(1)),
                         Integer.parseInt(matcher.group(2)),
