@@ -496,6 +496,10 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 
 /* ---------------- 卡片与网格 ---------------- */
 .grid { display: grid; gap: 14px; }
+/* 4 张能力卡固定 2×2，避免宽屏下变成 3+1 落单 */
+@media (min-width: 560px) {
+  .grid.grid--feats--2x2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 
 .feat {
   position: relative;
@@ -874,6 +878,61 @@ code {
   font-size: .9em;
   word-break: break-word;
 }
+
+/* 代码块 */
+.codeblock {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  overflow: hidden;
+}
+.codeblock__bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--muted);
+}
+.codeblock__bar .dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
+}
+.codeblock__bar b {
+  margin-left: auto;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: var(--ink-2);
+}
+.codeblock pre {
+  margin: 0;
+  padding: 14px 16px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 12.6px;
+  line-height: 1.72;
+  color: var(--ink-2);
+  tab-size: 2;
+}
+.codeblock pre code {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  word-break: normal;
+}
+
+/* 表格横向滚动容器：窄屏下长代码不撑破版心 */
+.table-wrap { margin-top: 16px; overflow-x: auto; }
 
 /* FAQ 折叠 */
 .faq { display: grid; gap: 8px; margin-top: 18px; }

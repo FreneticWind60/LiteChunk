@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ChunkBridge SDK — LiteChunk</title>
+  <meta name="description" content="ChunkBridge SDK：LiteChunk 转换引擎的独立 Android 库。约 1.7 MB AAR，不依赖 LiteChunk 与 Minecraft，全程离线，支持 Java 版与基岩版互转。">
+  <meta name="theme-color" content="#f5f8f5">
+
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('lc-theme');
+        if (!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) { }
+    })();
+  </script>
+
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="common.css">
+</head>
+<body>
+  <a class="skip" href="#main">跳到正文</a>
+
+  <svg class="sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+    <defs><clipPath id="crate-top"><rect x="0" y="0" width="24" height="9.3" /></clipPath></defs>
+    <symbol id="i-crate" viewBox="0 0 24 24">
+      <path fill="currentColor"
+        d="M19.895 11.048a.116.116 0 0 0 .031.201c1.621.579 2.393.66 2.393 2.081v4.011c0 .716-.051.88-.531 1.254c-.877.683-6.185 4.747-6.392 4.913c-.774.62-1.169.556-2.054.339a515 515 0 0 1-9.945-2.577c-1.746-.47-1.701-2.064-1.701-3.203c0-3.945-.015-7.468-.015-11.202c0-1.186.049-1.222.95-1.881c.83-.607 4.296-3.135 6.153-4.499c.553-.406.828-.607 1.618-.406c1.616.41 6.664 1.649 9.382 2.339c2.083.529 2.535.893 2.535 2.326V8.38c0 .465-.007.638-.408.981c-.202.173-1.348 1.14-2.016 1.687m1.624-2.556a.113.113 0 0 0 .141-.112c.001-1.414.011-2.495.011-3.666c0-.622-.35-1.137-1.121-1.343C16.501 2.29 10.486.866 10.191.778c-.197-.059-.322.108-.322.199c-.001 4.294.029 7.832.029 11.854c0 .741.408 1.525 1.292 1.765c3.582.973 6.578 1.655 10.331 2.667a.115.115 0 0 0 .143-.112c.001-.848.014-1.405.014-1.95c0-2.27.279-2.679-1.57-3.194c-2.198-.612-5.306-1.378-5.554-1.441c-.485-.124-.548-.266-.548-.591c0-.122-.011-2.346-.003-2.869c.002-.157.006-.31.157-.397c.134-.077.264-.046.664.053c.448.111 4.598 1.186 6.695 1.73m-7.65 14.735a.114.114 0 0 0 .142-.111c.001-1.185.017-2.484.017-3.352c0-1.475.182-1.334-1.064-1.639c-1.474-.36-4.433-1.146-5.967-1.552c-.355-.094-.459-.424-.459-.998c0-1.726-.006-4.575-.006-6.577c0-1.834.193-1.599-.703-1.832c-.565-.146-2.468-.637-3.313-.828c-.144-.032-.225.085-.225.224c-.003 3.939.053 8.211.053 11.994c0 1.228.439 1.815 1.321 2.051c3.589.963 6.446 1.652 10.204 2.62" />
+      <g clip-path="url(#crate-top)">
+        <path fill="#ffffff" opacity=".32"
+          d="M19.895 11.048a.116.116 0 0 0 .031.201c1.621.579 2.393.66 2.393 2.081v4.011c0 .716-.051.88-.531 1.254c-.877.683-6.185 4.747-6.392 4.913c-.774.62-1.169.556-2.054.339a515 515 0 0 1-9.945-2.577c-1.746-.47-1.701-2.064-1.701-3.203c0-3.945-.015-7.468-.015-11.202c0-1.186.049-1.222.95-1.881c.83-.607 4.296-3.135 6.153-4.499c.553-.406.828-.607 1.618-.406c1.616.41 6.664 1.649 9.382 2.339c2.083.529 2.535.893 2.535 2.326V8.38c0 .465-.007.638-.408.981c-.202.173-1.348 1.14-2.016 1.687m1.624-2.556a.113.113 0 0 0 .141-.112c.001-1.414.011-2.495.011-3.666c0-.622-.35-1.137-1.121-1.343C16.501 2.29 10.486.866 10.191.778c-.197-.059-.322.108-.322.199c-.001 4.294.029 7.832.029 11.854c0 .741.408 1.525 1.292 1.765c3.582.973 6.578 1.655 10.331 2.667a.115.115 0 0 0 .143-.112c.001-.848.014-1.405.014-1.95c0-2.27.279-2.679-1.57-3.194c-2.198-.612-5.306-1.378-5.554-1.441c-.485-.124-.548-.266-.548-.591c0-.122-.011-2.346-.003-2.869c.002-.157.006-.31.157-.397c.134-.077.264-.046.664.053c.448.111 4.598 1.186 6.695 1.73m-7.65 14.735a.114.114 0 0 0 .142-.111c.001-1.185.017-2.484.017-3.352c0-1.475.182-1.334-1.064-1.639c-1.474-.36-4.433-1.146-5.967-1.552c-.355-.094-.459-.424-.459-.998c0-1.726-.006-4.575-.006-6.577c0-1.834.193-1.599-.703-1.832c-.565-.146-2.468-.637-3.313-.828c-.144-.032-.225.085-.225.224c-.003 3.939.053 8.211.053 11.994c0 1.228.439 1.815 1.321 2.051c3.589.963 6.446 1.652 10.204 2.62" />
+      </g>
+    </symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <circle cx="12" cy="12" r="4.2" />
+      <path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6" />
+    </symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20.4 14.3A8.7 8.7 0 1 1 9.6 3.5a6.8 6.8 0 0 0 10.8 10.8Z" />
+    </symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </symbol>
+    <symbol id="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+      <path d="M6 6l12 12M18 6 6 18" />
+    </symbol>
+    <symbol id="i-github" viewBox="0 0 16 16">
+      <path fill="currentColor"
+        d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A7.995 7.995 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+    </symbol>
+    <symbol id="i-arrow-up" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 19.5V4.5" /><path d="m5.5 11 6.5-6.5L18.5 11" />
+    </symbol>
+    <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14.5 3.5h-7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8Z" />
+      <path d="M14.5 3.5V8h4" /><path d="M9 12.5h6M9 16h4" />
+    </symbol>
+    <symbol id="i-external" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M13.5 4.5h-7a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-7" />
+      <path d="M13 4.5h6.5V11" /><path d="M19.5 4.5 11 13" />
+    </symbol>
+    <symbol id="i-package" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="m12 3 7.5 4.2v9.6L12 21l-7.5-4.2V7.2Z" />
+      <path d="m4.8 7.4 7.2 4.1 7.2-4.1M12 11.5V21" />
+    </symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="m12 3.5 8 4.3-8 4.3-8-4.3Z" /><path d="m4 12 8 4.3 8-4.3" /><path d="m4 16.2 8 4.3 8-4.3" />
+    </symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3.2 5 6v5.4c0 4.1 2.9 7.4 7 9.4 4.1-2 7-5.3 7-9.4V6Z" />
+      <path d="m8.8 12 2.2 2.2 4.2-4.4" />
+    </symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4.5 8.5h13M14.5 5.5l3 3-3 3" /><path d="M19.5 15.5h-13M9.5 12.5l-3 3 3 3" />
+    </symbol>
+
+  </svg>
+
+  <header class="site-head" id="siteHead">
+    <div class="wrap head__in">
+      <a class="brand" href="index.html" aria-label="LiteChunk 首页">
+        <span class="brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-crate"></use></svg></span>
+        <span class="brand__name">Lite<b>Chunk</b></span>
+      </a>
+
+      <nav class="nav" id="siteNav" aria-label="主导航">
+        <a href="index.html" data-nav>首页</a>
+        <a href="doc.html" data-nav>文档</a>
+        <a href="sdk.html" data-nav>SDK</a>
+        <a href="log.html" data-nav>更新日志</a>
+        <a href="about.html" data-nav>关于</a>
+        <div class="nav__dl"><a class="btn btn--primary" href="index.html#download">下载 LiteChunk</a></div>
+      </nav>
+
+      <div class="head__act">
+        <a class="icon-btn head__cta" href="https://github.com/FreneticWind60/LiteChunk" target="_blank"
+          rel="noopener" aria-label="GitHub 仓库" title="GitHub 仓库">
+          <svg><use href="#i-github"></use></svg>
+        </a>
+        <a class="btn btn--primary btn--sm head__dl" href="index.html#download">下载</a>
+        <button class="icon-btn theme-btn" id="themeBtn" type="button" aria-label="切换主题" aria-pressed="false">
+          <svg class="i-sun" aria-hidden="true"><use href="#i-sun"></use></svg>
+          <svg class="i-moon" aria-hidden="true"><use href="#i-moon"></use></svg>
+        </button>
+        <button class="icon-btn menu-btn" id="menuBtn" type="button" aria-label="打开菜单"
+          aria-expanded="false" aria-controls="siteNav">
+          <svg class="i-menu" aria-hidden="true"><use href="#i-menu"></use></svg>
+          <svg class="i-close" aria-hidden="true"><use href="#i-close"></use></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <div class="page-head">
+      <div class="wrap">
+        <p class="eyebrow">chunkbridge sdk</p>
+        <h1>ChunkBridge SDK</h1>
+        <p>把 LiteChunk 的转换引擎装进你自己的 Android 应用：约 1.7 MB 的 AAR，不依赖 LiteChunk，不依赖 Minecraft，全程离线。</p>
+        <ul class="tags" style="margin-top:16px">
+          <li>v1.0.0</li><li>AAR 约 1.7 MB</li><li>minSdk 27</li><li>MIT</li>
+        </ul>
+        <div class="toolbar" style="margin-top:18px">
+          <a class="btn btn--primary btn--sm" href="https://github.com/FreneticWind60/ChunkBridge"
+            target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#i-github"></use></svg>GitHub 仓库</a>
+          <a class="btn btn--ghost btn--sm" href="https://github.com/FreneticWind60/ChunkBridge/blob/main/README.zh-CN.md"
+            target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#i-doc"></use></svg>中文 README</a>
+          <a class="btn btn--ghost btn--sm" href="https://github.com/FreneticWind60/ChunkBridge/blob/main/docs/INTEGRATION.md"
+            target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#i-external"></use></svg>集成文档</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="wrap doc">
+      <aside class="doc__toc" aria-label="本页目录">
+        <h2>本页目录</h2>
+        <ol>
+          <li><a href="#overview">概览</a></li>
+          <li><a href="#capabilities">能做什么</a></li>
+          <li><a href="#quickstart">快速开始</a></li>
+          <li><a href="#usage">用法</a></li>
+          <li><a href="#errors">错误码</a></li>
+          <li><a href="#foreground">前台服务</a></li>
+          <li><a href="#limits">限制</a></li>
+          <li><a href="#license">许可与共建</a></li>
+        </ol>
+      </aside>
+
+      <div class="doc__body">
+        <section id="overview">
+          <h2>概览</h2>
+          <p>
+            ChunkBridge SDK 是 LiteChunk 转换引擎的独立封装。它把 Chunker 的 Java 版 / 基岩版互转、版本目录、
+            存档检测与压缩包处理全部打进一个 Android 库，宿主应用只需要一次 Gradle 依赖，不必安装 LiteChunk，
+            也不必随包分发 Minecraft。
+          </p>
+          <p>
+            引擎以 dex 资源的形式随 AAR 分发，运行时加载进独立的 <code>:chunkbridge</code> 前台服务进程。
+            检测、转换、取消都通过公开 API 完成，回调固定回到主线程，错误以 <code>ErrorCode</code> 返回而不是
+            展示字符串。
+          </p>
+
+          <div class="grid grid--feats grid--feats--2x2" style="margin-top:22px">
+            <article class="feat reveal">
+              <span class="feat__icon"><svg aria-hidden="true"><use href="#i-package"></use></svg></span>
+              <h3>一个 AAR 带走引擎</h3>
+              <p>约 1.7 MB，引擎 dex、LevelDB、LZ4、方块映射与语言文件全部内置，不额外下载运行时。</p>
+              <ul class="tags"><li>自包含</li><li>无外部依赖</li></ul>
+            </article>
+
+            <article class="feat reveal">
+              <span class="feat__icon"><svg aria-hidden="true"><use href="#i-shield"></use></svg></span>
+              <h3>不装 LiteChunk</h3>
+              <p>宿主应用与 LiteChunk 完全解耦；转换全程在本机完成，不发起任何网络请求。</p>
+              <ul class="tags"><li>离线</li><li>无账号</li></ul>
+            </article>
+
+            <article class="feat reveal">
+              <span class="feat__icon"><svg aria-hidden="true"><use href="#i-layers"></use></svg></span>
+              <h3>稳定的契约</h3>
+              <p><code>api</code> 产物承载 <code>ChunkerEngine</code> 契约，先由宿主类加载器加载，之后才挂载引擎 dex。</p>
+              <ul class="tags"><li>独立 api</li><li>R8 友好</li></ul>
+            </article>
+
+            <article class="feat reveal">
+              <span class="feat__icon"><svg aria-hidden="true"><use href="#i-swap"></use></svg></span>
+              <h3>进度与取消</h3>
+              <p><code>onProgress</code> 回传阶段与比例，<code>ConversionHandle.cancel()</code> 随时终止。</p>
+              <ul class="tags"><li>主线程回调</li><li>可取消</li></ul>
+            </article>
+          </div>
+
+          <p class="note">
+            SDK 从 LiteChunk 应用中拆分而来，引擎版本 <strong>1.21.0</strong>，首个独立版本为
+            <strong>1.0.0</strong>。它与 LiteChunk 同源、同步升级；详情见仓库的
+            <a href="https://github.com/FreneticWind60/ChunkBridge/blob/main/VERSION.zh-CN.md"
+              target="_blank" rel="noopener">版本说明</a>。
+          </p>
+        </section>
+
+        <section id="capabilities">
+          <h2>能做什么</h2>
+          <p>公开 API 刻意保持窄：只做转换本身，不提供界面、不编辑 <code>level.dat</code>、不接管文件管理。</p>
+
+          <div class="table-wrap">
+            <table class="log-table">
+              <thead>
+                <tr><th>能力</th><th>入口</th><th>说明</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>初始化</td>
+                  <td><code>ChunkBridge.initialize(context)</code></td>
+                  <td>每个进程调用一次，准备引擎 dex 与资源；真正的引擎在服务进程首次使用时才加载。</td>
+                </tr>
+                <tr>
+                  <td>列出支持版本</td>
+                  <td><code>ChunkBridge.formats()</code><br><code>ChunkBridge.formatGroup(id)</code></td>
+                  <td>读取内置目录，同步返回，开销极小，可在主线程调用。</td>
+                </tr>
+                <tr>
+                  <td>检测存档</td>
+                  <td><code>ChunkBridge.detect(File, DetectionCallback)</code><br>
+                    <code>ChunkBridge.detect(Uri, DetectionCallback)</code></td>
+                  <td>支持世界文件夹、<code>.zip</code>、<code>.mcworld</code>、<code>.rar</code>、<code>.7z</code>、
+                    <code>.tar</code> 与 <code>.gz</code>；异步执行。</td>
+                </tr>
+                <tr>
+                  <td>转换</td>
+                  <td><code>ChunkBridge.convert(ConversionRequest, ConversionCallback)</code></td>
+                  <td>返回 <code>ConversionHandle</code>；支持世界文件夹、<code>.zip</code> 与 <code>.mcworld</code> 输入。</td>
+                </tr>
+                <tr>
+                  <td>取消</td>
+                  <td><code>ConversionHandle.cancel()</code></td>
+                  <td>结束 <code>:chunkbridge</code> 进程，这是中断引擎的唯一方式。</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <p class="note">
+            引擎支持到所捆绑 Chunker 源码已知的最新版本，撰写时为 <strong>Java 26.3.0 / 基岩 1.26.60</strong>。
+            权威列表请以 <code>ChunkBridge.formats()</code> 的返回值为准。
+          </p>
+        </section>
+
+        <section id="quickstart">
+          <h2>快速开始</h2>
+
+          <h3>环境要求</h3>
+          <div class="table-wrap">
+            <table class="log-table">
+              <tbody>
+                <tr><td><code>minSdk</code></td><td>27（Android 8.1）</td></tr>
+                <tr><td><code>compileSdk</code></td><td>35 或更高</td></tr>
+                <tr><td>Java</td><td>17（库以 Java 17 字节码编译）</td></tr>
+                <tr><td>宿主构建</td><td>AGP 8.x 或更高</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>安装</h3>
+          <p>
+            SDK 目前通过本地 Maven 仓库或仓库构建产物分发，尚未发布到 Maven Central。先在 SDK 仓库里发布到本地：
+          </p>
+          <div class="codeblock">
+            <div class="codeblock__bar"><span class="dot"></span>终端<b>bash</b></div>
+            <pre><code>./gradlew :api:publishToMavenLocal :library:publishReleasePublicationToMavenLocal</code></pre>
+          </div>
+
+          <p>然后在宿主工程里加入依赖：</p>
+          <div class="codeblock">
+            <div class="codeblock__bar"><span class="dot"></span>app/build.gradle.kts<b>Kotlin DSL</b></div>
+            <pre><code>repositories {
+    mavenLocal()
+}
+
+dependencies {
+    implementation("com.frenetic.chunkbridge:chunkbridge:1.0.0")
+    // api 会通过传递依赖引入；这里只是显式列出
+    // implementation("com.frenetic.chunkbridge:api:1.0.0")
+}</code></pre>
+          </div>
+
+          <p class="note">
+            如果只拷贝单个 AAR 文件，<strong>必须</strong>同时加入 <code>api-1.0.0.jar</code>：引擎 dex 挂载前，
+            <code>ChunkerEngine</code> 必须已经存在于宿主的类加载器中，否则会得到 <code>ENGINE_UNAVAILABLE</code>。
+          </p>
+
+          <h3>初始化</h3>
+          <div class="codeblock">
+            <div class="codeblock__bar"><span class="dot"></span>Application.java<b>Java</b></div>
+            <pre><code>@Override
+public void onCreate() {
+    super.onCreate();
+    ChunkBridge.initialize(getApplicationContext());
+}</code></pre>
+          </div>
+        </section>
+
+        <section id="usage">
+          <h2>用法</h2>
+
+          <h3>列出目标版本</h3>
+          <div class="codeblock">
+            <div class="codeblock__bar"><span class="dot"></span>Formats.java<b>Java</b></div>
+            <pre><code>for (FormatGroup group : ChunkBridge.formats()) {          // "JAVA"、"BEDROCK"
+    for (FormatVersion version : group.getVersions()) {    // 新版本在前
+        Log.i("ChunkBridge", version.getDisplayName() + " -> " + version.getFormatId());
+    }
+}</code></pre>
+          </div>
+
+          <h3>检测存档</h3>
+          <div class="codeblock">
+            <div class="codeblock__bar"><span class="dot"></span>Detect.java<b>Java</b></div>
+            <pre><code>ChunkBridge.detect(inputUri, (result, error) -> {
+    if (result != null) {
+        Log.i("ChunkBridge", result.getEditionLabel() + " " + result.getVersion());
+    } else {
+        Log.w("ChunkBridge", "detect failed: " + error.getCode());
+    }
+});</code></pre>
+          </div>
+
+          <h3>开始转换</h3>
+          <div class="codeblock">
+            <div class="codeblock__bar"><span class="dot"></span>Convert.java<b>Java</b></div>
+            <pre><code>ConversionHandle handle = ChunkBridge.convert(
+        new ConversionRequest.Builder()
+                .inputUri(inputUri)              // 世界文件夹、.zip 或 .mcworld
+                .outputUri(outputUri)            // SAF 创建，或使用 outputFile(File)
+                .targetFormatId("BEDROCK_1.26.60")
+                .convertEntities(true)           // 默认 true
+                .build(),
+        new ConversionCallback() {
+            @Override public void onProgress(double fraction, Stage stage) {
+                // fraction: 0.0 .. 1.0，单调递增但并非线性
+            }
+
+            @Override public void onCompleted(ConversionResult result) {
+                // result.getOutputBytes() / getTargetVersion() / getElapsedMs()
+            }
+
+            @Override public void onFailed(ChunkBridgeException error) {
+                // error.getCode(): INPUT_UNREADABLE、BUSY 等
+            }
+
+            @Override public void onCancelled() {
+                // 取消是尽力而为，可能留下 .part 输出
+            }
+        });
+
+// 之后可在任意线程取消
+handle.cancel();</code></pre>
+          </div>
+
+          <p>
+            输入与输出必须各指定一个：<code>inputFile(File)</code> / <code>inputUri(Uri)</code>，
+            以及 <code>outputFile(File)</code> / <code>outputUri(Uri)</code>。其他可选项包括
+            <code>leanMode(boolean)</code>（低内存设备使用更小的缓冲区）、<code>overwriteExisting(boolean)</code>
+            （仅对 <code>outputFile</code> 生效）、<code>deleteSourceArchiveAfterSuccess(boolean)</code>
+            （仅对压缩包输入生效）与通知标题 / 文案。
+          </p>
+
+          <h3>Stage 与取消</h3>
+          <p>
+            <code>Stage</code> 表示引擎当前所处的阶段：<code>TERRAIN</code>、<code>ENTITIES</code>、
+            <code>COMPACT</code>、<code>FINISH</code>、<code>UNKNOWN</code>。取消会结束
+            <code>:chunkbridge</code> 进程；若请求到达时服务仍存活，回调会收到 <code>onCancelled</code>。
+            紧接着发出的请求可能仍返回 <code>BUSY</code>，重试一次即可。
+          </p>
+        </section>
+
+        <section id="errors">
+          <h2>错误码</h2>
+          <p><code>ChunkBridgeException.getCode()</code> 返回类型化的 <code>ErrorCode</code>，可直接用于分支处理。</p>
+
+          <div class="table-wrap">
+            <table class="log-table">
+              <thead><tr><th>错误码</th><th>含义</th></tr></thead>
+              <tbody>
+                <tr><td><code>INPUT_UNREADABLE</code></td><td>输入不存在、不可读，或 URI 授权已失效。</td></tr>
+                <tr><td><code>ARCHIVE_UNSUPPORTED</code></td><td>不支持的压缩格式。</td></tr>
+                <tr><td><code>ARCHIVE_DAMAGED</code></td><td>压缩包损坏，或使用了不支持的压缩特性。</td></tr>
+                <tr><td><code>WORLD_NOT_FOUND</code></td><td>输入在三层目录内都找不到 <code>level.dat</code> 或基岩版 <code>db/</code>。</td></tr>
+                <tr><td><code>FORMAT_UNSUPPORTED</code></td><td><code>targetFormatId</code> 不在 <code>ChunkBridge.formats()</code> 中。</td></tr>
+                <tr><td><code>OUTPUT_UNWRITABLE</code></td><td>输出 URI / 文件无法创建，或路径不是绝对路径。</td></tr>
+                <tr><td><code>OUTPUT_EXISTS</code></td><td><code>outputFile</code> 已存在且 <code>overwriteExisting(false)</code>。</td></tr>
+                <tr><td><code>INSUFFICIENT_STORAGE</code></td><td>写入时设备空间不足。</td></tr>
+                <tr><td><code>OUT_OF_MEMORY</code></td><td>转换进程堆内存耗尽。</td></tr>
+                <tr><td><code>BUSY</code></td><td>已有转换在进行，或在转换期间请求了检测；结束后重试。</td></tr>
+                <tr><td><code>CANCELLED</code></td><td>请求被取消。</td></tr>
+                <tr><td><code>ENGINE_UNAVAILABLE</code></td><td>引擎 dex 无法加载（通常是 AAR 损坏或被裁剪）。</td></tr>
+                <tr><td><code>FOREGROUND_NOT_ALLOWED</code></td><td>Android 拒绝启动前台服务，见下一节。</td></tr>
+                <tr><td><code>INTERNAL</code></td><td>其他错误；<code>getDetail()</code> 携带引擎信息。</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="foreground">
+          <h2>前台服务规则</h2>
+          <p>
+            转换运行在 <code>:chunkbridge</code> 进程的 <code>dataSync</code> 前台服务中。下面几条不是建议，
+            而是平台要求：
+          </p>
+          <ul class="checklist">
+            <li>Android 12+ 调用 <code>ChunkBridge.convert(...)</code> 时宿主必须处于前台，例如 Activity 回调里；否则会立即以 <code>FOREGROUND_NOT_ALLOWED</code> 失败。</li>
+            <li>Android 13+ 需要 <code>POST_NOTIFICATIONS</code> 权限，进度通知才可见；部分厂商 ROM 会把「通知不可见的前台服务」判为保活滥用并杀掉进程，即使不在意通知也建议申请。</li>
+            <li>Android 15+ 对 <code>dataSync</code> 前台服务限制每天 6 小时；单次转换通常远低于该配额，超大批量需要自己的可见流程与调度。</li>
+          </ul>
+          <p class="note">
+            转换期间请保持界面可见。在后台开始的长转换，可能被激进省电的 ROM 直接终止；这是平台与厂商策略，
+            SDK 无法绕过。
+          </p>
+        </section>
+
+        <section id="limits">
+          <h2>限制</h2>
+          <ul class="checklist">
+            <li>每个进程同一时间只做一次转换，并发请求返回 <code>BUSY</code>。</li>
+            <li>SDK 不设置 <code>android:largeHeap</code>；预期处理大世界时建议宿主自行开启，引擎缓冲区会自适应，但更大的堆能减少重试。</li>
+            <li>解压设有上限：50 万条目、单条目 8 GiB、总计 32 GiB，用于阻挡解压炸弹。</li>
+            <li>压缩包大于 <code>cacheDir</code> 可用空间时无法落盘暂存；写入前会检查剩余空间。</li>
+            <li>取消是杀进程，可能留下 <code>.part</code> 输出；作业目录会在服务下次启动时清理。</li>
+            <li>除 <code>Stage</code> 外没有更细的世界级进度，也没有剩余时间预估。</li>
+            <li>不编辑 <code>level.dat</code>、不提供文件浏览器、不处理导入 Intent、不提供分享面板——这些仍是你自己的界面。</li>
+          </ul>
+        </section>
+
+        <section id="license">
+          <h2>许可与共建</h2>
+          <p>
+            ChunkBridge SDK 以 <strong>MIT</strong> 协议开源。转换引擎为
+            <a href="https://github.com/HiveGamesOSS/Chunker" target="_blank" rel="noopener">Chunker</a>
+            （MIT，Hive Games），压缩包解压使用
+            <a href="https://github.com/RealBurst/arcana/" target="_blank" rel="noopener">Arcana</a>
+            （Apache-2.0）。完整声明见仓库的
+            <a href="https://github.com/FreneticWind60/ChunkBridge/blob/main/THIRD-PARTY.md"
+              target="_blank" rel="noopener">THIRD-PARTY.md</a> 与
+            <a href="https://github.com/FreneticWind60/ChunkBridge/blob/main/LICENSE"
+              target="_blank" rel="noopener">LICENSE</a>。
+          </p>
+
+          <div class="callout" style="margin-top:22px">
+            <h3>邀请开发者一起共建</h3>
+            <p>
+              这个 SDK 是把 LiteChunk 的引擎拆出来给所有 Android 应用用的第一步。接入时遇到问题、想要新的回调或
+              发现文档没说清楚的地方，欢迎直接提 issue，也欢迎提交 PR 一起补文档、补示例、适配新的构建环境。
+            </p>
+            <div class="toolbar" style="margin-top:14px">
+              <a class="btn btn--primary btn--sm" href="https://github.com/FreneticWind60/ChunkBridge/issues"
+                target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#i-external"></use></svg>提 issue</a>
+              <a class="btn btn--ghost btn--sm" href="https://github.com/FreneticWind60/ChunkBridge"
+                target="_blank" rel="noopener"><svg aria-hidden="true"><use href="#i-github"></use></svg>查看仓库</a>
+            </div>
+          </div>
+
+          <p class="note">
+            更多材料：<a href="https://github.com/FreneticWind60/ChunkBridge/blob/main/README.zh-CN.md"
+              target="_blank" rel="noopener">中文 README</a>、
+            <a href="https://github.com/FreneticWind60/ChunkBridge/blob/main/docs/INTEGRATION.md"
+              target="_blank" rel="noopener">INTEGRATION.md</a>、
+            <a href="https://github.com/FreneticWind60/ChunkBridge/blob/main/docs/android-api-compat.md"
+              target="_blank" rel="noopener">android-api-compat.md</a>。
+          </p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <div class="foot__grid">
+        <div>
+          <div class="foot__brand">
+            <span class="brand__mark" aria-hidden="true"><svg viewBox="0 0 24 24"><use href="#i-crate"></use></svg></span>
+            <span class="brand__name">Lite<b>Chunk</b></span>
+          </div>
+          <p class="foot__desc">基于 Chunker 的轻量安卓移植版，只做 Minecraft 存档的跨版本转换。</p>
+        </div>
+        <div>
+          <div class="foot__title">站点</div>
+          <nav class="foot__links" aria-label="站点导航">
+            <a href="index.html">首页</a><a href="doc.html">使用文档</a>
+            <a href="sdk.html">ChunkBridge SDK</a>
+            <a href="log.html">更新日志</a><a href="about.html">关于项目</a>
+          </nav>
+        </div>
+        <div>
+          <div class="foot__title">社区</div>
+          <nav class="foot__links" aria-label="社区链接">
+            <a href="https://github.com/FreneticWind60/LiteChunk" target="_blank" rel="noopener">GitHub 仓库</a>
+            <a href="https://github.com/FreneticWind60/ChunkBridge" target="_blank" rel="noopener">ChunkBridge 仓库</a>
+            <a href="https://github.com/FreneticWind60/LiteChunk/issues" target="_blank" rel="noopener">问题反馈</a>
+            <a href="https://github.com/FreneticWind60/LiteChunk/releases" target="_blank" rel="noopener">下载发布页</a>
+            <a href="about.html#community">QQ 群 1124116373</a>
+          </nav>
+        </div>
+        <div>
+          <div class="foot__title">友链</div>
+          <nav class="foot__links" aria-label="友情链接">
+            <a href="https://chunkoid.top/" target="_blank" rel="noopener">Chunkoid</a>
+            <a href="https://chunker.app/" target="_blank" rel="noopener">Chunker</a>
+            <a href="https://theocraft.pages.dev/" target="_blank" rel="noopener">Theocraft</a>
+            <a href="https://github.com/RealBurst/arcana/" target="_blank" rel="noopener">Arcana</a>
+          </nav>
+        </div>
+      </div>
+      <div class="foot__bottom">
+        <span>© <span data-year>2026</span> LiteChunk · Frenetic · MIT 许可</span>
+        <span class="dis">非官方项目，与 Mojang Studios、Microsoft、Hive Games 均无隶属关系。</span>
+      </div>
+    </div>
+  </footer>
+
+  <button class="to-top" id="toTop" type="button" aria-label="回到顶部">
+    <svg aria-hidden="true"><use href="#i-arrow-up"></use></svg>
+  </button>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="common.js" defer></script>
+</body>
+</html>

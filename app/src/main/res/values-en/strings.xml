@@ -452,4 +452,6 @@
     <string name="FilesFragment_24">Measuring…</string>
 
     <string name="activity_about_16">Preferences</string>
+
+    <string name="ConvertFragment_44">Current</string>
 </resources>

@@ -199,6 +199,7 @@
       <nav class="nav" id="siteNav" aria-label="主导航">
         <a href="index.html" data-nav>首页</a>
         <a href="doc.html" data-nav>文档</a>
+        <a href="sdk.html" data-nav>SDK</a>
         <a href="log.html" data-nav>更新日志</a>
         <a href="about.html" data-nav>关于</a>
         <div class="nav__dl"><a class="btn btn--primary" href="#download">下载 LiteChunk</a></div>
@@ -248,7 +249,7 @@
           </div>
 
           <dl class="hero__facts">
-            <div><dt>当前版本</dt><dd>1.21.0 build4 pt2</dd></div>
+            <div><dt>当前版本</dt><dd>1.21.0 build4 pt3</dd></div>
             <div><dt>安装包</dt><dd>3.0 MB</dd></div>
             <div><dt>最低系统</dt><dd>Android 8.1</dd></div>
             <div><dt>协议</dt><dd>MIT</dd></div>
@@ -428,11 +429,11 @@
             <p class="eyebrow">下载</p>
             <h2 style="margin-top:10px">装上就能用，不需要电脑，不需要外挂支持库</h2>
             <p class="dl__sub">
-              安装包内含完整的转换引擎。当前最新为 <b>1.21.0 build4 pt2</b> 正式版，实体转换已经补齐到这个版本的完整形态。想要不带实体转换的老版本，可以用下面的 <b>1.21.0 build3</b>。
+              安装包内含完整的转换引擎。当前最新为 <b>1.21.0 build4 pt3</b> 正式版，实体转换已经补齐到这个版本的完整形态。想要不带实体转换的老版本，可以用下面的 <b>1.21.0 build3</b>。
             </p>
 
             <dl class="dl__meta">
-              <div><dt>版本</dt><dd>1.21.0 build4 pt2</dd></div>
+              <div><dt>版本</dt><dd>1.21.0 build4 pt3</dd></div>
               <div><dt>体积</dt><dd>3.0 MB</dd></div>
               <div><dt>系统</dt><dd>Android 8.1+</dd></div>
               <div><dt>签名</dt><dd>覆盖升级保留数据</dd></div>
@@ -455,11 +456,11 @@
           </div>
 
           <div class="dl__rel">
-            <a class="rel" href="https://github.com/FreneticWind60/LiteChunk/releases/tag/1.21.0-Build4-pt2"
+            <a class="rel" href="https://github.com/FreneticWind60/LiteChunk/releases/tag/1.21.0-Build4-pt3"
               target="_blank" rel="noopener">
               <span class="rel__chip">稳定</span>
               <span class="rel__body">
-                <b>1.21.0 build4 pt2</b>
+                <b>1.21.0 build4 pt3</b>
                 <small>实体转换 · 文件页直接导入 · 3.0 MB</small>
               </span>
               <svg class="rel__go" aria-hidden="true"><use href="#i-external"></use></svg>
@@ -474,6 +475,72 @@
               <svg class="rel__go" aria-hidden="true"><use href="#i-external"></use></svg>
             </a>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 开发者 ============ -->
+    <section class="section" id="sdk">
+      <div class="wrap">
+        <div class="dl reveal">
+          <div>
+            <p class="eyebrow">for developers</p>
+            <h2 style="margin-top:10px">您是开发者？试试ChunkBridge SDK！</h2>
+            <p class="dl__sub">
+              LiteChunk 的转换引擎已经拆成独立的 Android 库。一个约 1.7 MB 的 AAR，几行代码就能把 Java 版 / 基岩版互转接进你自己的应用——不用安装 LiteChunk，不用安装 Minecraft，全程离线。
+            </p>
+
+            <dl class="dl__meta">
+              <div><dt>产物</dt><dd>AAR 约 1.7 MB</dd></div>
+              <div><dt>依赖</dt><dd>com.frenetic.chunkbridge</dd></div>
+              <div><dt>系统</dt><dd>Android 8.1+</dd></div>
+              <div><dt>协议</dt><dd>MIT</dd></div>
+            </dl>
+
+            <div class="dl__cta" style="margin-top:18px">
+              <a class="btn btn--primary btn--lg" href="sdk.html">
+                <svg aria-hidden="true"><use href="#i-code"></use></svg>
+                了解 ChunkBridge SDK
+              </a>
+              <a class="btn btn--ghost btn--lg" href="https://github.com/FreneticWind60/ChunkBridge"
+                target="_blank" rel="noopener">
+                <svg aria-hidden="true"><use href="#i-github"></use></svg>
+                GitHub 仓库
+              </a>
+            </div>
+
+            <p class="dl__note">
+              公开 API 覆盖版本目录、存档检测、带进度与取消的异步转换；引擎跑在独立的前台服务进程里，不拖累宿主界面。接入方式、示例代码与限制说明都在 SDK 介绍页。
+            </p>
+          </div>
+
+          <div class="dl__rel">
+            <a class="rel" href="sdk.html">
+              <span class="rel__chip">SDK</span>
+              <span class="rel__body">
+                <b>ChunkBridge SDK</b>
+                <small>快速开始 · API · 错误码 · 限制</small>
+              </span>
+              <svg class="rel__go" aria-hidden="true"><use href="#i-arrow-right"></use></svg>
+            </a>
+            <a class="rel" href="https://github.com/FreneticWind60/ChunkBridge/blob/main/README.zh-CN.md"
+              target="_blank" rel="noopener">
+              <span class="rel__chip">文档</span>
+              <span class="rel__body">
+                <b>中文 README</b>
+                <small>能力、安装、示例与已知限制</small>
+              </span>
+              <svg class="rel__go" aria-hidden="true"><use href="#i-external"></use></svg>
+            </a>
+            <a class="rel" href="https://github.com/FreneticWind60/ChunkBridge/blob/main/docs/INTEGRATION.md"
+              target="_blank" rel="noopener">
+              <span class="rel__chip">集成</span>
+              <span class="rel__body">
+                <b>INTEGRATION.md</b>
+                <small>线程模型 · 存储布局 · 失败模式</small>
+              </span>
+              <svg class="rel__go" aria-hidden="true"><use href="#i-external"></use></svg>
+            </a>
           </div>
         </div>
       </div>
@@ -554,6 +621,7 @@
           <nav class="foot__links" aria-label="站点导航">
             <a href="index.html">首页</a>
             <a href="doc.html">使用文档</a>
+            <a href="sdk.html">ChunkBridge SDK</a>
             <a href="log.html">更新日志</a>
             <a href="about.html">关于项目</a>
           </nav>
@@ -563,6 +631,7 @@
           <div class="foot__title">社区</div>
           <nav class="foot__links" aria-label="社区链接">
             <a href="https://github.com/FreneticWind60/LiteChunk" target="_blank" rel="noopener">GitHub 仓库</a>
+            <a href="https://github.com/FreneticWind60/ChunkBridge" target="_blank" rel="noopener">ChunkBridge 仓库</a>
             <a href="https://github.com/FreneticWind60/LiteChunk/issues" target="_blank" rel="noopener">问题反馈</a>
             <a href="https://github.com/FreneticWind60/LiteChunk/releases" target="_blank" rel="noopener">下载发布页</a>
             <a href="about.html#community">QQ 群 1124116373</a>

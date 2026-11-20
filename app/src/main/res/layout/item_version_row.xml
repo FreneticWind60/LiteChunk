@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One selectable version. The whole row is the touch target; the radio only shows the state. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="48dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="20dp"
+    android:paddingEnd="16dp">
+
+    <TextView
+        android:id="@+id/tvVersion"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textColor="@color/text"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/tvCurrent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="10dp"
+        android:background="@drawable/bg_pill"
+        android:paddingStart="8dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="2dp"
+        android:text="@string/ConvertFragment_44"
+        android:textColor="@color/accent"
+        android:textSize="11sp"
+        android:visibility="gone" />
+
+    <com.google.android.material.radiobutton.MaterialRadioButton
+        android:id="@+id/radioVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:clickable="false"
+        android:duplicateParentState="false"
+        android:focusable="false" />
+
+</LinearLayout>

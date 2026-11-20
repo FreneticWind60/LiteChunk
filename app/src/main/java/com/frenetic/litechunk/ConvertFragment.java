@@ -14,7 +14,6 @@ import android.view.MotionEvent;
 import android.view.ViewConfiguration;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -33,8 +32,6 @@ import com.frenetic.litechunk.databinding.FragmentConvertBinding;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.checkbox.MaterialCheckBox;
-import com.google.android.material.chip.Chip;
-import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 
@@ -290,123 +287,37 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         String theCurrent = currentFormatId();
         int checked = theCurrent == null ? 0 : group.indexOf(theCurrent);
 
-        View content = getLayoutInflater().inflate(R.layout.dialog_version_picker, null);
-        LinearLayout list = content.findViewById(R.id.listVersions);
-        buildVersionSections(list, labels, checked);
-
-        View header = getLayoutInflater().inflate(R.layout.dialog_header, null);
-        ((TextView) header.findViewById(R.id.tvTitle)).setText(
+        View content = getLayoutInflater().inflate(R.layout.sheet_version_picker, null);
+        RecyclerView list = content.findViewById(R.id.listVersions);
+        list.setLayoutManager(new LinearLayoutManager(requireContext()));
+        ((TextView) content.findViewById(R.id.tvTitle)).setText(
                 formats.editionLabel(edition) + Text.get(R.string.ConvertFragment_06));
-        ((TextView) header.findViewById(R.id.tvSubtitle)).setText(R.string.ConvertFragment_43);
+        ((TextView) content.findViewById(R.id.tvSubtitle)).setText(R.string.ConvertFragment_43);
 
-        ScrollView scroll = content.findViewById(R.id.scrollVersions);
-        AlertDialog dialog = new MaterialAlertDialogBuilder(requireContext())
-                .setCustomTitle(header)
-                .setView(content)
-                .setNegativeButton(Text.get(R.string.ConvertFragment_07), null)
-                .create();
-        dialog.setOnShowListener(ignored -> {
-            // A group runs to eighty entries; open at the version in use instead of at the top.
-            View selected = list.findViewWithTag("selected");
-            if (selected != null) {
-                scroll.post(() -> scroll.smoothScrollTo(0, Math.max(0, selected.getTop() - 48)));
-            }
+        BottomSheetDialog sheet = new BottomSheetDialog(requireContext());
+        // Picking applies immediately: the row is the choice, not a staging state a dismissed sheet throws away.
+        VersionAdapter adapter = new VersionAdapter(labels, checked, index -> {
+            formatId = group.formatIds[index];
+            sheet.dismiss();
+            render();
         });
-        dialog.show();
+        list.setAdapter(adapter);
 
-        // The chips are built before the dialog exists, so their listener is patched in afterwards.
-        for (int index = 0; index < list.getChildCount(); index++) {
-            View child = list.getChildAt(index);
-            if (child instanceof LinearLayout section) {
-                wireSection(section, group, dialog);
-            }
-        }
+        // 48dp rows, capped to most of the screen: a Java list runs to eighty entries, and the sheet has to fit on a
+        // phone without pushing its own header off the top. setLayoutParams rather than mutating the existing ones -
+        // a layout inflated as a sheet root has none (the one-time NPE that shipped in pt3).
+        int rowHeight = dp(48);
+        int cap = (int) (getResources().getDisplayMetrics().heightPixels * 0.58f);
+        // The params must match the parent (a LinearLayout here), not the view: LinearLayout casts every child to
+        // LinearLayout.LayoutParams while measuring, and a RecyclerView.LayoutParams crashes the sheet on open.
+        list.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                Math.min(cap, Math.max(rowHeight * 3, adapter.getItemCount() * rowHeight))));
+
+        sheet.setContentView(content);
+        sheet.show();
+        list.scrollToPosition(adapter.positionOfSelected());
     }
-
-    /** One section per major version: a heading, then its patch versions as chips. */
-    private void buildVersionSections(LinearLayout list, String[] labels, int checked) {
-        String major = null;
-        ChipGroup chips = null;
-        for (int index = 0; index < labels.length; index++) {
-            String key = majorOf(labels[index]);
-            if (!key.equals(major)) {
-                major = key;
-                TextView heading = new TextView(requireContext());
-                heading.setText(key);
-                heading.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall);
-                int top = dp(list.getChildCount() == 0 ? 4 : 18);
-                heading.setPadding(0, top, 0, dp(6));
-                list.addView(heading);
-
-                chips = new ChipGroup(requireContext());
-                chips.setSingleSelection(true);
-                chips.setSelectionRequired(true);
-                chips.setTag("section:" + key);
-                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-                params.bottomMargin = dp(2);
-                list.addView(chips, params);
-            }
-
-            Chip chip = (Chip) getLayoutInflater().inflate(R.layout.view_version_chip, chips, false);
-            chip.setText(labels[index]);
-            chip.setId(View.generateViewId());
-            chip.setTag(index);
-            chip.setChecked(index == checked);
-            if (index == checked) {
-                chips.setTag("selected");
-            }
-            chips.addView(chip);
-        }
-    }
-
-    /** Give every chip in one section the same click behaviour. */
-    private void wireSection(LinearLayout section, Formats.Group group, AlertDialog dialog) {
-        for (int index = 0; index < section.getChildCount(); index++) {
-            View child = section.getChildAt(index);
-            if (!(child instanceof ChipGroup chips)) {
-                continue;
-            }
-            for (int chipIndex = 0; chipIndex < chips.getChildCount(); chipIndex++) {
-                View view = chips.getChildAt(chipIndex);
-                if (!(view instanceof Chip chip)) {
-                    continue;
-                }
-                int position = (int) chip.getTag();
-                chip.setOnClickListener(v -> {
-                    formatId = group.formatIds[position];
-                    dialog.dismiss();
-                    render();
-                });
-            }
-        }
-    }
-
-    /**
-     * Which heading a version belongs under.
-     * <p>
-     * Two eras, two schemes. Up to 1.21 the interesting number is the second one - "1.21.8" and "1.21.4" are far
-     * apart in time, "1.20" and "1.21" even more so, and grouping by the leading 1 would put eighteen years of the
-     * game under one heading. From 26 onwards Mojang dropped the leading 1, so the first number is the year-ish
-     * generation and the second is a point release inside it: "26.3.0" belongs with "26.1.2", not on its own.
-     *
-     * @param version a label from the format list, e.g. {@code 1.21.8} or {@code 26.3.0}.
-     * @return the heading text.
-     */
-    private static String majorOf(String version) {
-        String[] parts = version.split("\\.");
-        if (parts.length < 2) {
-            return version;
-        }
-        try {
-            // 22 is the first version without the leading 1 (25w14a aside), so anything up to 21 uses the second
-            // number as its grouping key and anything from 22 uses the first.
-            return Integer.parseInt(parts[0]) >= 22 ? parts[0] : parts[0] + "." + parts[1];
-        } catch (NumberFormatException notAVersion) {
-            return version;
-        }
-    }
-
 
     private String currentFormatId() {
         if (formats == null) {

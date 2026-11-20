@@ -90,6 +90,10 @@
       stroke-linejoin="round">
       <path d="M12 20s-7.5-4.6-7.5-9.4A4.1 4.1 0 0 1 12 8a4.1 4.1 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20Z" />
     </symbol>
+    <symbol id="i-code" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+      stroke-linejoin="round">
+      <path d="m8.5 7.5-4.5 4.5 4.5 4.5M15.5 7.5l4.5 4.5-4.5 4.5M13.5 4.5l-3 15" />
+    </symbol>
   </svg>
 
   <header class="site-head" id="siteHead">
@@ -104,6 +108,7 @@
       <nav class="nav" id="siteNav" aria-label="主导航">
         <a href="index.html" data-nav>首页</a>
         <a href="doc.html" data-nav>文档</a>
+        <a href="sdk.html" data-nav>SDK</a>
         <a href="log.html" data-nav>更新日志</a>
         <a href="about.html" data-nav>关于</a>
         <div class="nav__dl"><a class="btn btn--primary" href="index.html#download">下载 LiteChunk</a></div>
@@ -206,6 +211,51 @@
                 </svg>
                 提交 issue
                 <span>GitHub</span>
+              </a>
+            </div>
+          </div>
+        </section>
+
+        <section id="sdk">
+          <h2>给开发者：ChunkBridge SDK</h2>
+          <p>
+            LiteChunk 的转换引擎已经拆成一个独立的 Android 库。它是这次拆分留下的第一个公开产物，
+            也是这个项目第一次明确地开放给大家去用：一个约 1.7 MB 的 AAR，不依赖 LiteChunk，不依赖 Minecraft，
+            加一条 Gradle 依赖，就能把 Java 版 / 基岩版互转接进你自己的应用。
+          </p>
+          <p>
+            <strong>您是开发者？试试<a href="sdk.html">ChunkBridge SDK</a>！</strong>
+          </p>
+          <p>
+            欢迎一起共创：接入时遇到问题、发现文档没说清楚、想补一个示例，或者想适配新的构建环境与设备，
+            都可以直接提 issue 或 PR。SDK 与 LiteChunk 同源、同步升级，以 MIT 协议开源；
+            它不需要变成一个大而全的框架，只需要让「把世界转出来」这件事在更多应用里变得容易。
+          </p>
+          <p>
+            我们始终坚持开源精神，始终把我可以做到的最开放的一面展现给大家，邀请大家一同推进技术进步。
+            如果你喜欢这个库子，不妨去<a href="https://github.com/FreneticWind60/ChunkBridge" target="_blank"
+              rel="noopener">GitHub</a>点个Star；
+            如果您想使用这个SDK，可以直接在您的项目中添加依赖，并遵循MIT协议的相关规定，在README里给在下留个名字就好。
+          </p>
+
+          <div class="callout" style="margin-top:18px">
+            <h3>邀请开发者一起共建</h3>
+            <p>
+              文档、示例、错误码说明、不同 ROM 的兼容性记录——这些和代码一样重要。如果你愿意把接入过程中踩到的坑告诉我们，对下一个开发者就是实打实的帮助。
+            </p>
+            <div class="toolbar" style="margin-top:14px">
+              <a class="btn btn--primary btn--sm" href="sdk.html">
+                <svg aria-hidden="true">
+                  <use href="#i-code"></use>
+                </svg>
+                了解 ChunkBridge SDK
+              </a>
+              <a class="btn btn--ghost btn--sm" href="https://github.com/FreneticWind60/ChunkBridge" target="_blank"
+                rel="noopener">
+                <svg aria-hidden="true">
+                  <use href="#i-github"></use>
+                </svg>
+                GitHub 仓库
               </a>
             </div>
           </div>
@@ -323,6 +373,20 @@
               项目仓库
               <span>LiteChunk</span>
             </a>
+            <a href="sdk.html">
+              <svg aria-hidden="true">
+                <use href="#i-code"></use>
+              </svg>
+              ChunkBridge SDK
+              <span>SDK</span>
+            </a>
+            <a href="https://github.com/FreneticWind60/ChunkBridge" target="_blank" rel="noopener">
+              <svg aria-hidden="true">
+                <use href="#i-github"></use>
+              </svg>
+              SDK 仓库
+              <span>ChunkBridge</span>
+            </a>
             <a href="https://github.com/FreneticWind60/LiteChunk/releases" target="_blank" rel="noopener">
               <svg aria-hidden="true">
                 <use href="#i-external"></use>
@@ -352,6 +416,7 @@
           <div class="foot__title">站点</div>
           <nav class="foot__links" aria-label="站点导航">
             <a href="index.html">首页</a><a href="doc.html">使用文档</a>
+            <a href="sdk.html">ChunkBridge SDK</a>
             <a href="log.html">更新日志</a><a href="about.html">关于项目</a>
           </nav>
         </div>
@@ -359,6 +424,7 @@
           <div class="foot__title">社区</div>
           <nav class="foot__links" aria-label="社区链接">
             <a href="https://github.com/FreneticWind60/LiteChunk" target="_blank" rel="noopener">GitHub 仓库</a>
+            <a href="https://github.com/FreneticWind60/ChunkBridge" target="_blank" rel="noopener">ChunkBridge 仓库</a>
             <a href="https://github.com/FreneticWind60/LiteChunk/issues" target="_blank" rel="noopener">问题反馈</a>
             <a href="https://github.com/FreneticWind60/LiteChunk/releases" target="_blank" rel="noopener">下载发布页</a>
             <a href="about.html#community">QQ 群 1124116373</a>

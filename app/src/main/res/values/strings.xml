@@ -425,4 +425,6 @@
     <string name="FilesFragment_24">正在计算体积…</string>
 
     <string name="activity_about_16">偏好设置</string>
+
+    <string name="ConvertFragment_44">当前</string>
 </resources>

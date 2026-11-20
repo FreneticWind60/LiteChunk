@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Target version picker, as a bottom sheet: the list is the whole point, so it gets the full width and whatever
+    height the screen allows, and the sheet swallows the scroll instead of a dialog clipping a row in half at its
+    bottom edge.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="18dp"
+    android:paddingBottom="14dp">
+
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:textColor="@color/text"
+        android:textSize="17sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/tvSubtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="20dp"
+        android:paddingTop="2dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="6dp"
+        android:textAppearance="@style/Text.LiteChunk.Caption" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/listVersions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipToPadding="false"
+        android:paddingBottom="4dp"
+        android:scrollbars="vertical" />
+
+</LinearLayout>

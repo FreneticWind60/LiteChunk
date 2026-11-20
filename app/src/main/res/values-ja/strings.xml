@@ -452,4 +452,6 @@
     <string name="FilesFragment_24">サイズを計算しています…</string>
 
     <string name="activity_about_16">環境設定</string>
+
+    <string name="ConvertFragment_44">使用中</string>
 </resources>

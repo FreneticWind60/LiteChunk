@@ -73,6 +73,7 @@
       <nav class="nav" id="siteNav" aria-label="主导航">
         <a href="index.html" data-nav>首页</a>
         <a href="doc.html" data-nav>文档</a>
+        <a href="sdk.html" data-nav>SDK</a>
         <a href="log.html" data-nav>更新日志</a>
         <a href="about.html" data-nav>关于</a>
         <div class="nav__dl"><a class="btn btn--primary" href="index.html#download">下载 LiteChunk</a></div>
@@ -115,6 +116,7 @@
           <li><a href="#convert">转换</a></li>
           <li><a href="#output">取出成品</a></li>
           <li><a href="#level">存档详情</a></li>
+          <li><a href="#sdk">ChunkBridge SDK</a></li>
           <li><a href="#faq">常见问题</a></li>
           <li><a href="#limits">已知局限</a></li>
         </ol>
@@ -210,6 +212,28 @@
           <p>
             点「保存」会二次确认并写明「覆盖后不可找回」；
             想留原档就用「另存为」，它会用新时间戳产出一个新包，原文件不动。
+          </p>
+        </section>
+
+        <section id="sdk">
+          <h2>ChunkBridge SDK</h2>
+          <p>
+            LiteChunk 的转换引擎已经拆成一个独立的 Android 库——
+            <a href="sdk.html">ChunkBridge SDK</a>。
+            你不再需要安装 LiteChunk，也不必随包附带 Minecraft：把 SDK 发布到本地 Maven 后，添加一条 Gradle 依赖，就能在自己的应用里完成
+            Java 版与基岩版的互转。
+          </p>
+          <ul class="checklist">
+            <li>约 1.7 MB 的 AAR，引擎 dex 与资源全部内置，宿主无需联网。</li>
+            <li>公开 API 覆盖版本目录、存档检测、带进度与取消的异步转换，错误以类型化 <code>ErrorCode</code> 返回。</li>
+            <li>转换跑在独立的 <code>:chunkbridge</code> 前台服务进程里，不占用宿主自身的大堆。</li>
+            <li>与 LiteChunk 同源、同步升级，协议为 MIT。</li>
+          </ul>
+          <p class="note">
+            <strong>您是开发者？试试ChunkBridge SDK！</strong>完整的依赖方式、示例代码与限制说明见
+            <a href="sdk.html">ChunkBridge SDK 介绍</a>，集成细节则写在仓库的
+            <a href="https://github.com/FreneticWind60/ChunkBridge/blob/main/docs/INTEGRATION.md"
+              target="_blank" rel="noopener">INTEGRATION.md</a>。
           </p>
         </section>
 
@@ -321,6 +345,7 @@
           <div class="foot__title">站点</div>
           <nav class="foot__links" aria-label="站点导航">
             <a href="index.html">首页</a><a href="doc.html">使用文档</a>
+            <a href="sdk.html">ChunkBridge SDK</a>
             <a href="log.html">更新日志</a><a href="about.html">关于项目</a>
           </nav>
         </div>
@@ -328,6 +353,7 @@
           <div class="foot__title">社区</div>
           <nav class="foot__links" aria-label="社区链接">
             <a href="https://github.com/FreneticWind60/LiteChunk" target="_blank" rel="noopener">GitHub 仓库</a>
+            <a href="https://github.com/FreneticWind60/ChunkBridge" target="_blank" rel="noopener">ChunkBridge 仓库</a>
             <a href="https://github.com/FreneticWind60/LiteChunk/issues" target="_blank" rel="noopener">问题反馈</a>
             <a href="https://github.com/FreneticWind60/LiteChunk/releases" target="_blank" rel="noopener">下载发布页</a>
             <a href="about.html#community">QQ 群 1124116373</a>
