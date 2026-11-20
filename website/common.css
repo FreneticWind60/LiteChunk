@@ -801,7 +801,12 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
 .doc__toc a:hover { color: var(--ink); background: var(--surface-2); }
 .doc__toc a.is-active { color: var(--accent-ink); border-left-color: var(--accent); background: var(--accent-wash); }
 
-.doc__body { min-width: 0; display: grid; gap: 34px; }
+.doc__body {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 34px;
+}
 .doc__body section { scroll-margin-top: calc(var(--head-h) + 16px); }
 .doc__body h2 {
   display: flex;
