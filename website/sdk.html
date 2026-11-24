@@ -129,7 +129,7 @@
         <h1>ChunkBridge SDK</h1>
         <p>把 LiteChunk 的转换引擎装进你自己的 Android 应用：约 1.7 MB 的 AAR，不依赖 LiteChunk，不依赖 Minecraft，全程离线。</p>
         <ul class="tags" style="margin-top:16px">
-          <li>v1.0.0</li><li>AAR 约 1.7 MB</li><li>minSdk 27</li><li>MIT</li>
+          <li>v1.0.1</li><li>AAR 约 1.7 MB</li><li>minSdk 27</li><li>MIT</li>
         </ul>
         <div class="toolbar" style="margin-top:18px">
           <a class="btn btn--primary btn--sm" href="https://github.com/FreneticWind60/ChunkBridge"
@@ -202,8 +202,9 @@
           </div>
 
           <p class="note">
-            SDK 从 LiteChunk 应用中拆分而来，引擎版本 <strong>1.21.0</strong>，首个独立版本为
-            <strong>1.0.0</strong>。它与 LiteChunk 同源、同步升级；详情见仓库的
+            SDK 从 LiteChunk 应用中拆分而来，引擎版本 <strong>1.21.0</strong>，当前版本为
+            <strong>1.0.1</strong>（1.0.0 之后的补丁版，新增 <code>level.dat</code> 读取与修改）。
+            它与 LiteChunk 同源、同步升级；详情见仓库的
             <a href="https://github.com/FreneticWind60/ChunkBridge/blob/main/VERSION.zh-CN.md"
               target="_blank" rel="noopener">版本说明</a>。
           </p>
@@ -211,7 +212,7 @@
 
         <section id="capabilities">
           <h2>能做什么</h2>
-          <p>公开 API 刻意保持窄：只做转换本身，不提供界面、不编辑 <code>level.dat</code>、不接管文件管理。</p>
+          <p>公开 API 刻意保持窄：做转换与检测，外加 <code>level.dat</code> 的读取与修改（1.0.1 起）；不提供界面，也不接管文件管理与解压。</p>
 
           <div class="table-wrap">
             <table class="log-table">
@@ -240,6 +241,13 @@
                   <td>转换</td>
                   <td><code>ChunkBridge.convert(ConversionRequest, ConversionCallback)</code></td>
                   <td>返回 <code>ConversionHandle</code>；支持世界文件夹、<code>.zip</code> 与 <code>.mcworld</code> 输入。</td>
+                </tr>
+                <tr>
+                  <td>读取 / 修改 level.dat</td>
+                  <td><code>ChunkBridge.inspectLevel(File, LevelCallback)</code><br>
+                    <code>ChunkBridge.applyLevel(File, Map, LevelCallback)</code></td>
+                  <td>接受已解开、含 <code>level.dat</code> 的世界目录；返回字段清单（名称、种子、游戏模式等）与提示。
+                    只写 <code>level.dat</code>，不碰区块；压缩包的解开与写回由调用方负责。</td>
                 </tr>
                 <tr>
                   <td>取消</td>
@@ -288,15 +296,41 @@
 }
 
 dependencies {
-    implementation("com.frenetic.chunkbridge:chunkbridge:1.0.0")
+    implementation("com.frenetic.chunkbridge:chunkbridge:1.0.1")
     // api 会通过传递依赖引入；这里只是显式列出
-    // implementation("com.frenetic.chunkbridge:api:1.0.0")
+    // implementation("com.frenetic.chunkbridge:api:1.0.1")
 }</code></pre>
           </div>
 
           <p class="note">
-            如果只拷贝单个 AAR 文件，<strong>必须</strong>同时加入 <code>api-1.0.0.jar</code>：引擎 dex 挂载前，
+            如果只拷贝单个 AAR 文件，<strong>必须</strong>同时加入 <code>api-1.0.1.jar</code>：引擎 dex 挂载前，
             <code>ChunkerEngine</code> 必须已经存在于宿主的类加载器中，否则会得到 <code>ENGINE_UNAVAILABLE</code>。
+          </p>
+
+          <h3>或者：git submodule + 复合构建</h3>
+          <p>
+            想跟着 SDK 源码一起改（比如调引擎参数、改错误文案），把仓库挂成 submodule，让 Gradle 直接编译源码，
+            不用每次重新发布 AAR：
+          </p>
+          <div class="codeblock">
+            <div class="codeblock__bar"><span class="dot"></span>终端<b>bash</b></div>
+            <pre><code>git submodule add https://github.com/FreneticWind60/ChunkBridge.git chunkbridge
+git submodule update --init --recursive</code></pre>
+          </div>
+          <div class="codeblock">
+            <div class="codeblock__bar"><span class="dot"></span>settings.gradle.kts<b>Kotlin DSL</b></div>
+            <pre><code>val sdkDir = providers.gradleProperty("chunkbridge.sdk.dir").getOrElse("chunkbridge")
+
+includeBuild(file(sdkDir)) {
+    dependencySubstitution {
+        substitute(module("com.frenetic.chunkbridge:chunkbridge")).using(project(":library"))
+        substitute(module("com.frenetic.chunkbridge:api")).using(project(":api"))
+    }
+}</code></pre>
+          </div>
+          <p class="note">
+            本地开发时可以用 <code>-Pchunkbridge.sdk.dir=../sdk</code> 指向旁边的 SDK 检出。复合构建需要 SDK 源码，
+            CI 上记得带上 submodule（<code>--recursive</code>）；同一工程里不要同时用 AAR 和 <code>includeBuild</code>。
           </p>
 
           <h3>初始化</h3>
@@ -381,6 +415,28 @@ handle.cancel();</code></pre>
             <code>COMPACT</code>、<code>FINISH</code>、<code>UNKNOWN</code>。取消会结束
             <code>:chunkbridge</code> 进程；若请求到达时服务仍存活，回调会收到 <code>onCancelled</code>。
             紧接着发出的请求可能仍返回 <code>BUSY</code>，重试一次即可。
+          </p>
+
+          <h3>读取与修改 level.dat</h3>
+          <div class="codeblock">
+            <div class="codeblock__bar"><span class="dot"></span>Level.java<b>Java</b></div>
+            <pre><code>// 传入已解开、含 level.dat 的世界目录
+ChunkBridge.inspectLevel(worldDir, (info, error) -&gt; {
+    if (info == null) return;                 // error.getCode(), error.getMessage()
+    for (LevelField field : info.getFields()) {
+        Log.i("ChunkBridge", field.id + " = " + field.value);
+    }
+});
+
+// 只传要改的字段；未知 id 会被忽略
+Map&lt;String, String&gt; changes = new HashMap&lt;&gt;();
+changes.put("LevelName", "新的世界");
+ChunkBridge.applyLevel(worldDir, changes, (info, error) -&gt; { /* 写入后重新读取的最新值 */ });</code></pre>
+          </div>
+          <p class="note">
+            读写 <code>level.dat</code> 不需要前台服务，也不碰 Minecraft 的区块数据；压缩包里的
+            <code>level.dat</code> 解出与写回由调用方负责。字段类型见 <code>LevelField.KIND_*</code>，
+            <code>KIND_ENUM</code> 的可选值在 <code>optionIds</code> 里。
           </p>
         </section>
 

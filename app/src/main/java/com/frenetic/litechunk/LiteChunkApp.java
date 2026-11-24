@@ -4,6 +4,8 @@ import android.app.Application;
 
 import androidx.appcompat.app.AppCompatDelegate;
 
+import com.frenetic.litechunk.sdk.ChunkBridge;
+
 /**
  * Applies the saved theme before any activity is created.
  * <p>
@@ -24,6 +26,9 @@ public class LiteChunkApp extends Application {
         // whatever order things load in.
         System.setProperty("leveldb.mmap", "false");
         super.onCreate();
+        // The conversion engine now lives in the ChunkBridge SDK; every entry point (launcher, share sheet, import
+        // alias) needs it bound before a screen asks for the format catalog.
+        ChunkBridge.initialize(this);
         AppCompatDelegate.setDefaultNightMode(readNightMode(this));
         // Language before anything can read a string: installs the per-process lookup used by the file plumbing and
         // the error mapper, and hands the saved choice to AppCompat so activities come up in the right locale.

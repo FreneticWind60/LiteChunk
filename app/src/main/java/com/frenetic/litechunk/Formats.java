@@ -1,19 +1,19 @@
 package com.frenetic.litechunk;
 
-import android.os.Bundle;
-
-import com.frenetic.litechunk.api.ChunkerEngine;
-import com.frenetic.litechunk.api.FormatGroup;
-import com.frenetic.litechunk.api.FormatVersion;
+import com.frenetic.litechunk.sdk.ChunkBridge;
+import com.frenetic.litechunk.sdk.FormatGroup;
+import com.frenetic.litechunk.sdk.FormatVersion;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Parcelable-friendly snapshot of the formats the engine supports.
+ * Snapshot of the formats the engine supports, in the shape the conversion page wants.
  * <p>
- * The UI process never loads Chunker itself, so the list is produced in the {@code :chunker} process and shipped over
- * the {@link android.os.ResultReceiver} as primitive arrays.
+ * The SDK already publishes a catalog, but it models the editions as objects; the page keeps asking for parallel
+ * arrays (label plus format id per row) because the spinner and the version picker both key off the array index.
+ * Building that shape once here keeps the UI free of {@code FormatGroup} plumbing and keeps the engine unloaded
+ * until a conversion actually starts.
  */
 final class Formats {
 
@@ -52,19 +52,20 @@ final class Formats {
         this.groups = groups;
     }
 
-    static Formats of(ChunkerEngine engine) {
+    /** Read the catalog asset the SDK ships; this never loads Chunker. */
+    static Formats load() {
         List<Group> groups = new ArrayList<>();
-        for (FormatGroup group : engine.formats()) {
-            FormatVersion[] versions = group.versions;
-            String[] labels = new String[versions.length];
-            String[] ids = new String[versions.length];
-            for (int i = 0; i < versions.length; i++) {
-                labels[i] = versions[i].version;
-                ids[i] = versions[i].id;
+        for (FormatGroup group : ChunkBridge.formats()) {
+            List<FormatVersion> versions = group.getVersions();
+            String[] labels = new String[versions.size()];
+            String[] ids = new String[versions.size()];
+            for (int i = 0; i < versions.size(); i++) {
+                labels[i] = versions.get(i).getDisplayName();
+                ids[i] = versions.get(i).getFormatId();
             }
-            groups.add(new Group(group.id, group.label, labels, ids));
+            groups.add(new Group(group.getEditionId(), group.getEditionLabel(), labels, ids));
         }
-        return new Formats(engine.engineVersion(), groups.toArray(new Group[0]));
+        return new Formats(ChunkBridge.engineVersion(), groups.toArray(new Group[0]));
     }
 
     Group group(String id) {
@@ -79,37 +80,5 @@ final class Formats {
     String editionLabel(String groupId) {
         Group group = group(groupId);
         return group == null ? groupId : group.label;
-    }
-
-    Bundle toBundle() {
-        Bundle bundle = new Bundle();
-        bundle.putString(Job.KEY_ENGINE_VERSION, engineVersion);
-        bundle.putInt(Job.KEY_GROUP_COUNT, groups.length);
-        for (int i = 0; i < groups.length; i++) {
-            Group group = groups[i];
-            bundle.putString(Job.KEY_GROUP_ID + i, group.id);
-            bundle.putString(Job.KEY_GROUP_LABEL + i, group.label);
-            bundle.putStringArray(Job.KEY_GROUP_VERSIONS + i, group.versions);
-            bundle.putStringArray(Job.KEY_GROUP_FORMAT_IDS + i, group.formatIds);
-        }
-        return bundle;
-    }
-
-    static Formats fromBundle(Bundle bundle) {
-        int count = bundle.getInt(Job.KEY_GROUP_COUNT, 0);
-        Group[] groups = new Group[count];
-        for (int i = 0; i < count; i++) {
-            groups[i] = new Group(
-                    bundle.getString(Job.KEY_GROUP_ID + i, ""),
-                    bundle.getString(Job.KEY_GROUP_LABEL + i, ""),
-                    orEmpty(bundle.getStringArray(Job.KEY_GROUP_VERSIONS + i)),
-                    orEmpty(bundle.getStringArray(Job.KEY_GROUP_FORMAT_IDS + i))
-            );
-        }
-        return new Formats(bundle.getString(Job.KEY_ENGINE_VERSION, "?"), groups);
-    }
-
-    private static String[] orEmpty(String[] values) {
-        return values == null ? new String[0] : values;
     }
 }

@@ -93,12 +93,8 @@
             </intent-filter>
         </activity-alias>
 
-        <!-- Conversion runs in its own process: a second heap budget, a crash boundary and a hard cancel. -->
-        <service
-            android:name=".ConversionService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:process=":chunker" />
+        <!-- Conversion runs in the ChunkBridge SDK's own :chunkbridge process: a separate heap budget, a crash
+             boundary and a hard cancel. That service comes from the SDK's manifest and is merged here. -->
 
         <activity
             android:name=".AboutActivity"

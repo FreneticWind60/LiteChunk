@@ -221,7 +221,8 @@
           <p>
             LiteChunk 的转换引擎已经拆成一个独立的 Android 库。它是这次拆分留下的第一个公开产物，
             也是这个项目第一次明确地开放给大家去用：一个约 1.7 MB 的 AAR，不依赖 LiteChunk，不依赖 Minecraft，
-            加一条 Gradle 依赖，就能把 Java 版 / 基岩版互转接进你自己的应用。
+            加一条 Gradle 依赖（或者挂成 submodule 直接编译源码），就能把 Java 版 / 基岩版互转接进你自己的应用。
+            1.0.1 还把 <code>level.dat</code> 的读取与修改补进了公开 API。
           </p>
           <p>
             <strong>您是开发者？试试<a href="sdk.html">ChunkBridge SDK</a>！</strong>

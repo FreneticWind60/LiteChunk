@@ -139,32 +139,9 @@
     <string name="Controller_03">準備中…</string>
     <string name="Controller_04">ワールドを準備中…</string>
     <string name="Controller_05">不明なエラー</string>
-    <string name="Controller_06">不明なエラー</string>
     <string name="Controller_07">バージョンを判別できません</string>
 
-    <string name="ConversionService_01">バージョンを判別できません</string>
-    <string name="ConversionService_02">ワールド変換</string>
-    <string name="ConversionService_03">変換の進捗を表示</string>
-    <string name="ConversionService_04">すでに変換が実行中です</string>
-    <string name="ConversionService_05">変換を準備中…</string>
-    <string name="ConversionService_06">ワールドを読み込み中…</string>
-    <string name="ConversionService_07">ワールドデータが見つかりません（level.dat がありません）。ワールドのフォルダ自体を選んでいるか確認してください。</string>
-    <string name="ConversionService_08">読み込み完了、エンジンを起動しています…</string>
-    <string name="ConversionService_09">まとめています…</string>
-    <string name="ConversionService_10">一時フォルダを作成できません</string>
-    <string name="ConversionService_11">ワールドを展開中…</string>
-    <string name="ConversionService_12">選択したファイルを読み込めません</string>
-    <string name="ConversionService_13">ワールドフォルダをコピー中…</string>
-    <string name="ConversionService_14">ワールドフォルダをコピー中…</string>
-    <string name="ConversionService_15">ワールドを展開中…</string>
-    <string name="ConversionService_16">圧縮ファイルの中身を読み取れません（暗号化されているか、ZIP ではない可能性があります）。展開してフォルダとして取り込んでください。</string>
-    <string name="ConversionService_17">圧縮ファイルに level.dat がありません。ワールドフォルダ自体を圧縮したか確認するか、展開済みのフォルダを取り込んでください。</string>
-    <string name="ConversionService_18">マイワールド v1.2</string>
-    <string name="ConversionService_19">メモリ不足のため、軽い設定で再試行します（</string>
-    <string name="ConversionService_20">" スレッド / 省メモリモード）"</string>
-    <string name="ConversionService_21">出力フォルダを作成できません</string>
-    <string name="ConversionService_22">出力フォルダを作成できません</string>
-    <string name="ConversionService_23">LiteChunk が変換中です</string>
+    <string name="Controller_06">一時フォルダを作成できません</string>
 
     <string name="ConvertFragment_01">これらのワールドはすでにリストにあります</string>
     <string name="ConvertFragment_02">このワールドはすでにリストにあります</string>
@@ -248,6 +225,18 @@
     <string name="Job_03">アプリのデータフォルダに書き込めません。\n</string>
     <string name="Job_04">システム設定で LiteChunk のアプリデータを消去してから再試行してください（元のワールドは削除されません）。\n</string>
     <string name="Job_05">それでも失敗する場合は、ストレージが満杯でないか、外部ストレージがマウントされているかを確認してください。</string>
+    <string name="Job_06">このセーブを読み込めません。ファイルが壊れているか、移動されたか、アクセス権がありません。</string>
+    <string name="Job_07">この圧縮形式には対応していません。先にフォルダへ解凍するか、.zip / .mcworld を使ってください。</string>
+    <string name="Job_08">圧縮ファイルが壊れているか、パスワード保護のため解凍できません。</string>
+    <string name="Job_09">圧縮ファイルの中にワールドが見つかりません（level.dat がありません）。</string>
+    <string name="Job_10">その変換先バージョンには対応していません。選び直してください。</string>
+    <string name="Job_11">出力先に書き込めません。書き込み可能なフォルダを選んでください。</string>
+    <string name="Job_12">出力ファイルがすでに存在します。別の名前を選んでください。</string>
+    <string name="Job_13">空き容量が足りず、変換を完了できませんでした。容量を空けて再試行してください。</string>
+    <string name="Job_14">前回の変換がまだ終わっていません。しばらくしてから再試行してください。</string>
+    <string name="Job_15">変換はキャンセルされました。</string>
+    <string name="Job_16">変換エンジンを読み込めませんでした。アプリデータを消去するか再インストールしてから再試行してください。</string>
+    <string name="Job_17">変換を始める前にアプリを前面に表示してください。</string>
 
     <string name="LevelActivity_01">不明なエラー</string>
     <string name="LevelActivity_02">不明なエラー</string>

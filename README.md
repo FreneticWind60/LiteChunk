@@ -1,7 +1,9 @@
 # LiteChunk
 
 Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换引擎来自
-[Chunker](https://github.com/HiveGamesOSS/Chunker) 的裁剪版，通过 `DexClassLoader` 在独立进程中加载。
+[Chunker](https://github.com/HiveGamesOSS/Chunker) 的裁剪版，现在由
+[ChunkBridge SDK](https://github.com/FreneticWind60/ChunkBridge) 提供：引擎 dex 内嵌在 AAR 里，在
+`:chunkbridge` 进程中通过 `DexClassLoader` 加载。
 
 - 包名 `com.frenetic.litechunk`，版本 `1.21.0 build4 pr1`（build4 线的第一个预览，与引擎 Chunker 的版本同步）
 - 每个版本的新特性与已知局限见 [`VERSION.md`](VERSION.md)
@@ -11,33 +13,47 @@ Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换
 
 ## 工程结构
 
-```
-api/      com.frenetic.litechunk.api    App 与引擎之间的稳定契约（打进 APK，不混入 dex）
-engine/   Chunker 裁剪源码 + EngineImpl 门面 + level.dat 读写 + R8 打包任务
-app/      UI（转换页 / 文件页 / 存档详情）、文件流、外部导入、:chunker 隔离进程服务、DexClassLoader 加载器
-website/  官网（多页静态站：首页 / 文档 / 更新日志 / 关于，零构建、零外部依赖）
-```
+- /chunkbridge  ChunkBridge SDK（git submodule）
+- /app          UI、队列调度、文件流、外部导入、level.dat 的压缩包读写
+- /website      官网
 
-关键点：`api` 模块只被 App 的 ClassLoader 加载，引擎 dex 里不包含它的副本。`DexClassLoader` 是
-parent-first 的，所以 `EngineImpl` 实现接口后可以直接强转，不需要反射 Chunker 的任何类型。
+转换、检测、`level.dat` 读写全部通过 `ChunkBridge` 门面调用 SDK；引擎、解压、暂存、前台服务和
+`:chunkbridge` 进程都在 SDK 里，这个仓库只保留 UI 与文件流。两个仓库的边界与 API 说明见
+[ChunkBridge 的 README](https://github.com/FreneticWind60/ChunkBridge) 和
+[INTEGRATION.md](https://github.com/FreneticWind60/ChunkBridge/blob/main/docs/INTEGRATION.md)。
 
 ## 构建
 
 需要 JDK 17 或更高、Android SDK Platform 37 与 Build-Tools 37.0.0。
 
+SDK 是 Git submodule，并且以 Gradle **复合构建**（`includeBuild`）的方式接进来——改 SDK 源码不需要先发布
+AAR，重新构建 App 就会用上。首次接入要加 submodule（这一步会产生 `.gitmodules` 与一个 gitlink 提交）：
+
+```bash
+git submodule add https://github.com/FreneticWind60/ChunkBridge.git chunkbridge
+git submodule update --init --recursive
+```
+
+submodule 已经提交进仓库之后，clone 时带上 `--recursive` 即可；已有工作区用
+`git submodule update --init --recursive` 补齐。
+
+`settings.gradle.kts` 把 `chunkbridge/` 作为 included build，并把 `com.frenetic.chunkbridge:chunkbridge`
+和 `:api` 替换成 SDK 里的工程；`app/build.gradle.kts` 里写的是普通的 Maven 坐标
+`com.frenetic.chunkbridge:chunkbridge:1.0.1`，版本号在复合构建下被忽略。
+
+本地同时开发两个仓库时，可以让 App 指向任意 SDK 检出，不必把 submodule 放在仓库里：
+
+```bash
+./gradlew :app:assembleDebug -Pchunkbridge.sdk.dir=../ChunkBridge
+```
+
 ```bash
 ./gradlew :app:assembleDebug
 ./gradlew :app:assembleRelease     # 有 keystore.properties 才签名，没有就产出未签名包
-./gradlew :engine:engineDex        # 单独重新生成引擎 dex（改引擎源码后用）
 ```
 
-`app/src/main/assets/chunker.jar`（引擎 dex）不在仓库里，构建时由 `:engine:engineDex` 生成：
-R8 裁剪 + D8 dex，输入是本仓库的 `engine` 与 `api` 源码，所以改引擎代码不需要额外步骤。
-
-`assembleDebug` 也不需要手动先跑 `engineDex`：`merge*Assets` 与 lint 任务都显式
-`dependsOn(":engine:engineDex")`，而 `engineDex` 声明了 inputs/outputs，未改动时是 `UP-TO-DATE`。
-这层依赖本来是没有的：`chunker.jar` 只是 `assets` 里的普通文件，Gradle 不保证它先于 `mergeAssets` 写出，
-单独跑 `:app:assembleDebug` 会静默把**上一份 dex** 打进 APK。新增读 assets 的任务时要把依赖一起加上。
+引擎 dex（`assets/chunkbridge/engine.jar`）由 SDK 的 `:engine:engineDex` 生成并打进 AAR，App 侧不再有
+`engineDex` 任务，也没有 `app/src/main/assets/chunker.jar`。
 
 ### 发布签名
 
@@ -61,31 +77,15 @@ versionCode = major*10^8 + minor*10^6 + patch*10^4 + build*100 + stage
   stage = 50     正式发布
 ```
 
-`1.21.0 build1` → `121_000_150`。抬到 `10^8` 而不是 `10^7`，是因为最早的两次预览用过旧编码
-（`12_100_501` / `12_100_502`），正式版必须能在任何还留在设备上的预览版之上安装。
-
 ### 发布
 
 GitHub Release 的 tag 用连字符写法：`1.21.0-build1`（或 `v1.21.0-build1`）。
-Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（仓库里曾经有一个 `RELEASE_NOTES.md`，因为会把测试存档的路径写进公开历史，已弃用）。
-关于页的「检查更新」把 tag 与 `BuildConfig.VERSION_NAME` 去掉所有非字母数字字符后比对，
-所以这两种写法都认作同一个版本 —— tag 里不能有空格，git 也不允许。
-仓库地址写死在 `AboutActivity.REPO`，fork 之后要改那一行。
+Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**。
 
-### 桌面端验证
+关于页的「检查更新」把 tag 与 `BuildConfig.VERSION_NAME` 去掉所有非字母数字字符后比对，所以这两种写法都认作同一个版本。
 
-```bash
-./gradlew :engine:smokeTest    # 版本表是否还能加载、检测是否安全
-./gradlew :engine:roundTrip    # 官方集成样例 Java 1.20.5 -> 基岩 1.26.60 -> Java
-./gradlew :engine:engineCli -PheapSize=512m \
-  --args="<世界目录或zip> <工作目录> BEDROCK_1.26.60 nores 2"
-./gradlew :engine:actorDump --args="<基岩世界目录>"   # 统计 digp / actorprefix / definitions
-./gradlew :engine:levelTest --args="<世界目录>"       # level.dat 读写自检（JE 与 BE 都支持）
-```
+仓库地址写死在 `AboutActivity.REPO`，**fork 之后记得改一改**。
 
-`engineCli` 跑的是与 APK 内完全相同的引擎源码，只是 GC 不同，用来回答「这段世界要跑多久、多少内存」——
-比在模拟器上试快 10~40 倍。`actorDump` 是验证实体链路的唯一手段：基岩 1.16.100+ 要求每个
-`actorprefix` 记录都带 `definitions`，缺了游戏会**静默丢弃**该实体。
 
 ## 数据目录
 
@@ -126,7 +126,7 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（
   - `转出后自动删除原存档`（默认不勾）—— 只在**打包成功之后**才删，失败不会丢原档。
 - **输出命名**：由「存档原名 / 版本标记（BE/JE）/ 时间戳」三块拼成，可开关、**按住右侧手柄拖动排序**、
   分隔符可选 `-` `_` 无，默认 `原名-版本-时间`（`草稿-BE-20261027-1652.mcworld`）。点开是带实时预览的
-  BottomSheet，设置存 `SharedPreferences`，转换时随 Intent 传给 `:chunker` 进程（跨进程读 prefs 不保证可见）。
+  BottomSheet，设置存 `SharedPreferences`，转换时通过 `ChunkBridge.convert` 的请求参数传入。
   同名不覆盖：`WorldFiles.unique` 自动加 `(2)`。
   - 分隔符下面还有一行 `打包为 .mcworld`（仅目标格式为基岩版时可见，默认勾选）—— 取消后输出 `.zip`。
     它和命名是同一件事（决定最终文件名），所以从格式卡搬到了这里，转换页上不再有勾选框。
@@ -136,15 +136,12 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（
 
 ### 为什么转换期间要占住屏幕
 
-`ConversionService` 是前台服务，只能保证进程不被优先杀掉，**不阻止灭屏后 CPU 挂起**——用户看到的现象就是
-「切到后台或灭屏，进度就停了，回来才继续」。厂商的电池策略只会让这件事更早发生。三层处理：
+转换前台服务（SDK 的 `SdkConversionService`）只能保证进程不被优先杀掉，**不阻止灭屏后 CPU 挂起**——用户看到的现象就是「切到后台或灭屏，进度就停了，回来才继续」。厂商的电池策略只会让这件事更早发生。我们的处理办法：
 
 - **常亮**：`isRunning()` 时给 MainActivity 的窗口加 `FLAG_KEEP_SCREEN_ON`，结束或 `onPause` 清掉。
   用窗口标志而不是 `WakeLock`，因为它的生命周期跟窗口一致，不会忘记释放。
-- **唤醒锁**：`:chunker` 进程在转换期间持 `PARTIAL_WAKE_LOCK("LiteChunk:convert")`，`finally` 里释放。
-  只锁 CPU 不锁屏幕，灭屏也能跑完。
-- **白名单引导**：首次转换前弹一次「让转换安静地跑完 / Background limits」，按
-  `isIgnoringBatteryOptimizations` 判断后跳系统设置；两个按钮都会开始转换，看过一次就不再弹。
+- **唤醒锁**：SDK 在 `:chunkbridge` 进程里为每次转换持 `PARTIAL_WAKE_LOCK("ChunkBridge:convert")`，结束时释放。只锁 CPU 不锁屏幕，灭屏也能跑完。
+- **白名单引导**：首次转换前弹一次「让转换安静地跑完 / Background limits」，按 `isIgnoringBatteryOptimizations` 判断后跳系统设置；两个按钮都会开始转换，看过一次就不再弹。
 
 ### 文件页
 
@@ -193,14 +190,14 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（
   - 没有改动时退出直接放行；改了东西退出才弹「另存为 / 直接退出 / 保存」。
 - 另存为与保存共用一次遍历：`Archive.rewrite(source, target, ...)` 读原包、直接写到目标路径。
   1 GB 的存档先 `cp` 再重写会白读写两遍，这条路径不能那么干。
-- 引擎接口 `inspectLevel` / `applyLevelChanges` 同样在 `:chunker` 进程执行——UI 进程不加载 Chunker，
+- 引擎接口 `inspectLevel` / `applyLevelChanges` 同样在 `:chunkbridge` 进程执行——UI 进程不加载 Chunker，
   结果按平行数组跨进程传（`api` 是纯 Java 库，用不了 `Parcelable`）。`applyLevelChanges` 返回 `void`：
   没有备份时间戳可报了。
 
 ### 关于页
 
-软件介绍（基于 Chunker 的轻量版）、检查更新（GitHub releases API，取不到就明说取不到，不会假装「已是最新」）、
-开发者入口、MIT 与「与 Mojang / Microsoft 无关」的声明。
+语言设置和内存设置在这里。
+软件介绍、检查更新、版权声明声明也在这里。
 
 ### 其它
 
@@ -241,7 +238,7 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（
 
 补丁（源码里留有 `ChunkBridge:` 注释，历史工程名未改）：
 
-1. 资源改为通过 `Res.url(...)` 读取 —— dex 里没有资源，App 把 `assets/engine-res` 复制到私有目录再传给引擎。
+1. 资源改为通过 `Res.url(...)` 读取 —— dex 里没有资源，App 把 `assets/chunkbridge/engine-res` 复制到私有目录再传给引擎（这段逻辑在 SDK 的 `EngineProvider` 里）。
 2. `Tag.java` —— LZ4/XXHash 固定用 `safeInstance()` 的纯 Java 实现，避开 JNI 与 `sun.misc.Unsafe`。
 3. `org/iq80/leveldb/fileenv/ByteBufferSupport` —— 上游静态初始化依赖 `Unsafe#invokeCleaner` 与
    `DirectByteBuffer`，ART 上都没有，会在每次基岩版转换结束时抛 `AssertionError`。本仓库提供同名替代类，
@@ -296,7 +293,7 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（
 18. 多语言：界面文案原来全部写死在布局与代码里（布局 83 处、Java 约 200 条），现在抽成资源，
     提供 `values`（简体中文）/ `values-en` / `values-ja` 三套，外加 `values-*/quotes.xml` 的英日一言。
     代码里没有 `Context` 的地方（文件处理、压缩包识别、错误映射）走 `Text.get()`，它用保存的语言偏好
-    构造 `Resources`；这一步是必须的，因为转换跑在 `:chunker` 进程，AppCompat 的 per-app locale 在那种进程里
+    构造 `Resources`；这一步是必须的，因为转换跑在 `:chunkbridge` 进程，AppCompat 的 per-app locale 在那种进程里
     没有 Activity 可以重建。语言入口在「关于 → 语言」，默认跟随系统，切换用
     `AppCompatDelegate.setApplicationLocales()`，Android 13+ 同时注册进系统的应用语言设置。
 
@@ -398,23 +395,23 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（
       （`gradlew :engine:blockEntityDump` 查基岩库里的 `Command` 字段），
       `particle minecraft:flame ~ ~1 ~ 0.1 0.1 0.1 0.05 20` → `particle minecraft:basic_flame_particle ~ ~1 ~`。
 
-## 运行时设计
+## 运行时设计和一些倒腾的时候遇到的坑
 
-- **进程隔离**：`ConversionService` 跑在 `:chunker` 进程，独立堆预算；转换崩溃不影响 UI；取消 = 杀该进程
+- **进程隔离**：`SdkConversionService` 跑在 `:chunkbridge` 进程，独立堆预算；转换崩溃不影响 UI；取消 = 杀该进程
   （Chunker 没有中断 API）。
 - **多语言**：`values` / `values-en` / `values-ja` 三套资源；没有 `Context` 的代码用 `Text.get()`，
-  它在 `Application.onCreate` 里按保存的语言偏好建立 `Resources`，因此 `:chunker` 进程里的报错也跟 UI 一致。
-- **内存自适应**：`MemoryPlan` 按 `Runtime.maxMemory()` 决定档位（每 200MB 堆 1 线程，上限 2）。
+  它在 `Application.onCreate` 里按保存的语言偏好建立 `Resources`。`Job.describe(Throwable)` 把 SDK 返回的错误码
+  翻成这句 UI 文案，因此错误提示仍然跟随 App 的语言设置。
+- **内存自适应**：SDK 内的 `MemoryPlan` 按 `Runtime.maxMemory()` 决定档位（每 200MB 堆 1 线程，上限 2）。
   上限是 2 而不是 8：同一世界 8 线程实测比 2 线程更慢，线程越多 GC 压力越大。
   首次失败若是 OOM，自动降 1 线程 + 精简模式重试一次。
-- **进度**：200ms 轮询 + `ResultReceiver` 回传，前台服务通知同步。
+- **进度**：SDK 以 200ms 节流回调 `ConversionCallback`，前台服务通知同步。
 - **LevelDB 在 Android 上不用 mmap**：这个库的 mmap 实现是照着桌面 JDK 写的——`MMRandomInputFile` 调
   `MappedByteBuffer.duplicate()`，`MMWritableFile` 调 `force()` 和 `position()`，而这些方法的协变返回类型
   （返回 `MappedByteBuffer` 而不是 `Buffer`）是 **JDK 13** 才加的，Android 到 13（API 33）才有。之前的版本在
   Android 12 及以下会直接抛 `NoSuchMethodError: duplicate()Ljava/nio/MappedByteBuffer;`，一个区块都读不到，
-  转换在打开存档库的那一刻就失败。`EngineImpl` 的静态块在 Android 上设 `leveldb.mmap=false`，`LiteChunkApp`
-  再设一次兜底（`:chunker` 进程同样会走 `Application.onCreate`），LevelDB 改走 `FileChannel`。
-  桌面保持 mmap，下面所有耗时数字都是在 mmap 下测的。
+  转换在打开存档库的那一刻就失败。`EngineImpl` 的静态块在 Android 上设 `leveldb.mmap=false`，LevelDB 改走
+  `FileChannel`。桌面保持 mmap，下面所有耗时数字都是在 mmap 下测的。
 - **引擎不能调用 Android 13 之后才有的 `java.*` 方法**。R8 会把 `List.of` / `Set.of` / `Map.of` 这类 Java 9 的
   工厂方法降级成 Guava 或 `Arrays.asList`，但**不会**处理 `List.toArray(IntFunction)`（Java 11）、
   `Stream.toList()`（Java 16）、`String.formatted()`（Java 15）、`StringBuilder.isEmpty()`（Java 15）和
@@ -422,20 +419,22 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（
   而且异常会被任务调度器盖成一句 `Unable to free task which has not started`，完全看不出原因。
   现在这些调用全部换成了 Java 8 的写法；`org.iq80.leveldb.util.ZLib` 是 leveldb jar 里唯一走
   `Inflater`/`Deflater` 的 ByteBuffer 重载的类，所以和 `ByteBufferSupport` 一样在打包时被剔除，换成
-  `engine/src/main/java` 下的同包实现（见 `engineDex` 里的 `repackJar`）。
+  SDK 的 `engine/src/main/java` 下的同包实现（见 `engineDex` 里的 `repackJar`，这些构建任务现在在 ChunkBridge 仓库）。
   校验方式是拿 dex 与装好的 API 27 平台库逐条比对方法引用，当前只剩两条：Guava 里被 try/catch 兜住的
   `findVarHandle`，以及 mmap 关闭后不会执行的 `MappedByteBuffer.duplicate()`。
-- **文件**：世界先解压 / 复制成 `cacheDir/flush/` 下的真实文件（LevelDB 只能按路径打开，不能直接读写 SAF 路径），
-  输出打包成 `.zip` / `.mcworld` 放进 `output/`，再由 SAF `CreateDocument` 导出副本。
-- **暂存与复用**：识别与转换都需要解压后的世界，所以暂存目录按队列项命名（`stage-<id>`）而不是匿名 `job-*`。
-  识别完不再删除，转换时直接复用——同一个世界以前要解压两遍，现在第二遍是 0 秒（日志里 `read=0.0s(staged)`）。
-  完整写入后会落 `.ready` 标记，否则「添加后立刻点转换」可能读到写了一半的世界。
-  清理只在转换线程里做（`pruneStagesExcept`），删掉不属于本批次条目的暂存目录——放在 UI 线程会与刚启动的转换打架。
-- **两条写入路径**：完整转换走引擎管线（解码区块 → 重新编码），改 `level.dat` 走 `LevelEditor` 直写。
-  后者不碰区块，因此没有「引擎不认识的方块变占位块」的代价，也不受堆预算约束；
-  前者仍是唯一能跨版本改地形的手段。两者共用同一个 `:chunker` 进程。
-- **dex 加载**：`assets/chunker.jar` → `code_cache/engine/chunker-<size>.jar` → `setReadOnly()`
-  （Android 14 起动态加载的代码必须来自只读文件）→ `DexClassLoader`。
+- **文件**：世界由 SDK 解压 / 复制成 `cacheDir/chunkbridge/jobs/<id>/` 下的真实文件（LevelDB 只能按路径打开，
+  不能直接读写 SAF 路径），转换产物写到 App 通过 `outputFile` 指定的 `output/`，再按需由 SAF `CreateDocument`
+  导出副本。App 自己只为「文件夹」队列项建暂存（`stage-<id>`），因为树形 SAF 目录需要先复制成真实路径再交给 SDK。
+- **暂存与复用**：文件夹队列项的暂存按队列项命名（`stage-<id>`），识别完不删除，转换时直接复用——同一个世界
+  以前要解压两遍，现在第二遍是 0 秒（日志里 `read=0.0s(staged)`）。完整写入后会落 `.ready` 标记，否则
+  「添加后立刻点转换」可能读到写了一半的世界。清理只在批次结束时做（`pruneStagesExcept`）。
+  压缩包 / 单个文件不需要 App 暂存：把 Uri 直接交给 SDK，由它落到自己的作业目录并在结束时删掉。
+- **两条写入路径**：完整转换走 SDK 的引擎管线（解码区块 → 重新编码），改 `level.dat` 走
+  `ChunkBridge.applyLevel`（SDK 内部用 `LevelEditor` 直写）。后者不碰区块，因此没有「引擎不认识的方块变占位块」
+  的代价，也不受堆预算约束；前者仍是唯一能跨版本改地形的手段。两者共用同一个 `:chunkbridge` 进程。
+- **dex 加载**：`assets/chunkbridge/engine.jar` → `code_cache/chunkbridge/engine-<hash>.jar` → `setReadOnly()`
+  （Android 14 起动态加载的代码必须来自只读文件）→ `DexClassLoader`。这套逻辑在 SDK 的 `EngineProvider` 里，
+  App 不再有自己的 `EngineLoader`。
 
 ## 已知风险
 
@@ -445,34 +444,16 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**（
 - 最低系统 API 27，主流程在 API 27 与 API 35 / 36 上验证过；RAR / 7z 导入与分享入口在真机上走过一遍。
 - 目标版本列表来自引擎枚举，最新 Java 版本用 `dimensions/<namespace>/<dimension>/region` 新目录结构，
   旧客户端打不开，属预期。
-- 转换在 `:chunker` 进程中进行，App 被划掉后任务会继续；重启 App 不恢复进度（成品仍在 `output/`）。
-- **实体转换仍是「尽量还原」而非逐字节等价**。Java → 基岩：村民只还原职业、等级与生物群系，交易清单交给
-  游戏重新生成；骑乘的 `LinksTag` 现已按**游戏自己保存出来的格式**写（两端各一条，`RideID` / `VehicleID` 与
-  `entityID` / `linkID` 并存）；矿车的箱内物品写进 `ChestItems`（游戏自己的存档就是这么存的，写在 `Items` 会被
-  整份丢掉），带箱的驴与羊驼仍是 `Items`。**生物骑生物在基岩只能还原一半**：船、矿车、鸡、蜘蛛这类
-  `rideable` 放开了 `family_types` 的组合能保住，而马、猪、骆驼、驴的座位只认玩家，Java 里「猪骑野马」过去后
-  骑手会站到旁边。基岩 → Java：装备、坐骑装备、项圈颜色、坐下、村民职业等级、变体、
-  容器内容、拴绳与乘客都会跟着走，但**跨区块边界的骑手不会配对**（会变成同一位置的两个实体），
-  玩家拴的绳子挂不上；J→B 时写进「没有任何方块的列」的实体，转回 Java 时会消失
-  （真实存档不会出现这种列）。速度或坐标超出浮点范围的实体（作弊、损坏的存档）会被归零，否则基岩会把 actor
-  当成无效数据丢掉，或让它以天文数字的速度撞碎在地上。两个方向的实体记录本身都不是逐字节确定的，两次转换的
-  输出在实体顺序上就会有差异（区块数据是一致的）。
-- **粒子只在命令的载体里被重写**。存档本身不存粒子（Java 的粒子是客户端代码，基岩的是资源包定义），能被转换的
-  只有存着 `/particle` 的那条命令——普通命令方块与命令方块矿车（后者的命令写在 actor 上，以前整条丢掉了）。
-  数据包或函数文件里的粒子不随存档转换；没有映射的粒子（`ash`、`crimson_spore`、`item_slime` 等）命令保持原样，
-  进游戏会报参数错误，至少能看出是哪一条没转。
-- 常亮 + 唤醒锁解决的是「灭屏后被挂起」，**不是厂商的强制冻结**。部分 ROM 在极低电量或长时间无交互时
-  仍会冻结后台进程，白名单引导只是一个引导，能不能免疫取决于系统。
+- 转换在 `:chunkbridge` 进程中进行，App 被划掉后任务会继续；重启 App 不恢复进度（成品仍在 `output/`）。
+- **实体转换仍是「尽量还原」而非逐字节等价**。Java → 基岩：村民只还原职业、等级与生物群系，交易清单交给游戏重新生成；骑乘的 `LinksTag` 现已按**游戏自己保存出来的格式**写（两端各一条，`RideID` / `VehicleID` 与`entityID` / `linkID` 并存）；矿车的箱内物品写进 `ChestItems`（游戏自己的存档就是这么存的，写在 `Items` 会被整份丢掉），带箱的驴与羊驼仍是 `Items`。**生物骑生物在基岩只能还原一半**：船、矿车、鸡、蜘蛛这类`rideable` 放开了 `family_types` 的组合能保住，而马、猪、骆驼、驴的座位只认玩家，Java 里「猪骑野马」过去后骑手会站到旁边。基岩 → Java：装备、坐骑装备、项圈颜色、坐下、村民职业等级、变体、容器内容、拴绳与乘客都会跟着走，但**跨区块边界的骑手不会配对**（会变成同一位置的两个实体），玩家拴的绳子挂不上；J→B 时写进「没有任何方块的列」的实体，转回 Java 时会消失（真实存档不会出现这种列）。速度或坐标超出浮点范围的实体（作弊、损坏的存档）会被归零，否则基岩会把 actor当成无效数据丢掉，或让它以天文数字的速度撞碎在地上。两个方向的实体记录本身都不是逐字节确定的，两次转换的输出在实体顺序上就会有差异（区块数据是一致的）。
+- **粒子只在命令的载体里被重写**。存档本身不存粒子（Java 的粒子是客户端代码，基岩的是资源包定义），能被转换的只有存着 `/particle` 的那条命令——普通命令方块与命令方块矿车（后者的命令写在 actor 上，以前整条丢掉了）。数据包或函数文件里的粒子不随存档转换；没有映射的粒子（`ash`、`crimson_spore`、`item_slime` 等）命令保持原样，进游戏会报参数错误，至少能看出是哪一条没转。
+- 常亮 + 唤醒锁解决的是「灭屏后被挂起」，**不是厂商的强制冻结**。部分 ROM 在极低电量或长时间无交互时仍会冻结后台进程，白名单引导只是一个引导，能不能免疫取决于系统。
 - 关掉 LevelDB 尾部 compaction 后，中间 `.ldb` 是未压缩的，`db/` 目录会比上游大；打包成 `.mcworld` 后回落。
-- 存档详情改的是 `level.dat`，不会升级区块数据。改完的存档若正被游戏打开着，游戏退出时会用内存里的旧数据
-  覆盖回去——改之前先关掉游戏。
+- 存档详情改的是 `level.dat`，不会升级区块数据。改完的存档若正被游戏打开着，游戏退出时会用内存里的旧数据覆盖回去。改之前务必先关掉游戏。
 - 存档详情保存要重写整个压缩包（同目录 `.tmp` 再 rename），所以需要**与包体等量**的剩余空间；
   空间不足时写 `.tmp` 会失败，原包保持不动。
-- **保存没有后悔药**：写入链路能保证不写出半坏的包，但覆盖成功之后旧内容就没有了。
-  想留原档只能用「另存为」。
 - 卸载重装后系统不一定清理 `/sdcard/Android/data/com.frenetic.litechunk/`。如果它留着且属主还是旧 uid，
-  `output/` 里会写不进去（`EACCES`）。启动时会把不可写的 `output/` 改名成 `output.old-<时间戳>` 再新建；
-  这层存储不一定允许改名，失败时错误提示会引导用户清除应用数据（不会动原存档）。
+  `output/` 里会写不进去（`EACCES`）。启动时会把不可写的 `output/` 改名成 `output.old-<时间戳>` 再新建；这层存储不一定允许改名，失败时错误提示会引导用户清除应用数据（不会动原存档）。
 
 ## 许可
 
@@ -493,8 +474,8 @@ LiteChunk 的诞生离不开开源社区与各位朋友的帮助。在此，谨�
 
 ### 特别感谢
 
-- **Dozener**
-  感谢你在此项目上的奠基性工作。你对可行性的验证为 LiteChunk 的立项与推进提供了关键信心，这份贡献不可替代。
+- **[Dozener](https://github.com/DozenesStudio)**
+  感谢你在同类项目 Chunkoid 上的奠基性工作。你的可行性的验证为 LiteChunk 的立项与推进提供了关键信心，这份贡献不可替代。
 
 - **[Dicecan](https://github.com/Dicecan)**
   感谢你在实体转换方面提供的巨大帮助与技术支持。LiteChunk 在这一环节的顺利实现，离不开你的耐心解答与专业指导。
@@ -502,4 +483,4 @@ LiteChunk 的诞生离不开开源社区与各位朋友的帮助。在此，谨�
 我们始终坚持将所有帮助过我们的朋友忠实地列在 README 致谢名单内，放在官网的醒目位置。希望大家可以把这一份开源精神传承下去。
 ## 最后
 
-感谢所有关注、使用和反馈 LiteChunk 的朋友。开源的意义在于互相成就，LiteChunk 也将继续以开放的态度回馈社区。
+感谢所有关注、使用和反馈 LiteChunk 的朋友。开源的意义不在于耀武扬威，而是在于互相成就相互学习，LiteChunk 也将继续以开放的态度回馈社区。
