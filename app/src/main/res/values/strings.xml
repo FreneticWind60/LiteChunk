@@ -173,12 +173,6 @@
     <string name="ConvertFragment_40">" 秒"</string>
     <string name="ConvertFragment_41">" 秒"</string>
     <string name="ConvertFragment_42">转换进行中，先取消再修改列表</string>
-    <string name="EngineLoader_01">无法创建引擎缓存目录</string>
-    <string name="EngineLoader_02">无法写入引擎文件</string>
-    <string name="EngineLoader_03">无法将引擎设为只读</string>
-    <string name="EngineLoader_04">无法创建引擎资源目录</string>
-    <string name="EngineLoader_05">无法创建目录：</string>
-    <string name="EngineLoader_06">无法创建目录：</string>
     <string name="FilesFragment_01">导出一次只能选一个存档</string>
     <string name="FilesFragment_02">分享一次只能选一个存档</string>
     <string name="FilesFragment_03">已放入转化列表</string>
@@ -399,6 +393,9 @@
     <string name="LevelActivity_47">这个压缩包解开后会很大</string>
     <string name="LevelActivity_48">压缩包只有 $1，解开后预计 $2，可用空间 $3。要读取这个存档必须整个解开到缓存；如果来源不可信，请当心压缩炸弹。继续吗？</string>
     <string name="LevelActivity_49">继续解压</string>
+    <string name="LevelActivity_50">这是版本号，不是数据格式</string>
+    <string name="LevelActivity_51">你改了 $1。这些数字只声明版本，不会升级存档里的区块数据；改成不匹配的值，游戏可能直接判定存档损坏，而且保存后无法撤销。</string>
+    <string name="LevelActivity_52">仍然保存</string>
 
     <string name="Limits_01">使用推荐值</string>
     <string name="Limits_02">自定义</string>
@@ -416,4 +413,8 @@
     <string name="activity_about_16">偏好设置</string>
 
     <string name="ConvertFragment_44">当前</string>
+
+    <string name="ConvertFragment_45">搜索版本号</string>
+
+    <string name="ConvertFragment_46">没有匹配的版本</string>
 </resources>

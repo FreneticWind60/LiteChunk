@@ -3,8 +3,13 @@
     Target version picker, as a bottom sheet: the list is the whole point, so it gets the full width and whatever
     height the screen allows, and the sheet swallows the scroll instead of a dialog clipping a row in half at its
     bottom edge.
+
+    The search box earns its place here: a Java list runs to eighty entries and the groups alone do not help when
+    someone already knows the number they want ("1.20.4", not "somewhere under 1.20"). Filtering keeps the headings,
+    so a narrowed list still reads as groups rather than as a loose column of numbers.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
@@ -30,6 +35,54 @@
         android:paddingEnd="20dp"
         android:paddingBottom="6dp"
         android:textAppearance="@style/Text.LiteChunk.Caption" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/searchLayout"
+        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="4dp"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="2dp"
+        android:hint="@string/ConvertFragment_45"
+        app:boxBackgroundColor="@color/surface_high"
+        app:boxCornerRadiusBottomEnd="14dp"
+        app:boxCornerRadiusBottomStart="14dp"
+        app:boxCornerRadiusTopEnd="14dp"
+        app:boxCornerRadiusTopStart="14dp"
+        app:boxStrokeColor="@color/input_stroke"
+        app:boxStrokeWidth="1dp"
+        app:boxStrokeWidthFocused="2dp"
+        app:endIconMode="clear_text"
+        app:hintTextColor="@color/accent"
+        app:startIconDrawable="@drawable/ic_search">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/etSearch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:imeOptions="actionSearch"
+            android:importantForAutofill="no"
+            android:inputType="text"
+            android:maxLines="1"
+            android:paddingTop="12dp"
+            android:paddingBottom="12dp"
+            android:textColor="@color/text"
+            android:textSize="15sp" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <TextView
+        android:id="@+id/tvEmpty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="20dp"
+        android:paddingTop="18dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="18dp"
+        android:text="@string/ConvertFragment_46"
+        android:textAppearance="@style/Text.LiteChunk.Caption"
+        android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/listVersions"

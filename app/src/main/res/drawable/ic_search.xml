@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Fluent UI Search 16 Regular (MIT). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="?attr/colorControlNormal"
+    android:viewportHeight="16"
+    android:viewportWidth="16">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M7.5,2a5.5,5.5 0 0,1 4.383,8.822l3.147,3.148a0.5,0.5 0 0,1 -0.7,0.708l-3.148,-3.148A5.5,5.5 0 1,1 7.5,2m0,1a4.5,4.5 0 1,0 0,9a4.5,4.5 0 0,0 0,-9" />
+</vector>

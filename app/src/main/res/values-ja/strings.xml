@@ -186,12 +186,6 @@
     <string name="ConvertFragment_41">" 秒"</string>
     <string name="ConvertFragment_42">変換中です。リストを変更する前にキャンセルしてください</string>
 
-    <string name="EngineLoader_01">エンジンのキャッシュフォルダを作成できません</string>
-    <string name="EngineLoader_02">エンジンのファイルを書き込めません</string>
-    <string name="EngineLoader_03">エンジンを読み取り専用にできません</string>
-    <string name="EngineLoader_04">エンジンのリソースフォルダを作成できません</string>
-    <string name="EngineLoader_05">フォルダを作成できません：</string>
-    <string name="EngineLoader_06">フォルダを作成できません：</string>
 
     <string name="FilesFragment_01">書き出しは一度に 1 つだけ選べます</string>
     <string name="FilesFragment_02">共有は一度に 1 つだけ選べます</string>
@@ -426,6 +420,9 @@
     <string name="LevelActivity_47">展開すると非常に大きくなります</string>
     <string name="LevelActivity_48">圧縮ファイルは $1 ですが、展開後は約 $2 になり、空き容量は $3 です。読み込むにはすべてキャッシュに展開する必要があります。出所が不明な場合は圧縮爆弾にご注意ください。続行しますか？</string>
     <string name="LevelActivity_49">展開して続行</string>
+    <string name="LevelActivity_50">これはバージョン番号で、データ形式ではありません</string>
+    <string name="LevelActivity_51">$1 を変更しました。これらの数値はバージョンを宣言するだけで、ワールド内のチャンクデータは更新されません。一致しない値にすると、ゲームがワールドを破損とみなす可能性があり、保存後は元に戻せません。</string>
+    <string name="LevelActivity_52">それでも保存</string>
 
     <string name="Limits_01">推奨値を使う</string>
     <string name="Limits_02">カスタム</string>
@@ -443,4 +440,8 @@
     <string name="activity_about_16">環境設定</string>
 
     <string name="ConvertFragment_44">使用中</string>
+
+    <string name="ConvertFragment_45">バージョンを検索</string>
+
+    <string name="ConvertFragment_46">一致するバージョンがありません</string>
 </resources>

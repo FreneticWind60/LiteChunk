@@ -12,6 +12,7 @@ import com.google.android.material.radiobutton.MaterialRadioButton;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * The target version list: one column, a heading per major version and a single radio per row.
@@ -21,6 +22,10 @@ import java.util.List;
  * listener that only existed after the dialog was shown, so closing it by any other means kept the old version while
  * the screen still showed the new one as picked. Here the adapter owns the one selected index, and a tap calls
  * {@link Listener#onPick(int)} immediately - there is no state to get out of step.
+ * <p>
+ * The list is long (eighty-odd Java versions) and is built from a plain array, so the search field narrows it by
+ * rebuilding the same {@code items} list instead of hiding rows: headings are recomputed for whatever survives the
+ * filter, which keeps a narrowed list reading as groups rather than as a loose column of numbers.
  */
 final class VersionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
@@ -37,44 +42,33 @@ final class VersionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
     private final Listener listener;
     /** Either a String (a heading) or an Integer (the index of a version in {@link #labels}). */
     private final List<Object> items = new ArrayList<>();
+    /** Already lower-cased and trimmed; empty means "show everything". */
+    private String query = "";
 
     VersionAdapter(String[] labels, int selected, Listener listener) {
         this.labels = labels;
         this.selected = selected;
         this.listener = listener;
-
-        String major = null;
-        for (int index = 0; index < labels.length; index++) {
-            String key = majorOf(labels[index]);
-            if (!key.equals(major)) {
-                major = key;
-                items.add(key);
-            }
-            items.add(index);
-        }
+        rebuild();
     }
 
     /**
-     * Which heading a version belongs under.
+     * Narrows the list to the versions matching {@code text}.
      * <p>
-     * Two eras, two schemes. Up to 1.21 the interesting number is the second one - "1.21.8" and "1.21.4" are far
-     * apart in time, "1.20" and "1.21" even more so, and grouping by the leading 1 would put eighteen years of the
-     * game under one heading. From 22 onwards Mojang dropped the leading 1, so the first number is the generation and
-     * the second is a point release inside it: "26.3.0" belongs with "26.1.2", not on its own.
+     * Matching is deliberately loose: the raw label is tried first ({@code 1.20.4}), then both sides are compared
+     * with punctuation removed ({@code 1204}, {@code 1 20 4}), because people type a version the way they would say
+     * it and the separators in between are not what they are remembering.
      *
-     * @param version a label from the format list, e.g. {@code 1.21.8} or {@code 26.3.0}.
-     * @return the heading text.
+     * @param text what is in the search box; null or blank shows every version.
      */
-    static String majorOf(String version) {
-        String[] parts = version.split("\\.");
-        if (parts.length < 2) {
-            return version;
+    void setQuery(String text) {
+        String next = text == null ? "" : text.trim().toLowerCase(Locale.ROOT);
+        if (next.equals(query)) {
+            return;
         }
-        try {
-            return Integer.parseInt(parts[0]) >= 22 ? parts[0] : parts[0] + "." + parts[1];
-        } catch (NumberFormatException notAVersion) {
-            return version;
-        }
+        query = next;
+        rebuild();
+        notifyDataSetChanged();
     }
 
     /**
@@ -98,6 +92,81 @@ final class VersionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
             }
         }
         return 0;
+    }
+
+    /** How many version rows survive the filter (headings not counted). */
+    int countVersions() {
+        int count = 0;
+        for (Object item : items) {
+            if (item instanceof Integer) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private void rebuild() {
+        items.clear();
+        String major = null;
+        for (int index = 0; index < labels.length; index++) {
+            if (!matches(index)) {
+                continue;
+            }
+            String key = majorOf(labels[index]);
+            if (!key.equals(major)) {
+                major = key;
+                items.add(key);
+            }
+            items.add(index);
+        }
+    }
+
+    private boolean matches(int index) {
+        if (query.isEmpty()) {
+            return true;
+        }
+        String label = labels[index].toLowerCase(Locale.ROOT);
+        if (label.contains(query)) {
+            return true;
+        }
+        String squashedQuery = squash(query);
+        // A query made only of punctuation has nothing left to compare after squashing; the raw pass above owns it.
+        return !squashedQuery.isEmpty() && squash(label).contains(squashedQuery);
+    }
+
+    /** Lower-cased letters and digits only: {@code "1.20.4"} and {@code "1204"} both become {@code "1204"}. */
+    private static String squash(String text) {
+        StringBuilder out = new StringBuilder(text.length());
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (Character.isLetterOrDigit(character)) {
+                out.append(character);
+            }
+        }
+        return out.toString();
+    }
+
+    /**
+     * Which heading a version belongs under.
+     * <p>
+     * Two eras, two schemes. Up to 1.21 the interesting number is the second one - "1.21.8" and "1.21.4" are far
+     * apart in time, "1.20" and "1.21" even more so, and grouping by the leading 1 would put eighteen years of the
+     * game under one heading. From 22 onwards Mojang dropped the leading 1, so the first number is the generation and
+     * the second is a point release inside it: "26.3.0" belongs with "26.1.2", not on its own.
+     *
+     * @param version a label from the format list, e.g. {@code 1.21.8} or {@code 26.3.0}.
+     * @return the heading text.
+     */
+    static String majorOf(String version) {
+        String[] parts = version.split("\\\\.");
+        if (parts.length < 2) {
+            return version;
+        }
+        try {
+            return Integer.parseInt(parts[0]) >= 22 ? parts[0] : parts[0] + "." + parts[1];
+        } catch (NumberFormatException notAVersion) {
+            return version;
+        }
     }
 
     @Override

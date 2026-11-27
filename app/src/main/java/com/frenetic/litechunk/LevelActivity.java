@@ -32,8 +32,10 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import java.io.File;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -76,6 +78,14 @@ public class LevelActivity extends AppCompatActivity {
     private LevelInfo info;
     /** Edits made since the screen opened, in the engine's own value format. */
     private final Map<String, String> pending = new LinkedHashMap<>();
+
+    /**
+     * The three fields that declare a format version without changing the data behind it.
+     * <p>
+     * Saving one of these is the only edit in this screen that can leave a file the engine writes correctly and the
+     * game still refuses to open, which is why {@link #requestSave()} stops and explains before it writes.
+     */
+    private static final String[] VERSION_FIELDS = {"DataVersion", "StorageVersion", "NetworkVersion"};
 
     /** True while a read or write is in flight; the header buttons are disabled so a save cannot be doubled. */
     private boolean busy;
@@ -483,6 +493,35 @@ public class LevelActivity extends AppCompatActivity {
         if (busy || pending.isEmpty()) {
             return;
         }
+        String versions = changedVersions();
+        if (versions != null) {
+            // A version number is the one field where "the engine verified what it wrote" says nothing about whether
+            // the world still opens: the bytes are on disk exactly as asked, and the game may still call the save
+            // corrupt. So this warning comes before the overwrite dialog, and it is the only one in this screen that
+            // describes a consequence the app cannot take back.
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle(Text.get(R.string.LevelActivity_50))
+                    .setMessage(Text.get(R.string.LevelActivity_51).replace("$1", versions))
+                    .setNegativeButton(Text.get(R.string.LevelActivity_13), null)
+                    .setPositiveButton(Text.get(R.string.LevelActivity_52), (dialog, which) -> requestSaveConfirmed())
+                    .show();
+            return;
+        }
+        requestSaveConfirmed();
+    }
+
+    /** @return the ids of the changed version fields, or {@code null} when none of them is being saved. */
+    private String changedVersions() {
+        List<String> changed = new ArrayList<>(3);
+        for (String id : VERSION_FIELDS) {
+            if (pending.containsKey(id)) {
+                changed.add(id);
+            }
+        }
+        return changed.isEmpty() ? null : String.join(", ", changed);
+    }
+
+    private void requestSaveConfirmed() {
         if (container != WorldFiles.Container.ZIP) {
             // Overwriting is not on the table for these formats, so the dialog asks about the only thing it can do.
             titled(Text.get(R.string.LevelActivity_15), "SaveAsZip")

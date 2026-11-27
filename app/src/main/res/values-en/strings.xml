@@ -186,12 +186,6 @@
     <string name="ConvertFragment_41">" s"</string>
     <string name="ConvertFragment_42">A conversion is running — cancel it before changing the queue</string>
 
-    <string name="EngineLoader_01">Cannot create the engine cache folder</string>
-    <string name="EngineLoader_02">Cannot write the engine files</string>
-    <string name="EngineLoader_03">Cannot make the engine read-only</string>
-    <string name="EngineLoader_04">Cannot create the engine resource folder</string>
-    <string name="EngineLoader_05">Cannot create folder: </string>
-    <string name="EngineLoader_06">Cannot create folder: </string>
 
     <string name="FilesFragment_01">Export takes one save at a time</string>
     <string name="FilesFragment_02">Share takes one save at a time</string>
@@ -426,6 +420,9 @@
     <string name="LevelActivity_47">This archive unpacks to a lot</string>
     <string name="LevelActivity_48">The archive is only $1 but should unpack to about $2, with $3 free. Reading this save means writing all of it to the cache - be careful with a decompression bomb if you do not trust the source. Continue?</string>
     <string name="LevelActivity_49">Unpack anyway</string>
+    <string name="LevelActivity_50">A version number is not a data format</string>
+    <string name="LevelActivity_51">You changed $1. These numbers only declare a version - they do not upgrade the chunk data inside the save. A value that does not match can make the game treat the world as corrupt, and saving cannot be undone.</string>
+    <string name="LevelActivity_52">Save anyway</string>
 
     <string name="Limits_01">Use recommended</string>
     <string name="Limits_02">Custom</string>
@@ -443,4 +440,8 @@
     <string name="activity_about_16">Preferences</string>
 
     <string name="ConvertFragment_44">Current</string>
+
+    <string name="ConvertFragment_45">Search versions</string>
+
+    <string name="ConvertFragment_46">No matching version</string>
 </resources>

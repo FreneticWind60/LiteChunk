@@ -6,7 +6,11 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.PowerManager;
 import android.provider.Settings;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Gravity;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -33,6 +37,7 @@ import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.checkbox.MaterialCheckBox;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
 
 
 import java.io.File;
@@ -304,19 +309,72 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
         list.setAdapter(adapter);
 
         // 48dp rows, capped to most of the screen: a Java list runs to eighty entries, and the sheet has to fit on a
-        // phone without pushing its own header off the top. setLayoutParams rather than mutating the existing ones -
-        // a layout inflated as a sheet root has none (the one-time NPE that shipped in pt3).
+        // phone without pushing its own header off the top. Lifted out of the open path because a filter that leaves
+        // three rows must shrink the sheet too, or the rest of the screen is empty sheet.
         int rowHeight = dp(48);
         int cap = (int) (getResources().getDisplayMetrics().heightPixels * 0.58f);
+        fitListHeight(list, adapter.getItemCount(), rowHeight, cap);
+
+        TextView empty = content.findViewById(R.id.tvEmpty);
+        TextInputEditText search = content.findViewById(R.id.etSearch);
+        // Live filtering: the adapter is rebuilt on every keystroke and the empty state takes the list's place when
+        // nothing is left, so there is no search button to press and no second copy of the query to keep in step.
+        search.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence text, int start, int count, int after) {
+                // Nothing to undo: the adapter rebuilds from the labels array, not from the rows on screen.
+            }
+
+            @Override
+            public void onTextChanged(CharSequence text, int start, int before, int count) {
+                // afterTextChanged is the hook that has the final text; this one fires too early to filter on.
+            }
+
+            @Override
+            public void afterTextChanged(Editable text) {
+                adapter.setQuery(text.toString());
+                int rows = adapter.getItemCount();
+                boolean nothing = adapter.countVersions() == 0;
+                empty.setVisibility(nothing ? View.VISIBLE : View.GONE);
+                list.setVisibility(nothing ? View.GONE : View.VISIBLE);
+                if (!nothing) {
+                    fitListHeight(list, rows, rowHeight, cap);
+                    list.scrollToPosition(adapter.positionOfSelected());
+                }
+            }
+        });
+        // Enter is a search action, not a newline: the list already filtered, so all that is left for it to do is
+        // drop the keyboard that is covering the rows.
+        search.setOnEditorActionListener((view, actionId, event) -> {
+            if (actionId != EditorInfo.IME_ACTION_SEARCH && actionId != EditorInfo.IME_ACTION_DONE) {
+                return false;
+            }
+            InputMethodManager keyboard =
+                    (InputMethodManager) requireContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            keyboard.hideSoftInputFromWindow(view.getWindowToken(), 0);
+            view.clearFocus();
+            return true;
+        });
+
         // The params must match the parent (a LinearLayout here), not the view: LinearLayout casts every child to
         // LinearLayout.LayoutParams while measuring, and a RecyclerView.LayoutParams crashes the sheet on open.
-        list.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                Math.min(cap, Math.max(rowHeight * 3, adapter.getItemCount() * rowHeight))));
-
         sheet.setContentView(content);
         sheet.show();
         list.scrollToPosition(adapter.positionOfSelected());
+    }
+
+    /**
+     * Sizes the version list to the rows it currently holds, capped to most of the screen.
+     * <p>
+     * Three rows are the floor even when fewer match, so a two-row result does not leave the row itself jammed
+     * against the sheet's bottom edge while the user is still typing.
+     *
+     * @param rows adapter item count, headings included.
+     */
+    private static void fitListHeight(RecyclerView list, int rows, int rowHeight, int cap) {
+        list.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                Math.min(cap, Math.max(rowHeight * 3, Math.max(1, rows) * rowHeight))));
     }
 
     private String currentFormatId() {
