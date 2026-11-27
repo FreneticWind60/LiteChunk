@@ -1,0 +1,4 @@
+[submodule "chunkbridge"]
+	path = chunkbridge
+	url = https://github.com/FreneticWind60/ChunkBridge.git
+	branch = main
