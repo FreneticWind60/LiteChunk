@@ -301,7 +301,7 @@ public class ConvertFragment extends Fragment implements Store.Listener, Control
 
         BottomSheetDialog sheet = new BottomSheetDialog(requireContext());
         // Picking applies immediately: the row is the choice, not a staging state a dismissed sheet throws away.
-        VersionAdapter adapter = new VersionAdapter(labels, checked, index -> {
+        VersionAdapter adapter = new VersionAdapter(labels, checked, "BEDROCK".equals(edition), index -> {
             formatId = group.formatIds[index];
             sheet.dismiss();
             render();

@@ -39,15 +39,17 @@ final class VersionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
 
     private final String[] labels;
     private final int selected;
+    private final boolean bedrock;
     private final Listener listener;
     /** Either a String (a heading) or an Integer (the index of a version in {@link #labels}). */
     private final List<Object> items = new ArrayList<>();
     /** Already lower-cased and trimmed; empty means "show everything". */
     private String query = "";
 
-    VersionAdapter(String[] labels, int selected, Listener listener) {
+    VersionAdapter(String[] labels, int selected, boolean bedrock, Listener listener) {
         this.labels = labels;
         this.selected = selected;
+        this.bedrock = bedrock;
         this.listener = listener;
         rebuild();
     }
@@ -112,7 +114,7 @@ final class VersionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
             if (!matches(index)) {
                 continue;
             }
-            String key = majorOf(labels[index]);
+            String key = majorOf(labels[index], bedrock);
             if (!key.equals(major)) {
                 major = key;
                 items.add(key);
@@ -149,24 +151,27 @@ final class VersionAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder>
     /**
      * Which heading a version belongs under.
      * <p>
-     * Two eras, two schemes. Up to 1.21 the interesting number is the second one - "1.21.8" and "1.21.4" are far
-     * apart in time, "1.20" and "1.21" even more so, and grouping by the leading 1 would put eighteen years of the
-     * game under one heading. From 22 onwards Mojang dropped the leading 1, so the first number is the generation and
-     * the second is a point release inside it: "26.3.0" belongs with "26.1.2", not on its own.
+     * The rule differs by edition because the version schemes did. Bedrock has always been {@code 1.major.patch}, so
+     * the first two numbers are the heading ({@code 1.26}, {@code 1.21}, {@code 1.20}). Java ran {@code 1.major.patch}
+     * for eighteen years worth of releases - grouping those by the leading 1 would put all of it under one heading -
+     * and then dropped the leading 1 when it moved to {@code 26.major.patch}, where the first number is the generation
+     * again and {@code 26} covers 26.1 through 26.3.
+     * <p>
+     * So: two numbers while the version starts with 1, otherwise just the first one.
      *
      * @param version a label from the format list, e.g. {@code 1.21.8} or {@code 26.3.0}.
+     * @param bedrock whether the list is the Bedrock one, which always groups on two numbers.
      * @return the heading text.
      */
-    static String majorOf(String version) {
-        String[] parts = version.split("\\\\.");
+    static String majorOf(String version, boolean bedrock) {
+        String[] parts = version.split("\\.");
         if (parts.length < 2) {
             return version;
         }
-        try {
-            return Integer.parseInt(parts[0]) >= 22 ? parts[0] : parts[0] + "." + parts[1];
-        } catch (NumberFormatException notAVersion) {
-            return version;
+        if (bedrock || "1".equals(parts[0])) {
+            return parts[0] + "." + parts[1];
         }
+        return parts[0];
     }
 
     @Override
