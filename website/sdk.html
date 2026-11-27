@@ -129,7 +129,7 @@
         <h1>ChunkBridge SDK</h1>
         <p>把 LiteChunk 的转换引擎装进你自己的 Android 应用：约 1.7 MB 的 AAR，不依赖 LiteChunk，不依赖 Minecraft，全程离线。</p>
         <ul class="tags" style="margin-top:16px">
-          <li>v1.0.1</li><li>AAR 约 1.7 MB</li><li>minSdk 27</li><li>MIT</li>
+          <li>v1.0.2</li><li>AAR 约 1.7 MB</li><li>minSdk 27</li><li>MIT</li>
         </ul>
         <div class="toolbar" style="margin-top:18px">
           <a class="btn btn--primary btn--sm" href="https://github.com/FreneticWind60/ChunkBridge"
@@ -203,7 +203,7 @@
 
           <p class="note">
             SDK 从 LiteChunk 应用中拆分而来，引擎版本 <strong>1.21.0</strong>，当前版本为
-            <strong>1.0.1</strong>（1.0.0 之后的补丁版，新增 <code>level.dat</code> 读取与修改）。
+            <strong>1.0.2</strong>（新增盔甲架姿势双向转换，三个版本号可写）。
             它与 LiteChunk 同源、同步升级；详情见仓库的
             <a href="https://github.com/FreneticWind60/ChunkBridge/blob/main/VERSION.zh-CN.md"
               target="_blank" rel="noopener">版本说明</a>。
@@ -212,7 +212,7 @@
 
         <section id="capabilities">
           <h2>能做什么</h2>
-          <p>公开 API 刻意保持窄：做转换与检测，外加 <code>level.dat</code> 的读取与修改（1.0.1 起）；不提供界面，也不接管文件管理与解压。</p>
+          <p>公开 API 刻意保持窄：做转换与检测，外加 <code>level.dat</code> 的读取与修改（1.0.1 起；1.0.2 起三个版本号也可写）；不提供界面，也不接管文件管理与解压。</p>
 
           <div class="table-wrap">
             <table class="log-table">
@@ -281,29 +281,41 @@
 
           <h3>安装</h3>
           <p>
-            SDK 目前通过本地 Maven 仓库或仓库构建产物分发，尚未发布到 Maven Central。先在 SDK 仓库里发布到本地：
+            SDK 从 <a href="https://github.com/FreneticWind60/ChunkBridge/releases/tag/v1.0.2"
+              target="_blank" rel="noopener">GitHub Release</a> 分发，还没有发布到 Maven Central。下载
+            <code>chunkbridge-sdk-1.0.2-maven-repo.zip</code> 解到你自己的目录（比如 <code>libs/</code>），
+            然后在宿主工程里指向它：
+          </p>
+          <div class="codeblock">
+            <div class="codeblock__bar"><span class="dot"></span>settings.gradle.kts<b>Kotlin DSL</b></div>
+            <pre><code>dependencyResolutionManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("libs") }   // 解压出来的本地仓库
+    }
+}</code></pre>
+          </div>
+          <p>
+            也可以在自己的机器上从源码发布到本地 Maven：
           </p>
           <div class="codeblock">
             <div class="codeblock__bar"><span class="dot"></span>终端<b>bash</b></div>
             <pre><code>./gradlew :api:publishToMavenLocal :library:publishReleasePublicationToMavenLocal</code></pre>
           </div>
 
-          <p>然后在宿主工程里加入依赖：</p>
+          <p>然后加入依赖：</p>
           <div class="codeblock">
             <div class="codeblock__bar"><span class="dot"></span>app/build.gradle.kts<b>Kotlin DSL</b></div>
-            <pre><code>repositories {
-    mavenLocal()
-}
-
-dependencies {
-    implementation("com.frenetic.chunkbridge:chunkbridge:1.0.1")
+            <pre><code>dependencies {
+    implementation("com.frenetic.chunkbridge:chunkbridge:1.0.2")
     // api 会通过传递依赖引入；这里只是显式列出
-    // implementation("com.frenetic.chunkbridge:api:1.0.1")
+    // implementation("com.frenetic.chunkbridge:api:1.0.2")
 }</code></pre>
           </div>
 
           <p class="note">
-            如果只拷贝单个 AAR 文件，<strong>必须</strong>同时加入 <code>api-1.0.1.jar</code>：引擎 dex 挂载前，
+            如果只拷贝单个 AAR 文件，<strong>必须</strong>同时加入 <code>api-1.0.2.jar</code>：引擎 dex 挂载前，
             <code>ChunkerEngine</code> 必须已经存在于宿主的类加载器中，否则会得到 <code>ENGINE_UNAVAILABLE</code>。
           </p>
 
