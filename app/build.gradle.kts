@@ -35,7 +35,6 @@ android {
         // them on any device that still has one.
         versionCode = 121_000_551
         versionName = "1.21.0 build5 pr1"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildFeatures {
@@ -100,7 +99,4 @@ dependencies {
     // The engine, its dex loader and the public facade all arrive from the ChunkBridge composite build
     // declared in settings.gradle.kts; `api` comes with it as a transitive dependency.
     implementation("com.frenetic.chunkbridge:chunkbridge:1.0.1")
-
-    androidTestImplementation("androidx.test:runner:1.6.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }

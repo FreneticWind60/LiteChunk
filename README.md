@@ -5,7 +5,7 @@ Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换
 [ChunkBridge SDK](https://github.com/FreneticWind60/ChunkBridge) 提供：引擎 dex 内嵌在 AAR 里，在
 `:chunkbridge` 进程中通过 `DexClassLoader` 加载。
 
-- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build4 pr1`（build4 线的第一个预览，与引擎 Chunker 的版本同步）
+- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build5 pr1`（build5 线的第一个预览，引擎来自 ChunkBridge SDK 1.0.1）
 - 每个版本的新特性与已知局限见 [`VERSION.md`](VERSION.md)
 - 最低系统 Android 8.1（API 27）—— `java.nio.file` 与基岩版 1.26 的共同下限；目标 API 37
 - 只做一件事：选存档 → 选版本 → 转换 → 保存 / 分享 / 导入
@@ -27,15 +27,15 @@ Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换
 需要 JDK 17 或更高、Android SDK Platform 37 与 Build-Tools 37.0.0。
 
 SDK 是 Git submodule，并且以 Gradle **复合构建**（`includeBuild`）的方式接进来——改 SDK 源码不需要先发布
-AAR，重新构建 App 就会用上。首次接入要加 submodule（这一步会产生 `.gitmodules` 与一个 gitlink 提交）：
+AAR，重新构建 App 就会用上。submodule 已经提交进仓库（指向 `FreneticWind60/ChunkBridge` 的 `main`，当前
+锁定 SDK 1.0.1），所以：
 
 ```bash
-git submodule add https://github.com/FreneticWind60/ChunkBridge.git chunkbridge
-git submodule update --init --recursive
+git clone --recursive https://github.com/FreneticWind60/LiteChunk.git   # 第一次拿仓库
+git submodule update --init --recursive                                  # 已有工作区补齐/跟到锁定的提交
 ```
 
-submodule 已经提交进仓库之后，clone 时带上 `--recursive` 即可；已有工作区用
-`git submodule update --init --recursive` 补齐。
+要把 submodule 跟到 SDK 的最新提交，进 `chunkbridge/` 里 pull 之后回到这里 `git add chunkbridge` 再提交。
 
 `settings.gradle.kts` 把 `chunkbridge/` 作为 included build，并把 `com.frenetic.chunkbridge:chunkbridge`
 和 `:api` 替换成 SDK 里的工程；`app/build.gradle.kts` 里写的是普通的 Maven 坐标
@@ -174,13 +174,14 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**。
   文案跟随界面语言：引擎只交双语字面量（`labelZh` + `labelEn`），日语界面会显示中文标题，所以每个字段带一个
   稳定的 `hintCode`（就是 NBT 键名，和进度阶段码一个思路），App 侧 `LevelText` 拿它查 `R.string`，
   查不到的才回落到引擎给的文字；选项与提示同理。第二行仍显示原始键，那是给查过资料的人看的文档，不翻译。
-  Java 侧 `LevelName / GameType / Difficulty / allowCommands / hardcore / RandomSeed / SpawnXYZ / DayTime`；
-  基岩侧 `LevelName / GameType / Difficulty / commandsEnabled / Generator / RandomSeed / SpawnXYZ / Time`。
-  `DataVersion`、`StorageVersion`、`NetworkVersion` 一律只读并在下方说明原因：改这些数字只改声明、
-  不升级区块数据，反而可能让游戏判定存档损坏。
+  Java 侧 `LevelName / GameType / Difficulty / allowCommands / hardcore / RandomSeed / SpawnXYZ / DayTime / DataVersion`；
+  基岩侧 `LevelName / GameType / Difficulty / commandsEnabled / Generator / RandomSeed / SpawnXYZ / Time /
+  StorageVersion / NetworkVersion`。三个版本号（`DataVersion`、`StorageVersion`、`NetworkVersion`）默认能改，
+  但保存前会单独弹一次警告：它们只改声明、不升级区块数据，改成不匹配的值可能让游戏判定存档损坏，
+  而且写的是原始数字（`StorageVersion` 落在文件头，不在 NBT 里），保存后无法撤销。
 - **类型安全**：枚举字段只能从固定选项里选，不许手输；难度在 Java 里是 `byte`、基岩里是 `int`，写入时按版本选宽度。
   读取走原始 tag 再走 `Number`——同一个键在不同版本里宽度不同，直接 `getInt()` 遇到 `ByteTag` 会抛
-  `ClassCastException`（这个 bug 是 `:engine:levelTest` 抓到的）。
+  `ClassCastException`（这个 bug 是 SDK 的 `:engine:levelTest` 抓到的）。
 - **写入安全**：写 `.tmp` → **读回校验每个被改字段** → rename 才替换原文件；存档本身是 zip，
   重写走同目录 `.tmp` 再 rename，中途失败原包不动。所以不会写出半坏的包。
 - **安全兜底**：由用户显式选择——顶栏保存图标 + 汉堡菜单（保存 / 另存为 / 恢复默认值）：
@@ -391,7 +392,7 @@ Release 正文直接在 GitHub 的 Release 表单里写，**不放进仓库**。
       粒子」比「什么都不发生」更难排查。表在 `commands/ParticleIds`，约 110 对。
     - **1.20.5 前后两种选项写法都认**：新的 `dust{color:[1,0,0],scale:1}` 和旧的 `dust 1 0 0 1`，前者选项粘在
       名字上，后者是独立参数，跳过数量不同。
-    - 验证：`gradlew :engine:particleSmoke` 覆盖双向 12 个用例；再用一个真的命令方块世界走完整链路
+    - 验证：在 SDK 仓库（`chunkbridge/`）里 `gradlew :engine:particleSmoke` 覆盖双向 12 个用例；再用一个真的命令方块世界走完整链路
       （`gradlew :engine:blockEntityDump` 查基岩库里的 `Command` 字段），
       `particle minecraft:flame ~ ~1 ~ 0.1 0.1 0.1 0.05 20` → `particle minecraft:basic_flame_particle ~ ~1 ~`。
 

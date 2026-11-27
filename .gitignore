@@ -20,5 +20,4 @@ keystore/
 *.aab
 app/src/main/assets/chunker.jar
 
-# Test worlds are private saves, see app/src/androidTest/assets/README.md.
-app/src/androidTest/assets/*.zip
+# Instrumentation tests live in the SDK repo; this app has none, so no fixture paths to ignore here.

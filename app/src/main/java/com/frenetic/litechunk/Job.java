@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Wire protocol between the UI process and the isolated {@code :chunker} process.
+ * Wire protocol between the UI process and the SDK's isolated {@code :chunkbridge} process.
  * <p>
  * The engine lives in its own process so a conversion that exhausts the heap cannot take the UI down with it, and so
  * a cancelled job can be terminated by killing only that process.
@@ -46,7 +46,7 @@ final class Job {
     static final String EXTRA_KEEP_FLUSH = "keepFlush";
     /**
      * Naming settings, shipped with the batch rather than read from SharedPreferences: the service runs in the
-     * {@code :chunker} process, where a preference the UI wrote seconds ago is not guaranteed to be visible yet.
+     * {@code :chunkbridge} process, where a preference the UI wrote seconds ago is not guaranteed to be visible yet.
      */
     static final String EXTRA_NAMING_ORDER = "namingOrder";
     static final String EXTRA_NAMING_ENABLED = "namingEnabled";
@@ -123,7 +123,7 @@ final class Job {
      * Flatten a {@link LevelInfo} into a bundle.
      * <p>
      * Parallel arrays rather than parcelable objects: {@code api} is a plain Java library with no Android
-     * dependency, and the details screen runs in the UI process while the engine lives in {@code :chunker}, so the
+     * dependency, and the details screen runs in the UI process while the engine lives in {@code :chunkbridge}, so the
      * description has to cross a process boundary as primitives.
      */
     static Bundle packLevel(LevelInfo info) {
