@@ -5,7 +5,7 @@ Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换
 [ChunkBridge SDK](https://github.com/FreneticWind60/ChunkBridge) 提供：引擎 dex 内嵌在 AAR 里，在
 `:chunkbridge` 进程中通过 `DexClassLoader` 加载。
 
-- 包名 `com.frenetic.litechunk`，版本 `1.21.0 build5 pr2`（build5 线的第二个预览，引擎来自 ChunkBridge SDK 1.0.2）
+- 包名 `com.frenetic.litechunk`，版本 `1.22.0 build5 pr3`（build5 线的第三个预览，引擎来自 ChunkBridge SDK 1.0.3）
 - 每个版本的新特性与已知局限见 [`VERSION.md`](VERSION.md)
 - 最低系统 Android 8.1（API 27）—— `java.nio.file` 与基岩版 1.26 的共同下限；目标 API 37
 - 只做一件事：选存档 → 选版本 → 转换 → 保存 / 分享 / 导入
@@ -28,7 +28,7 @@ Android 上的 Minecraft 存档互转工具（Java 版 ⇄ 基岩版）。转换
 
 SDK 是 Git submodule，并且以 Gradle **复合构建**（`includeBuild`）的方式接进来——改 SDK 源码不需要先发布
 AAR，重新构建 App 就会用上。submodule 已经提交进仓库（指向 `FreneticWind60/ChunkBridge` 的 `main`，当前
-锁定 SDK 1.0.2），所以：
+锁定 SDK 1.0.3），所以：
 
 ```bash
 git clone --recursive https://github.com/FreneticWind60/LiteChunk.git   # 第一次拿仓库
@@ -39,7 +39,7 @@ git submodule update --init --recursive                                  # 已�
 
 `settings.gradle.kts` 把 `chunkbridge/` 作为 included build，并把 `com.frenetic.chunkbridge:chunkbridge`
 和 `:api` 替换成 SDK 里的工程；`app/build.gradle.kts` 里写的是普通的 Maven 坐标
-`com.frenetic.chunkbridge:chunkbridge:1.0.2`，版本号在复合构建下被忽略。
+`com.frenetic.chunkbridge:chunkbridge:1.0.3`，版本号在复合构建下被忽略。
 
 本地同时开发两个仓库时，可以让 App 指向任意 SDK 检出，不必把 submodule 放在仓库里：
 
