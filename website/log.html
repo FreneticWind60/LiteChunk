@@ -128,18 +128,19 @@
     <div class="wrap" style="padding-block:28px 64px">
       <div class="callout" style="margin-bottom:28px">
         <p class="eyebrow" style="margin-bottom:6px">chunkbridge sdk</p>
-        <h3>ChunkBridge SDK 1.0.2 已发布</h3>
+        <h3>ChunkBridge SDK 1.0.3 已发布</h3>
         <p>
           LiteChunk 的转换引擎现在是一个独立的 Android 库：约 1.7 MB 的 AAR，不依赖 LiteChunk，也不依赖 Minecraft。
           接入后即可在自己的应用里完成 Java 版与基岩版互转，支持进度回调与取消，错误以类型化错误码返回。
-          1.0.1 补充了 <code>level.dat</code> 的读取与修改 API；1.0.2 让三个版本号可写，并补上盔甲架姿势的双向转换
-          （基岩版 13 个预烘焙姿势 ←→ Java 六部位旋转，转回 Java 时保留手臂）。
+          1.0.3 把引擎升到 Chunker 1.22.0：目标版本补到 Java 26.4 与基岩 1.26.70，基岩 1.26.50+ 的存档写出区块元数据
+          （<code>LevelChunkMetaDataDictionary</code> + 每列 <code>MetaDataHash</code>），Java 26.4 的逐方块生物群系双向转换，
+          并补上 1.12 之前头颅材质、冻尸与冰球两个新实体。
         </p>
-        <ul class="tags" style="margin-top:12px"><li>AAR 约 1.7 MB</li><li>minSdk 27</li><li>MIT</li><li>level.dat</li><li>盔甲架姿势</li></ul>
+        <ul class="tags" style="margin-top:12px"><li>AAR 约 1.7 MB</li><li>minSdk 27</li><li>MIT</li><li>Java 26.4</li><li>基岩 1.26.70</li></ul>
         <div class="toolbar" style="margin-top:14px">
           <a class="btn btn--primary btn--sm" href="sdk.html">了解 ChunkBridge SDK</a>
-          <a class="btn btn--ghost btn--sm" href="https://github.com/FreneticWind60/ChunkBridge/releases/tag/v1.0.2"
-            target="_blank" rel="noopener">下载 1.0.2</a>
+          <a class="btn btn--ghost btn--sm" href="https://github.com/FreneticWind60/ChunkBridge/releases/tag/v1.0.3"
+            target="_blank" rel="noopener">下载 1.0.3</a>
           <a class="btn btn--ghost btn--sm" href="https://github.com/FreneticWind60/ChunkBridge"
             target="_blank" rel="noopener">GitHub 仓库</a>
         </div>

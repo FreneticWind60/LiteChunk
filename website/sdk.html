@@ -129,7 +129,7 @@
         <h1>ChunkBridge SDK</h1>
         <p>把 LiteChunk 的转换引擎装进你自己的 Android 应用：约 1.7 MB 的 AAR，不依赖 LiteChunk，不依赖 Minecraft，全程离线。</p>
         <ul class="tags" style="margin-top:16px">
-          <li>v1.0.2</li><li>AAR 约 1.7 MB</li><li>minSdk 27</li><li>MIT</li>
+          <li>v1.0.3</li><li>AAR 约 1.7 MB</li><li>minSdk 27</li><li>MIT</li>
         </ul>
         <div class="toolbar" style="margin-top:18px">
           <a class="btn btn--primary btn--sm" href="https://github.com/FreneticWind60/ChunkBridge"
@@ -202,8 +202,9 @@
           </div>
 
           <p class="note">
-            SDK 从 LiteChunk 应用中拆分而来，引擎版本 <strong>1.21.0</strong>，当前版本为
-            <strong>1.0.2</strong>（新增盔甲架姿势双向转换，三个版本号可写）。
+            SDK 从 LiteChunk 应用中拆分而来，引擎版本 <strong>1.22.0</strong>，当前版本为
+            <strong>1.0.3</strong>（引擎升级到 Chunker 1.22.0：Java 26.4 逐方块生物群系、基岩 1.26.70、
+            基岩 1.26.50+ 的区块元数据）。
             它与 LiteChunk 同源、同步升级；详情见仓库的
             <a href="https://github.com/FreneticWind60/ChunkBridge/blob/main/VERSION.zh-CN.md"
               target="_blank" rel="noopener">版本说明</a>。
@@ -259,7 +260,7 @@
           </div>
 
           <p class="note">
-            引擎支持到所捆绑 Chunker 源码已知的最新版本，撰写时为 <strong>Java 26.3.0 / 基岩 1.26.60</strong>。
+            引擎支持到所捆绑 Chunker 源码已知的最新版本，撰写时为 <strong>Java 26.4 / 基岩 1.26.70</strong>。
             权威列表请以 <code>ChunkBridge.formats()</code> 的返回值为准。
           </p>
         </section>
@@ -281,9 +282,9 @@
 
           <h3>安装</h3>
           <p>
-            SDK 从 <a href="https://github.com/FreneticWind60/ChunkBridge/releases/tag/v1.0.2"
+            SDK 从 <a href="https://github.com/FreneticWind60/ChunkBridge/releases/tag/v1.0.3"
               target="_blank" rel="noopener">GitHub Release</a> 分发，还没有发布到 Maven Central。下载
-            <code>chunkbridge-sdk-1.0.2-maven-repo.zip</code> 解到你自己的目录（比如 <code>libs/</code>），
+            <code>chunkbridge-sdk-1.0.3-maven-repo.zip</code> 解到你自己的目录（比如 <code>libs/</code>），
             然后在宿主工程里指向它：
           </p>
           <div class="codeblock">
@@ -308,14 +309,14 @@
           <div class="codeblock">
             <div class="codeblock__bar"><span class="dot"></span>app/build.gradle.kts<b>Kotlin DSL</b></div>
             <pre><code>dependencies {
-    implementation("com.frenetic.chunkbridge:chunkbridge:1.0.2")
+    implementation("com.frenetic.chunkbridge:chunkbridge:1.0.3")
     // api 会通过传递依赖引入；这里只是显式列出
-    // implementation("com.frenetic.chunkbridge:api:1.0.2")
+    // implementation("com.frenetic.chunkbridge:api:1.0.3")
 }</code></pre>
           </div>
 
           <p class="note">
-            如果只拷贝单个 AAR 文件，<strong>必须</strong>同时加入 <code>api-1.0.2.jar</code>：引擎 dex 挂载前，
+            如果只拷贝单个 AAR 文件，<strong>必须</strong>同时加入 <code>api-1.0.3.jar</code>：引擎 dex 挂载前，
             <code>ChunkerEngine</code> 必须已经存在于宿主的类加载器中，否则会得到 <code>ENGINE_UNAVAILABLE</code>。
           </p>
 
@@ -388,7 +389,7 @@ public void onCreate() {
         new ConversionRequest.Builder()
                 .inputUri(inputUri)              // 世界文件夹、.zip 或 .mcworld
                 .outputUri(outputUri)            // SAF 创建，或使用 outputFile(File)
-                .targetFormatId("BEDROCK_1.26.60")
+                .targetFormatId("BEDROCK_1.26.70")
                 .convertEntities(true)           // 默认 true
                 .build(),
         new ConversionCallback() {
